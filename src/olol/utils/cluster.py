@@ -609,56 +609,72 @@ class OllamaCluster:
         Returns:
             Dict with cluster status information
         """
-        # Gather locks in a specific order to avoid deadlocks
+        # Collect data under individual locks instead of nesting locks
+        # This avoids potential deadlocks
+        
+        # Get server health information
         with self.health_lock:
-            with self.server_lock:
-                with self.model_lock:
-                    with self.session_lock:
-                        with self.capabilities_lock:
-                            # Basic server information
-                            server_info = {
-                                server: {
-                                    "load": self.server_loads[server],
-                                    "healthy": self.server_health.get(server, False),
-                                } for server in self.server_addresses
-                            }
-                            
-                            # Add capability information where available
-                            for server, info in server_info.items():
-                                if server in self.server_capabilities:
-                                    # Include selected capability highlights
-                                    caps = self.server_capabilities[server]
-                                    info["device_type"] = caps.get("device_type", "unknown")
-                                    
-                                    # Include device info if available
-                                    if "device_info" in caps:
-                                        info["device_info"] = caps["device_info"]
-                                        
-                                    # Include model count
-                                    if "models" in caps:
-                                        info["model_count"] = len(caps["models"])
-                                        
-                            # Get enhanced model information
-                            model_info = {}
-                            for model_name, servers in self.model_server_map.items():
-                                # Get model details if available
-                                details = self.model_manager.get_model_details(model_name) or {}
-                                
-                                # Create entry with both servers and available details
-                                model_info[model_name] = {
-                                    "servers": servers,
-                                    "details": details
-                                }
-                            
-                            # Build the complete status response
-                            return {
-                                "servers": server_info,
-                                "models": model_info,
-                                "model_count": len(model_info),
-                                "server_count": len(server_info),
-                                "healthy_server_count": sum(1 for s in server_info.values() if s.get("healthy", False)),
-                                "sessions": len(self.session_server_map)
-                            }
+            server_health = {server: health for server, health in self.server_health.items()}
+            
+        # Get server loads
+        with self.server_lock:
+            server_loads = {server: load for server, load in self.server_loads.items()}
+            server_addresses = list(self.server_addresses)
+            
+        # Get model information
+        with self.model_lock:
+            model_map = {model: list(servers) for model, servers in self.model_server_map.items()}
+            
+        # Get session information
+        with self.session_lock:
+            session_count = len(self.session_server_map)
+            
+        # Get capabilities information
+        with self.capabilities_lock:
+            capabilities = {server: caps.copy() for server, caps in self.server_capabilities.items()}
+            
+        # Build server info dict
+        server_info = {}
+        for server in server_addresses:
+            server_info[server] = {
+                "load": server_loads.get(server, 0),
+                "healthy": server_health.get(server, False),
+            }
+            
+            # Add capability information where available
+            if server in capabilities:
+                caps = capabilities[server]
+                server_info[server]["device_type"] = caps.get("device_type", "unknown")
+                
+                # Include device info if available
+                if "device_info" in caps:
+                    server_info[server]["device_info"] = caps["device_info"]
+                    
+                # Include model count
+                if "models" in caps:
+                    server_info["model_count"] = len(caps["models"])
+                    
+        # Get enhanced model information
+        model_info = {}
+        for model_name, servers in model_map.items():
+            # Get model details if available - this uses its own lock internally
+            details = self.model_manager.get_model_details(model_name) or {}
+            
+            # Create entry with both servers and available details
+            model_info[model_name] = {
+                "servers": servers,
+                "details": details
+            }
+        
+        # Build the complete status response
+        return {
+            "servers": server_info,
+            "models": model_info,
+            "model_count": len(model_info),
+            "server_count": len(server_info),
+            "healthy_server_count": sum(1 for s in server_info.values() if s.get("healthy", False)),
+            "sessions": session_count
+        }
             
     def add_server(self, server_address: str, connection_details: Optional[Dict[str, Any]] = None) -> None:
         """Add a new server to the cluster.

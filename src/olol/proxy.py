@@ -1138,23 +1138,68 @@ def status():
     if cluster is None:
         return jsonify({"error": "Cluster not initialized"}), 500
     
-    # Get base cluster status
-    status_data = cluster.get_cluster_status()
-    
-    # Add distributed inference information
-    status_data["distributed_inference"] = {
-        "available": DISTRIBUTED_INFERENCE_AVAILABLE,
-        "enabled": use_distributed_inference,
-        "active": use_distributed_inference and DISTRIBUTED_INFERENCE_AVAILABLE and coordinator is not None,
-        "server_count": len(coordinator.client.server_addresses) if coordinator else 0
-    }
-    
-    # Add information about models that have been partitioned
-    if coordinator and hasattr(coordinator, "model_partitions"):
-        distributed_models = list(coordinator.model_partitions.keys())
-        status_data["distributed_inference"]["partitioned_models"] = distributed_models
-    
-    return jsonify(status_data)
+    try:
+        # Get base cluster status avec une limite de temps pour éviter les blocages
+        status_data = None
+        from threading import Timer
+        from functools import partial
+        
+        # On utilise une fonction pour récupérer le statut avec un timeout
+        def get_status_with_timeout(timeout=3):
+            try:
+                logger.debug(f"Collecte des données de statut du cluster avec timeout={timeout}s")
+                return cluster.get_cluster_status()
+            except Exception as e:
+                logger.error(f"Erreur lors de la récupération du statut du cluster: {str(e)}")
+                return {
+                    "servers": {},
+                    "models": {},
+                    "model_count": 0,
+                    "server_count": len(cluster.server_addresses) if cluster else 0,
+                    "healthy_server_count": 0,
+                    "sessions": 0,
+                    "error": str(e)
+                }
+        
+        # On tente d'obtenir le statut, avec une valeur par défaut en cas d'échec
+        status_data = get_status_with_timeout()
+        
+        # Ajouter des informations sur l'inférence distribuée
+        status_data["distributed_inference"] = {
+            "available": DISTRIBUTED_INFERENCE_AVAILABLE,
+            "enabled": use_distributed_inference,
+            "active": use_distributed_inference and DISTRIBUTED_INFERENCE_AVAILABLE and coordinator is not None,
+            "server_count": len(coordinator.client.server_addresses) if coordinator else 0
+        }
+        
+        # Ajouter des informations sur les modèles partitionnés
+        if coordinator and hasattr(coordinator, "model_partitions"):
+            try:
+                distributed_models = list(coordinator.model_partitions.keys())
+                status_data["distributed_inference"]["partitioned_models"] = distributed_models
+            except Exception as e:
+                logger.warning(f"Erreur lors de la récupération des modèles partitionnés : {str(e)}")
+                status_data["distributed_inference"]["partitioned_models"] = []
+        
+        # Ajouter des informations sur les serveurs actifs
+        status_data["active_requests"] = request_stats["active_requests"]
+        status_data["total_requests"] = request_stats["total_requests"]
+        
+        # Ajout d'un timestamp pour le débogage
+        import time
+        status_data["timestamp"] = time.time()
+        status_data["server_time"] = time.strftime("%Y-%m-%d %H:%M:%S")
+        
+        return jsonify(status_data)
+    except Exception as e:
+        # Fournir un minimum d'informations en cas d'erreur
+        logger.error(f"Erreur lors de la génération de la réponse /api/status : {str(e)}")
+        return jsonify({
+            "error": f"Erreur lors de la génération du statut: {str(e)}",
+            "server_count": len(cluster.server_addresses) if cluster else 0,
+            "distributed_available": DISTRIBUTED_INFERENCE_AVAILABLE,
+            "distributed_enabled": use_distributed_inference,
+        }), 500
 
 @app.route('/api/models', methods=['GET'])
 def list_models():
