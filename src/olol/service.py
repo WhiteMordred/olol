@@ -237,6 +237,7 @@ class OllamaService(ollama_pb2_grpc.OllamaServiceServicer):
     def List(self, request, context):
         """List available models"""
         try:
+            # Exécuter "ollama list" sans l'option --format, qui cause l'erreur
             result = subprocess.run(
                 ["ollama", "list"],
                 capture_output=True, text=True, timeout=30
@@ -249,49 +250,41 @@ class OllamaService(ollama_pb2_grpc.OllamaServiceServicer):
                 context.set_details(error_msg)
                 return ollama_pb2.ListResponse(models=[])
             
-            # Essayer de parser le résultat comme JSON
-            try:
-                models_data = json.loads(result.stdout)
-                model_objects = []
-                
-                # Traiter la sortie au format JSON
-                for model_data in models_data.get("models", []):
-                    model_obj = ollama_pb2.Model(
-                        name=model_data.get("name", ""),
-                        model_file=model_data.get("model_file", ""),
-                        parameter_size=str(model_data.get("parameter_size", "")),
-                        quantization_level=model_data.get("quantization_level", 0),
-                        template=model_data.get("template", "")
-                    )
-                    model_objects.append(model_obj)
-                    
-                return ollama_pb2.ListResponse(models=model_objects)
-            except json.JSONDecodeError:
-                # Format texte, le convertir
-                lines = result.stdout.strip().split('\n')
-                model_objects = []
-                
-                # Ignorer la première ligne (en-tête) si elle existe
-                if lines and len(lines) > 1:
-                    for line in lines[1:]:  # Sauter l'en-tête
-                        if not line.strip():
-                            continue
-                        parts = line.split()
-                        if len(parts) >= 2:
-                            model_name = parts[0]
-                            tag = parts[1] if len(parts) > 1 else ""
-                            
-                            # Créer un objet Model avec les informations disponibles
-                            model_obj = ollama_pb2.Model(
-                                name=model_name,
-                                model_file="",  # Cette info n'est pas dans la sortie texte
-                                parameter_size=parts[3] if len(parts) > 3 else "",
-                                quantization_level=0,  # Cette info n'est pas dans la sortie texte
-                                template=""  # Cette info n'est pas dans la sortie texte
-                            )
-                            model_objects.append(model_obj)
-                
-                return ollama_pb2.ListResponse(models=model_objects)
+            # Parser la sortie sous forme de texte (format tabulaire)
+            lines = result.stdout.strip().split('\n')
+            model_objects = []
+            
+            # Ignorer la première ligne (en-tête) si elle existe
+            if lines and len(lines) > 1:
+                for i, line in enumerate(lines):
+                    # Sauter l'en-tête (première ligne)
+                    if i == 0 and "NAME" in line.upper():
+                        continue
+                        
+                    if not line.strip():
+                        continue
+                        
+                    # Format typique: NAME ID SIZE MODIFIED
+                    parts = line.split()
+                    if len(parts) >= 1:
+                        # Le nom du modèle est la première colonne
+                        model_name = parts[0]
+                        
+                        # Récupérer les autres informations si disponibles
+                        model_id = parts[1] if len(parts) > 1 else ""
+                        model_size = parts[2] if len(parts) > 2 else ""
+                        
+                        # Créer un objet Model
+                        model_obj = ollama_pb2.Model(
+                            name=model_name,
+                            model_file=model_id,  # Utiliser ID comme model_file
+                            parameter_size=model_size,
+                            quantization_level=0,  # Information non disponible dans la sortie
+                            template=""  # Information non disponible dans la sortie
+                        )
+                        model_objects.append(model_obj)
+            
+            return ollama_pb2.ListResponse(models=model_objects)
                 
         except Exception as e:
             error_msg = f"Error listing models: {str(e)}"
