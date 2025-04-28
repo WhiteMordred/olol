@@ -25,6 +25,8 @@ logger = logging.getLogger(__name__)
 
 # Global variables for Flask app
 app = Flask(__name__)
+app.config['DEBUG'] = True  # Activer le mode debug
+app.config['PROPAGATE_EXCEPTIONS'] = True  # Propager les exceptions pour faciliter le débogage
 cluster: Optional[OllamaCluster] = None
 coordinator: Optional[InferenceCoordinator] = None
 health_check_interval = 30  # seconds
