@@ -124,16 +124,13 @@ class OllamaService(ollama_pb2_grpc.OllamaServiceServicer):
                     "content": msg.content
                 })
                 
-            # Build the command
+            # Build the command - supprimer le flag --format
             cmd = ["ollama", "chat", request.model]
             
             # Add options if provided
             if request.options:
                 options_str = json.dumps(dict(request.options))
                 cmd.extend(["--options", options_str])
-                
-            # Format as JSON and stream
-            cmd.extend(["--format", "json"])
                 
             # Prepare messages input
             messages_json = json.dumps({"messages": messages})
@@ -156,22 +153,43 @@ class OllamaService(ollama_pb2_grpc.OllamaServiceServicer):
             for line in iter(process.stdout.readline, ''):
                 if context.is_active():
                     try:
-                        response_data = json.loads(line)
-                        message = ollama_pb2.Message(
-                            role="assistant",
-                            content=response_data.get("message", {}).get("content", "")
-                        )
-                        yield ollama_pb2.ChatResponse(
-                            message=message,
-                            model=request.model,
-                            done=response_data.get("done", False)
-                        )
-                    except json.JSONDecodeError:
-                        # Skip invalid JSON lines
+                        # Essayer de parser comme JSON, mais gérer aussi le texte brut
+                        try:
+                            response_data = json.loads(line)
+                            message = ollama_pb2.Message(
+                                role="assistant",
+                                content=response_data.get("message", {}).get("content", "")
+                            )
+                            yield ollama_pb2.ChatResponse(
+                                message=message,
+                                model=request.model,
+                                done=response_data.get("done", False)
+                            )
+                        except json.JSONDecodeError:
+                            # Traiter comme texte brut
+                            message = ollama_pb2.Message(
+                                role="assistant",
+                                content=line.strip()
+                            )
+                            yield ollama_pb2.ChatResponse(
+                                message=message,
+                                model=request.model,
+                                done=False
+                            )
+                    except Exception:
+                        # Skip problematic lines
                         continue
                 else:
                     process.terminate()
                     break
+                    
+            # Send done message at the end if needed
+            if context.is_active():
+                yield ollama_pb2.ChatResponse(
+                    message=ollama_pb2.Message(role="assistant", content=""),
+                    model=request.model,
+                    done=True
+                )
                     
             # Check for errors
             return_code = process.wait()
@@ -487,14 +505,7 @@ class OllamaService(ollama_pb2_grpc.OllamaServiceServicer):
             if request.options:
                 options_str = json.dumps(dict(request.options))
                 cmd.extend(["--options", options_str])
-                
-            # Add format if provided
-            if request.format:
-                cmd.extend(["--format", request.format])
-                
-            # Use JSON format for parsing
-            cmd.extend(["--format", "json"])
-                
+            
             process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
@@ -507,20 +518,37 @@ class OllamaService(ollama_pb2_grpc.OllamaServiceServicer):
             for line in iter(process.stdout.readline, ''):
                 if context.is_active():
                     try:
-                        response_data = json.loads(line)
-                        yield ollama_pb2.GenerateResponse(
-                            model=request.model,
-                            response=response_data.get("response", ""),
-                            done=response_data.get("done", False),
-                            total_duration=response_data.get("total_duration", 0)
-                        )
-                    except json.JSONDecodeError:
-                        # Skip invalid JSON lines
+                        # Essayer de parser comme JSON
+                        try:
+                            response_data = json.loads(line)
+                            yield ollama_pb2.GenerateResponse(
+                                model=request.model,
+                                response=response_data.get("response", ""),
+                                done=response_data.get("done", False),
+                                total_duration=response_data.get("total_duration", 0)
+                            )
+                        except json.JSONDecodeError:
+                            # Traiter comme texte brut en cas d'échec
+                            yield ollama_pb2.GenerateResponse(
+                                model=request.model,
+                                response=line.strip(),
+                                done=False
+                            )
+                    except Exception:
+                        # Skip problematic lines
                         continue
                 else:
                     process.terminate()
                     break
-                    
+            
+            # Envoyer un message final "done" si nécessaire
+            if context.is_active():
+                yield ollama_pb2.GenerateResponse(
+                    model=request.model,
+                    response="",
+                    done=True
+                )
+                
             # Check for errors
             return_code = process.wait()
             if return_code != 0:

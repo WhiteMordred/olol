@@ -305,7 +305,8 @@ class OllamaService(ollama_pb2_grpc.OllamaServiceServicer):
 
     async def Show(self, request, context):
         """Show model details"""
-        cmd = ["ollama", "show", request.model, "--format", "json"]
+        # Suppression du flag --format qui n'est plus supporté
+        cmd = ["ollama", "show", request.model]
         try:
             process = await asyncio.create_subprocess_exec(
                 *cmd,
@@ -316,10 +317,46 @@ class OllamaService(ollama_pb2_grpc.OllamaServiceServicer):
             
             if process.returncode != 0:
                 raise Exception(stderr.decode())
-                
-            model_info = json.loads(stdout)
-            return ollama_pb2.ShowResponse(**model_info)
             
+            # Tenter de décoder la sortie comme JSON
+            try:
+                model_info = json.loads(stdout)
+                return ollama_pb2.ShowResponse(**model_info)
+            except json.JSONDecodeError:
+                # Si la sortie n'est pas un JSON, la convertir en format structuré
+                output = stdout.decode().strip()
+                model_info = {}
+                
+                # Parsing simple du format texte
+                current_section = "general"
+                model_info[current_section] = {}
+                
+                for line in output.split('\n'):
+                    line = line.strip()
+                    if not line:
+                        continue
+                    
+                    # Vérifier s'il s'agit d'un en-tête de section
+                    if line.endswith(':') and not ': ' in line:
+                        current_section = line[:-1].lower().replace(' ', '_')
+                        model_info[current_section] = {}
+                        continue
+                        
+                    if ':' in line:
+                        key, value = line.split(':', 1)
+                        model_info[current_section][key.strip().lower().replace(' ', '_')] = value.strip()
+                
+                # Créer une structure aplatie pour ShowResponse
+                flat_info = {}
+                for section, items in model_info.items():
+                    if isinstance(items, dict):
+                        for k, v in items.items():
+                            flat_info[k] = v
+                    else:
+                        flat_info[section] = items
+                        
+                return ollama_pb2.ShowResponse(**flat_info)
+                
         except Exception as e:
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
@@ -407,6 +444,51 @@ class OllamaService(ollama_pb2_grpc.OllamaServiceServicer):
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
             return ollama_pb2.GetModelsResponse()
+
+    def LegacyChat(self, request, context):
+        try:
+            # Validate request
+            model_name = request.model if hasattr(request, "model") else ""
+            session_id = request.session_id if hasattr(request, "session_id") else ""
+            
+            logger.info(f"Legacy chat request for model {model_name}, session {session_id}")
+            
+            # Format chat history for ollama if needed
+            history_arg = json.dumps(request.messages) if hasattr(request, "messages") else "{}"
+            
+            # Supprimer le flag --format json qui n'est plus supporté
+            result = subprocess.run(
+                ["ollama", "run", model_name, "--options", 
+                 f'{{"messages": {history_arg}}}'],
+                capture_output=True, text=True, timeout=300
+            )
+            
+            if result.returncode != 0:
+                error_msg = f"Ollama chat failed: {result.stderr}"
+                logger.error(error_msg)
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(error_msg)
+                return ollama_pb2.ModelResponse()
+            
+            # Parse the response
+            response_text = result.stdout.strip()
+            
+            # Try to parse as JSON if it looks like JSON
+            if response_text.startswith("{") and response_text.endswith("}"):
+                try:
+                    data = json.loads(response_text)
+                    response_text = data.get("response", response_text)
+                except json.JSONDecodeError:
+                    # Not valid JSON, use as is
+                    pass
+                    
+            return ollama_pb2.ModelResponse(output=response_text)
+        except Exception as e:
+            error_msg = f"Error in legacy chat: {str(e)}"
+            logger.error(error_msg)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(error_msg)
+            return ollama_pb2.ModelResponse()
 
     # Add cleanup method
     async def cleanup(self):
