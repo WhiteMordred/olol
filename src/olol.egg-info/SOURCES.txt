@@ -1,0 +1,15 @@
+README.md
+pyproject.toml
+src/ollama_async_client.py
+src/ollama_async_pb2.py
+src/ollama_async_pb2_grpc.py
+src/ollama_async_server.py
+src/ollama_pb2.py
+src/ollama_pb2_grpc.py
+src/olol.egg-info/PKG-INFO
+src/olol.egg-info/SOURCES.txt
+src/olol.egg-info/dependency_links.txt
+src/olol.egg-info/entry_points.txt
+src/olol.egg-info/requires.txt
+src/olol.egg-info/top_level.txt
+tests/test_ollama_service.py

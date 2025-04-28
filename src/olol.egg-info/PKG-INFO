@@ -1,0 +1,341 @@
+Metadata-Version: 2.2
+Name: olol
+Version: 0.1.0
+Summary: ololo is a gRPC interface for Arduino with sync/async support
+Author-email: Shane Macaulay <ktwo@ktwo.ca>
+Maintainer-email: K2 <ktwo@ktwo.ca>
+License: MIT
+Keywords: ollama,llm,grpc,protobuf,async,asyncio
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: Framework :: AsyncIO
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.12
+Description-Content-Type: text/markdown
+Requires-Dist: grpclib>=0.4.7
+Requires-Dist: asyncio>=3.4.3
+Requires-Dist: grpcio-tools[all]>=1.70.0
+
+# Ollama<=>Ollama Inference Cluster
+
+A distributed inference system that allows you to build a powerful multi-host cluster for Ollama AI models with transparent scaling and fault tolerance.
+
+Other options are available however did not work well for my needs, were overly complex or incompatiable. Olol is just a little bit of proxt glue and template grpc.
+
+## Overview
+
+This system provides a unified API endpoint that transparently distributes inference requests across multiple Ollama instances running on different hosts. It maintains compatibility with the Ollama API while adding clustering capabilities.
+
+### Key Features
+
+- **Transparent API Compatibility**: Drop-in replacement for the Ollama API
+- **Automatic Load Balancing**: Distributes requests across available servers
+- **Model Awareness**: Routes requests to servers that have the requested model
+- **Session Affinity**: Maintains chat history consistently across requests
+- **Redundancy**: Can pull models to multiple servers for high availability
+- **Monitoring**: Built-in status endpoint to monitor the cluster
+
+## Architecture
+
+The system consists of three main components:
+
+1. **gRPC Server**: Runs on each inference host with local Ollama installed
+2. **API Proxy Client**: Provides a unified Ollama API endpoint for applications
+3. **Protocol Buffer Definition**: Defines the communication contract
+
+### System Architecture
+
+```mermaid
+flowchart TD
+    Client[Client Application] -->|HTTP API Requests| Proxy[API Proxy]
+    
+    subgraph Load Balancer
+        Proxy -->|Model Registry| Registry[Model Registry]
+        Proxy -->|Session Tracking| Sessions[Session Manager]
+        Proxy -->|Server Monitoring| Monitor[Server Monitor]
+    end
+    
+    Registry -.->|Updates| Proxy
+    Sessions -.->|State| Proxy
+    Monitor -.->|Status Updates| Proxy
+    
+    Proxy -->|gRPC| Server1[Inference Server 1]
+    Proxy -->|gRPC| Server2[Inference Server 2]
+    Proxy -->|gRPC| Server3[Inference Server 3]
+    
+    subgraph "Inference Server 1"
+        Server1 -->|CLI Commands| Ollama1[Ollama]
+        Ollama1 -->|Local Models| ModelDir1[Model Storage]
+    end
+    
+    subgraph "Inference Server 2"
+        Server2 -->|CLI Commands| Ollama2[Ollama]
+        Ollama2 -->|Local Models| ModelDir2[Model Storage]
+    end
+    
+    subgraph "Inference Server 3" 
+        Server3 -->|CLI Commands| Ollama3[Ollama]
+        Ollama3 -->|Local Models| ModelDir3[Model Storage]
+    end
+    
+    class Client,Proxy,Registry,Sessions,Monitor,Server1,Server2,Server3 componentNode;
+    class Ollama1,Ollama2,Ollama3,ModelDir1,ModelDir2,ModelDir3 resourceNode;
+    
+    classDef componentNode fill:#b3e0ff,stroke:#9cc,stroke-width:2px;
+    classDef resourceNode fill:#ffe6cc,stroke:#d79b00,stroke-width:1px;
+```
+
+### Entity Relationship Model
+
+```mermaid
+erDiagram
+    APIProxy ||--o{ InferenceServer : "routes-requests-to"
+    APIProxy ||--o{ Session : "manages"
+    APIProxy ||--o{ ModelRegistry : "maintains"
+    APIProxy ||--o{ LoadBalancer : "uses"
+    InferenceServer ||--o{ Model : "hosts"
+    InferenceServer ||--o{ Session : "maintains-state-for"
+    InferenceServer ||--o{ Metrics : "generates"
+    Session }o--|| Model : "uses"
+    Model }|--|| ModelRegistry : "registered-in"
+    Client }|--o{ APIProxy : "connects-to"
+    Session }o--o{ ChatHistory : "contains"
+    LoadBalancer }o--|| HealthCheck : "performs"
+    
+    APIProxy {
+        string host
+        int port
+        array servers
+        object session_map
+        object model_map
+        int max_workers
+        bool async_mode
+    }
+    
+    InferenceServer {
+        string host
+        int port
+        int current_load
+        bool online
+        array loaded_models
+        array active_sessions
+        float cpu_usage
+        float memory_usage
+        int gpu_memory
+        timestamp last_heartbeat
+    }
+    
+    Model {
+        string name
+        string tag
+        string family
+        int size_mb
+        string digest
+        array compatible_servers
+        json parameters
+        float quantization
+        string architecture
+    }
+    
+    Session {
+        string session_id
+        string model_name
+        array messages
+        timestamp created_at
+        timestamp last_active
+        string server_host
+        json model_parameters
+        float timeout
+        string status
+    }
+    
+    ChatHistory {
+        string role
+        string content
+        timestamp timestamp
+        float temperature
+        int tokens_used
+        float completion_time
+        json metadata
+    }
+    
+    Client {
+        string application_type
+        string api_version
+        string client_id
+        json preferences
+        timestamp connected_at
+    }
+    
+    ModelRegistry {
+        map model_to_servers
+        int total_models
+        timestamp last_updated
+        json model_stats
+        array pending_pulls
+        json version_info
+    }
+
+    LoadBalancer {
+        string algorithm
+        int max_retries
+        float timeout
+        json server_weights
+        bool sticky_sessions
+        json routing_rules
+    }
+
+    Metrics {
+        string server_id
+        float response_time
+        int requests_per_second
+        float error_rate
+        json resource_usage
+        timestamp collected_at
+    }
+
+    HealthCheck {
+        string check_id
+        string status
+        int interval_seconds
+        timestamp last_check
+        json error_details
+        int consecutive_failures
+    }
+```
+
+### Request Flow Sequence
+
+```mermaid
+sequenceDiagram
+    participant Client as Client Application
+    participant Proxy as API Proxy
+    participant Registry as Model Registry
+    participant SessionMgr as Session Manager
+    participant Server1 as Inference Server 1
+    participant Server2 as Inference Server 2
+    participant Ollama as Ollama CLI
+    
+    Client->>+Proxy: POST /api/chat (model: llama2)
+    Proxy->>+Registry: Find servers with llama2
+    Registry-->>-Proxy: Server1 and Server2 available
+    
+    Proxy->>+SessionMgr: Create/Get Session
+    alt New Session
+        SessionMgr-->>-Proxy: New Session ID
+        Note over Proxy,Server1: Select Server1 (lowest load)
+        Proxy->>+Server1: CreateSession(session_id, "llama2")
+        Server1->>Ollama: ollama run llama2
+        Server1-->>-Proxy: Session Created
+    else Existing Session
+        SessionMgr-->>-Proxy: Existing Session on Server2
+        Note over Proxy,Server2: Maintain Session Affinity
+    end
+    
+    Proxy->>+Server1: ChatMessage(session_id, message)
+    Server1->>Ollama: ollama run with history
+    Ollama-->>Server1: Response
+    Server1-->>-Proxy: Chat Response
+    Proxy-->>-Client: JSON Response
+    
+    Note right of Client: Later: Model Update
+    
+    Client->>+Proxy: POST /api/pull (model: mistral)
+    Proxy->>+Registry: Check model status
+    Registry-->>-Proxy: Not available
+    
+    par Pull to Server1
+        Proxy->>+Server1: PullModel("mistral")
+        Server1->>Ollama: ollama pull mistral
+        Server1-->>Proxy: Stream Progress
+    and Pull to Server2
+        Proxy->>+Server2: PullModel("mistral") 
+        Server2->>Ollama: ollama pull mistral
+        Server2-->>Proxy: Stream Progress
+    end
+    
+    Server1-->>-Proxy: Pull Complete
+    Server2-->>-Proxy: Pull Complete
+    Proxy->>Registry: Update model->server map
+    Proxy-->>-Client: Pull Complete Response
+```
+
+## Installation
+
+### Prerequisites
+
+- Python 3.8+
+- gRPC and Protocol Buffers
+- Multiple machines with Ollama installed
+
+### Step 1: Generate Python Code from Protocol Buffer
+
+```bash
+# Generate gRPC code
+python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. ollama.proto
+```
+
+### Step 2: Install the gRPC Server on Inference Hosts
+
+```bash
+# On each inference host
+pip install grpcio grpcio-tools protobuf
+python ollama_server.py
+```
+
+### Step 3: Configure and Start the API Proxy
+
+```bash
+# On the API gateway host
+pip install grpcio grpcio-tools protobuf flask
+export OLLAMA_SERVERS="host1:50051,host2:50051,host3:50051"
+python ollama_proxy.py
+```
+
+## Usage
+
+### Basic Use
+
+Once the proxy is running, connect your client applications to it using the standard Ollama API:
+
+```bash
+# Example: Chat with a model
+curl -X POST http://localhost:11434/api/chat -d '{
+  "model": "llama2",
+  "messages": [{"role": "user", "content": "Hello, how are you?"}]
+}'
+```
+
+### Status Endpoint
+
+Monitor the status of your cluster:
+
+```bash
+curl http://localhost:11434/api/status
+```
+
+### Pull Models to Multiple Servers
+
+```bash
+curl -X POST http://localhost:11434/api/pull -d '{
+  "model": "mistral"
+}'
+```
+
+## Configuration
+
+The proxy client accepts several environment variables:
+
+- `OLLAMA_SERVERS`: Comma-separated list of gRPC server addresses (default: "localhost:50051")
+- `PORT`: HTTP port for the API proxy (default: 11434)
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.

@@ -1,0 +1,3 @@
+grpclib>=0.4.7
+asyncio>=3.4.3
+grpcio-tools[all]>=1.70.0

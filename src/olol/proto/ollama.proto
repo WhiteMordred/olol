@@ -1,0 +1,357 @@
+syntax = "proto3";
+
+// API versioning
+// Current version: v1.2.0
+// Format: vMAJOR.MINOR.PATCH
+// - MAJOR version increases with breaking changes
+// - MINOR version increases with backwards-compatible new features
+// - PATCH version increases with backwards-compatible bug fixes
+
+package ollama;
+
+option go_package = "github.com/ollama/ollama/api;ollama_api";
+option java_package = "org.olol.grpc";
+option java_multiple_files = true;
+option java_outer_classname = "OllamaProto";
+option objc_class_prefix = "OLL";
+
+// Add RPC extension messages for distributed inference
+
+// Service API version
+enum ApiVersion {
+    UNKNOWN = 0;
+    V1_0_0 = 1;
+    V1_1_0 = 2;
+    V1_2_0 = 3;  // Current version
+}
+
+// Version message for compatibility checking
+message VersionInfo {
+    ApiVersion api_version = 1;
+    string version_string = 2;
+    int32 protocol_version = 3;
+}
+
+service OllamaService {
+    // Version and health checking
+    rpc GetVersion (VersionRequest) returns (VersionInfo);
+    rpc HealthCheck (HealthCheckRequest) returns (HealthCheckResponse);
+    
+    // Core Generation APIs
+    rpc Generate (GenerateRequest) returns (stream GenerateResponse);
+    rpc Chat (ChatRequest) returns (stream ChatResponse);
+    rpc Embeddings (EmbeddingsRequest) returns (EmbeddingsResponse);
+
+    // Model Management
+    rpc Pull (PullRequest) returns (stream PullResponse);
+    rpc Push (PushRequest) returns (stream PushResponse);
+    rpc Create (CreateRequest) returns (CreateResponse);
+    rpc List (ListRequest) returns (ListResponse);
+    rpc Copy (CopyRequest) returns (CopyResponse);
+    rpc Delete (DeleteRequest) returns (DeleteResponse);
+    rpc Show (ShowRequest) returns (ShowResponse);
+
+    // Session Management
+    rpc CreateSession (SessionRequest) returns (SessionResponse);
+    rpc DeleteSession (SessionRequest) returns (SessionResponse);
+    
+    // Legacy methods for backward compatibility
+    rpc RunModel (ModelRequest) returns (ModelResponse);
+    rpc LegacyChat (LegacyChatRequest) returns (ModelResponse);
+    rpc StreamLegacyChat (LegacyChatRequest) returns (stream ModelResponse);
+}
+
+// For async implementation
+service AsyncOllamaService {
+    // Version and health checking
+    rpc GetVersion (VersionRequest) returns (VersionInfo);
+    rpc HealthCheck (HealthCheckRequest) returns (HealthCheckResponse);
+    
+    // Core Generation APIs
+    rpc Generate (GenerateRequest) returns (stream GenerateResponse);
+    rpc Chat (ChatRequest) returns (stream ChatResponse);
+    rpc Embeddings (EmbeddingsRequest) returns (EmbeddingsResponse);
+
+    // Model Management
+    rpc Pull (PullRequest) returns (stream PullResponse);
+    rpc Push (PushRequest) returns (stream PushResponse);
+    rpc Create (CreateRequest) returns (CreateResponse);
+    rpc List (ListRequest) returns (ListResponse);
+    rpc Copy (CopyRequest) returns (CopyResponse);
+    rpc Delete (DeleteRequest) returns (DeleteResponse);
+    rpc Show (ShowRequest) returns (ShowResponse);
+
+    // Session Management
+    rpc CreateSession (SessionRequest) returns (SessionResponse);
+    rpc DeleteSession (SessionRequest) returns (SessionResponse);
+    
+    // Legacy methods for backward compatibility
+    rpc RunModel (ModelRequest) returns (ModelResponse);
+    rpc LegacyChat (LegacyChatRequest) returns (ModelResponse);
+    rpc StreamLegacyChat (LegacyChatRequest) returns (stream ModelResponse);
+}
+
+// RPC service for distributed inference
+service DistributedOllamaService {
+    // Version and health checking
+    rpc GetVersion (VersionRequest) returns (VersionInfo);
+    rpc HealthCheck (HealthCheckRequest) returns (HealthCheckResponse);
+    
+    // Device capabilities and registry
+    rpc GetDeviceCapabilities (DeviceCapabilitiesRequest) returns (DeviceCapabilitiesResponse);
+    
+    // Distributed inference
+    rpc DistributedGenerate (DistributedGenerateRequest) returns (stream DistributedGenerateResponse);
+    rpc ProcessLayers (LayerProcessRequest) returns (stream LayerProcessResponse);
+}
+
+// Messages for distributed inference
+message DeviceCapabilitiesRequest {
+    bool detail = 1;
+}
+
+message DeviceCapabilitiesResponse {
+    string device_type = 1;  // "cpu", "cuda", "metal", etc.
+    int32 device_id = 2;
+    int64 memory = 3;        // in bytes
+    int32 cores = 4;         // CPU cores or GPU compute units
+    string compute_capability = 5;  // For CUDA devices
+    map<string, string> details = 6;
+}
+
+message DistributedGenerateRequest {
+    string model = 1;
+    string prompt = 2;
+    repeated int32 assigned_layers = 3;
+    bool is_first = 4;  // First server in the pipeline
+    bool is_last = 5;   // Last server in the pipeline
+    map<string, string> options = 6;
+}
+
+message DistributedGenerateResponse {
+    repeated float tensor_data = 1;
+    map<int32, bytes> layer_outputs = 2;
+    repeated int32 tokens = 3;
+    bool done = 4;
+}
+
+message LayerProcessRequest {
+    int32 layer_id = 1;
+    bytes input_tensor = 2;
+    string operation = 3;  // "forward", "attention", etc.
+}
+
+message LayerProcessResponse {
+    int32 layer_id = 1;
+    bytes output_tensor = 2;
+    bool success = 3;
+    string error = 4;
+}
+
+message GenerateRequest {
+    string model = 1;
+    string prompt = 2;
+    map<string, string> options = 3;
+    repeated Message messages = 4;
+    string template = 5;
+    string format = 6;
+    bool stream = 7;
+    repeated bytes images = 8;
+    bool keep_alive = 9;
+}
+
+message GenerateResponse {
+    string model = 1;
+    string created_at = 2;
+    string response = 3;
+    bool done = 4;
+    repeated int32 context = 5;
+    string prompt_eval_count = 6;
+    string prompt_eval_duration = 7;
+    string eval_count = 8;
+    string eval_duration = 9;
+    int64 total_duration = 10;
+    bool streaming = 11;
+}
+
+message ChatRequest {
+    string model = 1;
+    repeated Message messages = 2;
+    map<string, string> options = 3;
+    string format = 4;
+    bool stream = 5;
+    bool keep_alive = 6;
+}
+
+message ChatResponse {
+    Message message = 1;
+    string model = 2;
+    string created_at = 3;
+    bool done = 4;
+    int64 total_duration = 5;
+    string load_duration = 6;
+    string prompt_eval_duration = 7;
+    string eval_count = 8;
+    string eval_duration = 9;
+}
+
+message Message {
+    string role = 1;
+    string content = 2;
+    repeated bytes images = 3;
+}
+
+message EmbeddingsRequest {
+    string model = 1;
+    string prompt = 2;
+    map<string, string> options = 3;
+    bool keep_alive = 4;
+}
+
+message EmbeddingsResponse {
+    repeated float embeddings = 1;
+}
+
+message ModelFile {
+    string name = 1;
+    string type = 2;
+    string path = 3;
+    string size = 4;
+    string digest = 5;
+}
+
+message ListRequest {}
+
+message ListResponse {
+    repeated Model models = 1;
+}
+
+message Model {
+    string name = 1;
+    string model_file = 2;
+    repeated ModelFile files = 3;
+    string parameter_size = 4;
+    int64 quantization_level = 5;
+    string template = 6;
+    string license = 7;
+    map<string, string> details = 8;
+}
+
+// Model management requests/responses
+message PullRequest {
+    string model = 1;
+    bool insecure = 2;
+}
+
+message PullResponse {
+    string status = 1;
+    string digest = 2;
+    string total = 3;
+    string completed = 4;
+}
+
+message PushRequest {
+    string model = 1;
+    bool insecure = 2;
+    bool stream = 3;
+}
+
+message PushResponse {
+    string status = 1;
+    string digest = 2;
+    string total = 3;
+    string completed = 4;
+}
+
+message CreateRequest {
+    string model = 1;
+    string modelfile = 2;
+    string modelfile_content = 3;
+    string path = 4;
+    repeated bytes blobs = 5;
+    bool stream = 6;
+}
+
+message CreateResponse {
+    bool success = 1;
+    string error = 2;
+    string status = 3;
+}
+
+message CopyRequest {
+    string source = 1;
+    string destination = 2;
+}
+
+message CopyResponse {
+    bool success = 1;
+    string error = 2;
+}
+
+message DeleteRequest {
+    string model = 1;
+}
+
+message DeleteResponse {
+    bool success = 1;
+    string error = 2;
+}
+
+message ShowRequest {
+    string model = 1;
+}
+
+message ShowResponse {
+    Model model = 1;
+    string license = 2;
+    string modelfile = 3;
+    string parameters = 4;
+    string template = 5;
+    string system = 6;
+}
+
+// Session management
+message SessionRequest {
+    string session_id = 1;
+    string model_name = 2;
+}
+
+message SessionResponse {
+    bool success = 1;
+    string error_message = 2;
+}
+
+// Legacy API messages - for backward compatibility
+message ModelRequest {
+    string model_name = 1;
+    string prompt = 2;
+    map<string, string> parameters = 3;
+}
+
+message ModelResponse {
+    string output = 1;
+    float completion_time = 2;
+    map<string, float> metrics = 3;
+}
+
+message LegacyChatRequest {
+    string session_id = 1;
+    string message = 2;
+}
+
+// Version and health check request/response
+message VersionRequest {
+    bool detail = 1;
+}
+
+message HealthCheckRequest {
+    bool detail = 1;
+}
+
+message HealthCheckResponse {
+    bool healthy = 1;
+    string status = 2;
+    map<string, string> details = 3;
+    string version = 4;
+    int64 uptime_seconds = 5;
+}

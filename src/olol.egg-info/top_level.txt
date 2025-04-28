@@ -1,0 +1,7 @@
+dist
+ollama_async_client
+ollama_async_pb2
+ollama_async_pb2_grpc
+ollama_async_server
+ollama_pb2
+ollama_pb2_grpc

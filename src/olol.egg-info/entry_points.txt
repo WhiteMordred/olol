@@ -1,0 +1,2 @@
+[console_scripts]
+olol = olol.script.oprotob:build

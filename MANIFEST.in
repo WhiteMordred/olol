@@ -1,0 +1,12 @@
+include LICENSE
+include README.md
+include CHANGELOG.md
+include CONTRIBUTING.md
+
+recursive-include src/olol *.py
+recursive-include src/olol/proto *.proto
+
+global-exclude __pycache__
+global-exclude *.py[cod]
+global-exclude *.so
+global-exclude .DS_Store
