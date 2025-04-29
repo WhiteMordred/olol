@@ -31,49 +31,6 @@ class OllamaClient:
                 options: Optional[Dict[str, str]] = None) -> Iterator[ollama_pb2.GenerateResponse]:
         """Generate text from a model.
         
-        This method automatically falls back to RunModel if the server doesn't support Generate.
-        
-        Args:
-            model: Name of the model to use
-            prompt: Text prompt to send to the model
-            stream: Whether to stream the response
-            options: Optional dictionary of model parameters
-            
-        Returns:
-            Iterator of responses if streaming, otherwise a single response
-            
-        Raises:
-            grpc.RpcError: If the gRPC call fails
-        """
-        try:
-            request = ollama_pb2.GenerateRequest(
-                model=model,
-                prompt=prompt,
-                stream=stream,
-                options=options or {}
-            )
-            try:
-                # Essayer d'abord la méthode moderne Generate
-                responses = self.stub.Generate(request)
-                return responses
-            except grpc.RpcError as e:
-                # Si la commande "generate" n'est pas reconnue, utiliser RunModel
-                if "unknown command" in e.details() and "generate" in e.details():
-                    logger.warning(f"Server doesn't support Generate API, falling back to RunModel. Error: {e.details()}")
-                    return self._generate_with_runmodel(model, prompt, stream, options)
-                else:
-                    # Autre erreur gRPC, la propager
-                    logger.error(f"gRPC error: {e.code()}: {e.details()}")
-                    raise
-        except Exception as e:
-            logger.error(f"Generate error: {str(e)}")
-            raise
-            
-    def _generate_with_runmodel(self, model: str, prompt: str, 
-                              stream: bool = True, 
-                              options: Optional[Dict[str, str]] = None) -> Iterator[ollama_pb2.GenerateResponse]:
-        """Implementation fallback using RunModel instead of Generate.
-        
         Args:
             model: Name of the model to use
             prompt: Text prompt to send to the model
@@ -81,25 +38,23 @@ class OllamaClient:
             options: Optional dictionary of model parameters
             
         Returns:
-            Iterator with a single GenerateResponse
+            Iterator of responses
+            
+        Raises:
+            grpc.RpcError: If the gRPC call fails
         """
         try:
-            # Convertir les options en paramètres pour RunModel
-            parameters = {}
-            if options:
-                parameters = options
-                
-            # Créer une requête RunModel
+            # Utiliser directement RunModel car c'est ce que le serveur Ollama supporte
             request = ollama_pb2.ModelRequest(
                 model_name=model,
                 prompt=prompt,
-                parameters=parameters
+                parameters=options or {}
             )
             
-            # Exécuter RunModel (non-streaming)
+            # Exécuter RunModel et obtenir la réponse
             response = self.stub.RunModel(request)
             
-            # Créer une réponse compatible avec l'interface Generate
+            # Créer une réponse compatible avec le format attendu par le proxy
             generate_response = ollama_pb2.GenerateResponse(
                 model=model,
                 response=response.output if hasattr(response, 'output') else str(response),
@@ -107,81 +62,34 @@ class OllamaClient:
                 total_duration=int(response.completion_time * 1000) if hasattr(response, 'completion_time') else 0
             )
             
-            # Créer un itérateur simple qui ne renvoie qu'une seule réponse
+            # Créer un itérateur qui renvoie cette réponse
             def response_iterator():
                 yield generate_response
-                
+            
             return response_iterator()
         except Exception as e:
-            logger.error(f"RunModel fallback error: {str(e)}")
+            logger.error(f"Generate error: {str(e)}")
             raise
-            
+    
     def chat(self, model: str, messages: List[Dict[str, str]], 
             stream: bool = True,
             options: Optional[Dict[str, str]] = None) -> Iterator[ollama_pb2.ChatResponse]:
         """Chat with a model.
         
-        This method automatically falls back to LegacyChat or RunModel if the server doesn't support Chat.
-        
         Args:
             model: Name of the model to use
             messages: List of messages for the conversation
-            stream: Whether to stream the response
+            stream: Whether to stream the response (ignored in this implementation)
             options: Optional dictionary of model parameters
             
         Returns:
-            Iterator of responses if streaming, otherwise a single response
+            Iterator of responses
             
         Raises:
             grpc.RpcError: If the gRPC call fails
         """
         try:
-            proto_messages = [
-                ollama_pb2.Message(
-                    role=msg["role"],
-                    content=msg["content"]
-                ) for msg in messages
-            ]
-            
-            request = ollama_pb2.ChatRequest(
-                model=model,
-                messages=proto_messages,
-                stream=stream,
-                options=options or {}
-            )
-            
-            try:
-                responses = self.stub.Chat(request)
-                return responses
-            except grpc.RpcError as e:
-                # Si la commande "chat" n'est pas reconnue, essayer avec LegacyChat ou RunModel
-                if "unknown command" in e.details() and "chat" in e.details():
-                    logger.warning(f"Server doesn't support Chat API, falling back to RunModel. Error: {e.details()}")
-                    return self._chat_with_runmodel(model, messages, stream, options)
-                else:
-                    # Autre erreur gRPC, la propager
-                    logger.error(f"gRPC error: {e.code()}: {e.details()}")
-                    raise
-        except Exception as e:
-            logger.error(f"Chat error: {str(e)}")
-            raise
-            
-    def _chat_with_runmodel(self, model: str, messages: List[Dict[str, str]], 
-                          stream: bool = True, 
-                          options: Optional[Dict[str, str]] = None) -> Iterator[ollama_pb2.ChatResponse]:
-        """Implementation fallback using RunModel instead of Chat.
-        
-        Args:
-            model: Name of the model to use
-            messages: List of messages for the conversation
-            stream: Whether to stream the response
-            options: Optional parameters
-            
-        Returns:
-            Iterator with single ChatResponse containing a single assistant message
-        """
-        try:
-            # Extraire uniquement le dernier message utilisateur pour la compatibilité
+            # Extraire le dernier message utilisateur pour utiliser avec RunModel
             user_message = ""
             for msg in reversed(messages):
                 if msg.get('role') == 'user':
@@ -190,20 +98,15 @@ class OllamaClient:
                     
             if not user_message:
                 raise ValueError("No user message found in conversation")
-                
-            # Convertir les options en paramètres pour RunModel
-            parameters = {}
-            if options:
-                parameters = options
-                
+            
             # Créer une requête RunModel
             request = ollama_pb2.ModelRequest(
                 model_name=model,
                 prompt=user_message,
-                parameters=parameters
+                parameters=options or {}
             )
             
-            # Exécuter RunModel (non-streaming)
+            # Exécuter RunModel
             response = self.stub.RunModel(request)
             
             # Créer une réponse compatible avec l'interface Chat
@@ -219,13 +122,13 @@ class OllamaClient:
                 total_duration=int(response.completion_time * 1000) if hasattr(response, 'completion_time') else 0
             )
             
-            # Créer un itérateur simple qui ne renvoie qu'une seule réponse
+            # Créer un itérateur qui renvoie cette réponse
             def response_iterator():
                 yield chat_response
-                
+            
             return response_iterator()
         except Exception as e:
-            logger.error(f"RunModel fallback for chat error: {str(e)}")
+            logger.error(f"Chat error: {str(e)}")
             raise
     
     def list_models(self) -> ollama_pb2.ListResponse:
@@ -248,8 +151,6 @@ class OllamaClient:
     def embeddings(self, model: str, prompt: str, options: Optional[Dict[str, str]] = None) -> ollama_pb2.EmbeddingsResponse:
         """Get embeddings for text.
         
-        This method automatically falls back to a compatible approach if Embeddings is not supported.
-        
         Args:
             model: Name of the model to use
             prompt: Text to get embeddings for
@@ -262,48 +163,15 @@ class OllamaClient:
             grpc.RpcError: If the gRPC call fails
         """
         try:
-            request = ollama_pb2.EmbeddingsRequest(
-                model=model,
-                prompt=prompt,
-                options=options or {}
+            # Pour les embeddings, nous n'avons pas de fallback simple avec RunModel
+            # Alors nous retournons juste un vecteur vide
+            logger.warning("Embeddings not available in this version of Ollama server")
+            return ollama_pb2.EmbeddingsResponse(
+                embeddings=[]
             )
-            try:
-                response = self.stub.Embeddings(request)
-                return response
-            except grpc.RpcError as e:
-                # Si la commande "embeddings" n'est pas reconnue, utiliser une méthode alternative
-                if "unknown command" in e.details() and "embeddings" in e.details():
-                    logger.warning(f"Server doesn't support Embeddings API, falling back to RunModel. Error: {e.details()}")
-                    return self._embeddings_with_runmodel(model, prompt, options)
-                else:
-                    # Autre erreur gRPC, la propager
-                    logger.error(f"gRPC error: {e.code()}: {e.details()}")
-                    raise
         except Exception as e:
             logger.error(f"Embeddings error: {str(e)}")
             raise
-            
-    def _embeddings_with_runmodel(self, model: str, prompt: str, 
-                               options: Optional[Dict[str, str]] = None) -> ollama_pb2.EmbeddingsResponse:
-        """Implementation fallback for embeddings.
-        
-        Args:
-            model: Name of the model to use
-            prompt: Text to embed
-            options: Optional parameters
-            
-        Returns:
-            EmbeddingsResponse with empty embeddings
-            
-        Note:
-            This is a placeholder fallback since RunModel doesn't provide embeddings.
-            In a real implementation, you might want to use a different approach.
-        """
-        # Pour la compatibilité, on renvoie une réponse vide
-        logger.warning("Embeddings not available in this version of Ollama server")
-        return ollama_pb2.EmbeddingsResponse(
-            embeddings=[]
-        )
             
     def pull_model(self, model: str) -> Iterator[ollama_pb2.PullResponse]:
         """Pull a model.

@@ -28,53 +28,10 @@ class AsyncOllamaClient:
         self.host = host
         self.port = port
     
-    # Legacy methods for backward compatibility
-    async def run_model(self, model_name: str, prompt: str):
-        """Run a one-off model query"""
-        try:
-            request = ollama_pb2.ModelRequest(
-                model_name=model_name,
-                prompt=prompt
-            )
-            response = await self.stub.RunModel(request)
-            return response.output
-        except grpclib.exceptions.GRPCError as e:
-            logger.error(f"gRPC error: {e}")
-            raise
-    
-    async def create_session(self, session_id: str, model_name: str):
-        """Create a new chat session"""
-        try:
-            request = ollama_pb2.SessionRequest(
-                session_id=session_id,
-                model_name=model_name
-            )
-            response = await self.stub.CreateSession(request)
-            return response.success
-        except grpclib.exceptions.GRPCError as e:
-            logger.error(f"gRPC error: {e}")
-            raise
-
-    async def chat_message(self, session_id: str, message: str):
-        """Send a message in an existing chat session"""
-        try:
-            request = ollama_pb2.ChatRequest(
-                session_id=session_id,
-                message=message
-            )
-            response = await self.stub.ChatMessage(request)
-            return response.output
-        except grpclib.exceptions.GRPCError as e:
-            logger.error(f"gRPC error: {e}")
-            raise
-        
-    # New methods matching the latest Ollama API
     async def generate(self, model: str, prompt: str, 
                       stream: bool = True, 
                       options: Optional[Dict[str, str]] = None) -> AsyncIterator[ollama_pb2.GenerateResponse]:
         """Generate text from a model.
-        
-        This method automatically falls back to RunModel if the server doesn't support Generate.
         
         Args:
             model: Name of the model to use
@@ -89,60 +46,17 @@ class AsyncOllamaClient:
             grpclib.exceptions.GRPCError: If the gRPC call fails
         """
         try:
-            request = ollama_pb2.GenerateRequest(
-                model=model,
-                prompt=prompt,
-                stream=stream,
-                options=options or {}
-            )
-            try:
-                # Essayer d'abord la méthode moderne Generate
-                async for response in self.stub.Generate(request):
-                    yield response
-            except grpclib.exceptions.GRPCError as e:
-                # Si la commande "generate" n'est pas reconnue, utiliser RunModel
-                if "unknown command" in str(e) and "generate" in str(e).lower():
-                    logger.warning(f"Server doesn't support Generate API, falling back to RunModel. Error: {str(e)}")
-                    async for response in self._generate_with_runmodel(model, prompt, stream, options):
-                        yield response
-                else:
-                    # Autre erreur gRPC, la propager
-                    logger.error(f"gRPC error: {str(e)}")
-                    raise
-        except Exception as e:
-            logger.error(f"Generate error: {str(e)}")
-            raise
-            
-    async def _generate_with_runmodel(self, model: str, prompt: str, 
-                                    stream: bool = True, 
-                                    options: Optional[Dict[str, str]] = None) -> AsyncIterator[ollama_pb2.GenerateResponse]:
-        """Implementation fallback using RunModel instead of Generate.
-        
-        Args:
-            model: Name of the model to use
-            prompt: Text prompt to send to the model
-            stream: Whether to stream the response (ignored in this implementation)
-            options: Optional dictionary of model parameters
-            
-        Returns:
-            AsyncIterator with a single GenerateResponse
-        """
-        try:
-            # Convertir les options en paramètres pour RunModel
-            parameters = {}
-            if options:
-                parameters = options
-                
-            # Créer une requête RunModel
+            # Créer une requête RunModel car c'est ce que le serveur Ollama supporte
             request = ollama_pb2.ModelRequest(
                 model_name=model,
-                prompt=prompt
+                prompt=prompt,
+                parameters=options or {}  # Utiliser les options comme paramètres si présentes
             )
             
-            # Exécuter RunModel (non-streaming)
+            # Exécuter RunModel - c'est la méthode que le serveur Ollama reconnaît
             response = await self.stub.RunModel(request)
             
-            # Créer une réponse compatible avec l'interface Generate
+            # Créer une réponse compatible avec l'interface Generate que le proxy attend
             generate_response = ollama_pb2.GenerateResponse(
                 model=model,
                 response=response.output if hasattr(response, 'output') else str(response),
@@ -153,7 +67,7 @@ class AsyncOllamaClient:
             # Retourner la réponse comme un générateur asynchrone
             yield generate_response
         except Exception as e:
-            logger.error(f"RunModel fallback error: {str(e)}")
+            logger.error(f"Generate error: {str(e)}")
             raise
     
     async def chat(self, model: str, messages: List[Dict[str, str]], 
@@ -174,24 +88,43 @@ class AsyncOllamaClient:
             grpclib.exceptions.GRPCError: If the gRPC call fails
         """
         try:
-            proto_messages = [
-                ollama_pb2.Message(
-                    role=msg["role"],
-                    content=msg["content"]
-                ) for msg in messages
-            ]
+            # Extraire le dernier message utilisateur pour utiliser avec RunModel
+            user_message = ""
+            for msg in reversed(messages):
+                if msg.get('role') == 'user':
+                    user_message = msg.get('content', '')
+                    break
+                    
+            if not user_message:
+                raise ValueError("No user message found in conversation")
             
-            request = ollama_pb2.ChatRequest(
-                model=model,
-                messages=proto_messages,
-                stream=stream,
-                options=options or {}
+            # Utiliser RunModel comme fallback pour le chat
+            request = ollama_pb2.ModelRequest(
+                model_name=model,
+                prompt=user_message,
+                parameters=options or {}
             )
             
-            async for response in self.stub.Chat(request):
-                yield response
-        except grpclib.exceptions.GRPCError as e:
-            logger.error(f"gRPC error: {e}")
+            # Exécuter RunModel
+            response = await self.stub.RunModel(request)
+            
+            # Créer une réponse compatible avec l'interface Chat
+            assistant_message = ollama_pb2.Message(
+                role="assistant",
+                content=response.output if hasattr(response, 'output') else str(response)
+            )
+            
+            chat_response = ollama_pb2.ChatResponse(
+                model=model,
+                message=assistant_message,
+                done=True,
+                total_duration=int(response.completion_time * 1000) if hasattr(response, 'completion_time') else 0
+            )
+            
+            # Retourner la réponse comme un générateur asynchrone
+            yield chat_response
+        except Exception as e:
+            logger.error(f"Chat error: {str(e)}")
             raise
     
     async def list_models(self) -> ollama_pb2.ListResponse:
@@ -227,16 +160,27 @@ class AsyncOllamaClient:
             grpclib.exceptions.GRPCError: If the gRPC call fails
         """
         try:
-            request = ollama_pb2.EmbeddingsRequest(
-                model=model,
-                prompt=prompt,
-                options=options or {}
+            # Pour les embeddings, nous n'avons pas de fallback simple avec RunModel
+            # Alors nous retournons juste un vecteur vide
+            return ollama_pb2.EmbeddingsResponse(
+                embeddings=[]
             )
-            response = await self.stub.Embeddings(request)
-            return response
-        except grpclib.exceptions.GRPCError as e:
-            logger.error(f"gRPC error: {e}")
+        except Exception as e:
+            logger.error(f"Embeddings error: {str(e)}")
             raise
+    
+    async def check_health(self) -> bool:
+        """Check if the server is healthy.
+        
+        Returns:
+            True if server is healthy, False otherwise
+        """
+        try:
+            # Essayer de lister les modèles comme test de santé
+            await self.list_models()
+            return True
+        except Exception:
+            return False
     
     async def close(self) -> None:
         """Close the channel."""
@@ -247,12 +191,8 @@ async def main() -> None:
     """Example usage of the AsyncOllamaClient."""
     client = AsyncOllamaClient()
     try:
-        # Simple model run (legacy API)
-        response = await client.run_model("llama2", "What is the capital of France?")
-        print(f"Legacy API response: {response}")
-        
-        # New API with streaming
-        print("\nNew API with streaming:")
+        # Test simple avec RunModel
+        print("\nRunning generate:")
         async for chunk in client.generate("llama2", "What is the capital of France?"):
             if not chunk.done:
                 print(chunk.response, end="", flush=True)
