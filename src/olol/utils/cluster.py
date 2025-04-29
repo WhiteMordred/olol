@@ -514,36 +514,43 @@ class OllamaCluster:
         with self.server_lock:
             for server in server_addresses:
                 self.server_loads[server] = 0
-                
-        # Initialize server health status
-        with self.health_lock:
-            for server in server_addresses:
                 self.server_health[server] = False
-                
-        # Initialize model-server mappings
-        # This sera rempli plus tard lorsque les serveurs seront découverts
         
-        # Start model discovery for each server
-        threading.Thread(target=self._discover_all_servers, daemon=True).start()
+        # MODIFICATION IMPORTANTE: Découvrir immédiatement au moins un serveur
+        # pour avoir des données disponibles avant de lancer le thread de découverte
+        if server_addresses:
+            # Prendre le premier serveur et le découvrir immédiatement
+            first_server = server_addresses[0]
+            self._discover_server_models(first_server)
+            
+        # Lancer la découverte complète en arrière-plan
+        threading.Thread(target=self._discover_remaining_servers, daemon=True).start()
         
-    def _discover_all_servers(self):
-        """Discover models on all servers."""
+    def _discover_remaining_servers(self):
+        """Discover models on all remaining servers."""
+        time.sleep(0.5)  # Petit délai pour permettre à l'interface de s'initialiser
+        
         with self.server_lock:
-            servers = list(self.server_addresses)
+            # Sauter le premier serveur déjà découvert
+            servers = list(self.server_addresses)[1:] if len(self.server_addresses) > 1 else []
         
-        # Ajouter un message de log pour le débogage
-        logger.info(f"Découverte des modèles sur {len(servers)} serveurs")
+        logger.info(f"Découverte des modèles sur {len(servers)} serveurs restants")
         
         for server in servers:
-            # Exécuter immédiatement pour le premier serveur, puis un par un
             self._discover_server_models(server)
-            # Ajouter un petit délai pour éviter de surcharger les serveurs
+            # Petit délai pour éviter de surcharger les serveurs
             time.sleep(0.5)
             
-        # Ajouter un log pour indiquer la fin de la découverte
-        with self.model_lock:
-            model_count = len(self.model_server_map)
-            logger.info(f"Découverte terminée: {model_count} modèles trouvés")
+        logger.info(f"Découverte complète terminée")
+    
+    def _discover_all_servers(self):
+        """Méthode de compatibilité pour l'ancienne API."""
+        # Découvrir immédiatement au moins un serveur
+        if self.server_addresses:
+            self._discover_server_models(self.server_addresses[0])
+            
+        # Puis continuer avec les autres
+        threading.Thread(target=self._discover_remaining_servers, daemon=True).start()
     
     def _discover_server_models(self, server_address: str):
         """Discover models available on a server."""

@@ -167,95 +167,128 @@ class RichUI:
     
     def _create_servers_panel(self, cluster=None) -> Panel:
         """Create servers panel with server status."""
-        # Méthode sûre sans verrou qui ne bloque jamais
-        if not cluster:
+        if not cluster or not hasattr(cluster, 'server_addresses'):
             return Panel("Initialisation du cluster en cours...", title="Servers", border_style="yellow")
         
-        # Accès direct sans verrouillage
         try:
-            server_addresses = getattr(cluster, 'server_addresses', [])
+            # Récupération des informations sans verrous qui pourraient bloquer
+            server_addresses = getattr(cluster, 'server_addresses', [])[:]  # Copie pour éviter les problèmes de concurrence
+            
             if not server_addresses:
                 return Panel("Aucun serveur trouvé.\nVérifiez que vos serveurs Ollama sont bien accessibles.", 
-                             title="Servers", border_style="yellow")
+                            title="Servers", border_style="yellow")
                 
-            # Création du tableau
+            # Création du tableau des serveurs
             table = Table(box=box.SIMPLE, expand=True)
-            table.add_column("Server", style="dim")
-            table.add_column("Status", justify="center")
+            table.add_column("Serveur", style="dim")
+            table.add_column("État", justify="center")
+            
+            # Récupérer l'état de santé de manière sécurisée
+            server_health = {}
+            try:
+                # Tentative d'accès à l'état de santé sans verrou
+                server_health = {s: cluster.server_health.get(s, False) for s in server_addresses}
+            except:
+                # En cas d'erreur, considérer tous les serveurs comme disponibles pour l'affichage
+                server_health = {s: True for s in server_addresses}
             
             # Afficher chaque serveur
             for server in server_addresses:
-                # Par défaut, considéré comme sain pour éviter le blocage lors de l'accès aux verrous
-                is_healthy = True
+                is_healthy = server_health.get(server, True)  # Par défaut considéré comme sain
                 table.add_row(server, "[green]✓ Disponible[/green]" if is_healthy else "[red]✗ Indisponible[/red]")
                 
             return Panel(table, title=f"[bold]Serveurs[/bold] ({len(server_addresses)} détectés)", 
-                         border_style="blue", box=box.ROUNDED)
+                        border_style="blue", box=box.ROUNDED)
         except Exception as e:
-            # En cas d'erreur, ne pas bloquer
+            logger.exception("Erreur lors de la création du panneau des serveurs")
             return Panel(f"Erreur d'accès aux serveurs: {str(e)}", title="Serveurs", border_style="red")
     
     def _create_models_panel(self, cluster=None) -> Panel:
         """Create models panel with model availability info."""
-        # Méthode sûre sans verrou qui ne bloque jamais
         if not cluster:
             return Panel("Initialisation du cluster en cours...", title="Modèles", border_style="yellow")
             
-        # Accès direct sans verrouillage
         try:
-            # Récupération directe des modèles
+            # Récupération des modèles de manière sécurisée sans verrous
             models_info = []
             
-            # Tenter d'obtenir les modèles directement auprès des serveurs
-            for server in getattr(cluster, 'server_addresses', []):
-                try:
-                    # Format host:port simple
-                    if server.count(':') == 1:
-                        host, port_str = server.split(':')
-                        port = int(port_str)
-                        
-                        # Création directe d'un client sans passer par le cluster
-                        from olol.sync.client import OllamaClient
-                        client = OllamaClient(host=host, port=port)
-                        
-                        try:
-                            # Appeler list_models directement
-                            models_response = client.list_models()
-                            
-                            # Ajouter les modèles à la liste
-                            if hasattr(models_response, 'models'):
-                                for model in models_response.models:
-                                    model_name = model.name
-                                    if model_name not in [m['name'] for m in models_info]:
-                                        models_info.append({
-                                            'name': model_name,
-                                            'server': server
-                                        })
-                        finally:
-                            client.close()
-                except Exception as e:
-                    # En cas d'erreur avec un serveur, continuer
-                    continue
-                    
-            # Si aucun modèle n'est trouvé
+            # Essayer d'abord d'accéder à model_server_map directement
+            try:
+                server_map = getattr(cluster, 'model_server_map', {})
+                
+                # Créer une liste de modèles à partir de la carte
+                for model_name, servers in server_map.items():
+                    if servers:  # Si au moins un serveur a ce modèle
+                        models_info.append({
+                            'name': model_name,
+                            'server': servers[0]  # Utiliser le premier serveur
+                        })
+            except Exception:
+                # Si problème d'accès à model_server_map, utiliser l'approche directe
+                pass
+                
+            # Si aucun modèle n'est trouvé dans la carte, essayer l'approche directe
             if not models_info:
-                return Panel("Aucun modèle disponible actuellement.\nVérifiez vos serveurs Ollama.", 
-                             title="Modèles", border_style="yellow")
+                for server in getattr(cluster, 'server_addresses', []):
+                    # Essayer de contacter directement chaque serveur, sans utiliser les verrous du cluster
+                    try:
+                        if server.count(':') == 1:
+                            host, port_str = server.split(':')
+                            port = int(port_str)
+                            
+                            # Créer un client temporaire
+                            from olol.sync.client import OllamaClient
+                            client = OllamaClient(host=host, port=port)
+                            
+                            try:
+                                models_response = client.list_models()
+                                
+                                if hasattr(models_response, 'models'):
+                                    for model in models_response.models:
+                                        model_name = model.name
+                                        if model_name not in [m['name'] for m in models_info]:
+                                            models_info.append({
+                                                'name': model_name,
+                                                'server': server
+                                            })
+                            finally:
+                                client.close()
+                    except Exception:
+                        # Ignorer les erreurs pour ce serveur et continuer
+                        continue
             
-            # Création du tableau
+            # Si toujours aucun modèle trouvé
+            if not models_info:
+                # Vérifier combien de serveurs sont disponibles
+                try:
+                    healthy_servers = sum(1 for h in getattr(cluster, 'server_health', {}).values() if h)
+                    if healthy_servers == 0:
+                        return Panel("Aucun serveur n'est disponible.\nVérifiez la connexion avec vos serveurs Ollama.", 
+                                    title="Modèles", border_style="yellow")
+                except:
+                    pass
+                
+                return Panel("Aucun modèle disponible actuellement.\nVérifiez vos serveurs Ollama.", 
+                            title="Modèles", border_style="yellow")
+            
+            # Créer le tableau des modèles
             table = Table(box=box.SIMPLE, expand=True)
             table.add_column("Modèle", style="cyan")
             table.add_column("Serveur", justify="right")
                 
-            # Afficher les modèles (limité à 10)
+            # Afficher les modèles (limité pour éviter un tableau trop grand)
             for model_info in models_info[:10]:
                 table.add_row(model_info['name'], model_info['server'])
                 
+            # Indiquer s'il y a plus de modèles que ceux affichés
+            if len(models_info) > 10:
+                table.add_row(f"...et {len(models_info) - 10} autres", "")
+                
             return Panel(table, title=f"[bold]Modèles disponibles[/bold] ({len(models_info)})", 
-                         border_style="cyan", box=box.ROUNDED)
+                        border_style="cyan", box=box.ROUNDED)
                 
         except Exception as e:
-            # En cas d'erreur, ne pas bloquer
+            logger.exception("Erreur lors de la création du panneau des modèles")
             return Panel(f"Erreur d'accès aux modèles: {str(e)}", title="Modèles", border_style="red")
     
     def _create_status_panel(self) -> Panel:
