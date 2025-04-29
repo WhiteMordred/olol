@@ -126,9 +126,9 @@ class ConsoleUI:
         self.stdscr.addstr(0, 0, header, curses.color_pair(1) | curses.A_BOLD)
         
         # Import needed only here to avoid circular imports
-        import olol.proxy.app as proxy_app
-        cluster = proxy_app.cluster
-        use_distributed_inference = proxy_app.use_distributed_inference
+        from olol.proxy import app
+        cluster = app.cluster
+        use_distributed_inference = app.use_distributed_inference
         
         # Server status
         server_count = 0
@@ -299,8 +299,8 @@ def run_console_ui(params=None):
     ui = ConsoleUI(params)
     try:
         # Import needed only here to avoid circular imports
-        import olol.proxy.app as proxy_app
-        cluster = proxy_app.cluster
+        from olol.proxy import app
+        cluster = app.cluster
         
         # Register listeners for discovery events to update UI
         if cluster and (params.get('verbose', False) or params.get('debug', False)):
