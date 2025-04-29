@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+
+{% block title %}Documentation API - OLOL Proxy{% endblock %}
+
+{% block head %}
+<!-- Swagger UI CSS -->
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+<style>
+    /* Ajustements de style pour l'intégration avec notre thème */
+    .swagger-ui {
+        font-family: inherit;
+    }
+    
+    .swagger-ui .topbar {
+        display: none; /* Cacher la barre supérieure de Swagger UI car nous avons déjà notre propre header */
+    }
+    
+    .swagger-ui .scheme-container {
+        background-color: var(--card-bg);
+        box-shadow: none;
+        border-radius: var(--border-radius);
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+    
+    .swagger-ui .btn {
+        box-shadow: none;
+    }
+    
+    .swagger-ui .opblock {
+        border-radius: var(--border-radius);
+        box-shadow: none;
+        margin-bottom: 15px;
+    }
+    
+    /* Style pour le thème sombre */
+    body.dark-mode .swagger-ui, 
+    body.dark-mode .swagger-ui .opblock-tag,
+    body.dark-mode .swagger-ui .opblock .opblock-summary-description {
+        color: #f1f1f1;
+    }
+    
+    body.dark-mode .swagger-ui input[type=text],
+    body.dark-mode .swagger-ui textarea {
+        background-color: #2c2c2c;
+        color: #f1f1f1;
+        border-color: #444;
+    }
+    
+    body.dark-mode .swagger-ui select {
+        background-color: #2c2c2c;
+        color: #f1f1f1;
+        border-color: #444;
+    }
+    
+    body.dark-mode .swagger-ui .opblock-body pre.microlight {
+        background-color: #222;
+        color: #f1f1f1;
+    }
+    
+    body.dark-mode .swagger-ui .scheme-container {
+        background-color: var(--card-bg, #2c2c2c);
+    }
+    
+    body.dark-mode .swagger-ui .model-box {
+        background-color: #2c2c2c;
+    }
+    
+    body.dark-mode .swagger-ui .model {
+        color: #f1f1f1;
+    }
+    
+    body.dark-mode .swagger-ui .opblock-description-wrapper p {
+        color: #ccc;
+    }
+    
+    /* Corriger certains problèmes d'affichage */
+    .swagger-ui .response-col_links {
+        display: none; /* Masquer la colonne links qui est parfois vide */
+    }
+    
+    body.dark-mode .swagger-ui .opblock-summary-method {
+        color: #fff;
+    }
+    
+    body.dark-mode .swagger-ui table thead tr td, 
+    body.dark-mode .swagger-ui table thead tr th {
+        color: #ddd;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h2>Documentation API</h2>
+        <p class="text-muted">Explorez et testez les endpoints de l'API RESTful OLOL Proxy</p>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <i class="fas fa-book me-2"></i> Documentation Swagger
+            </div>
+            <div>
+                <a href="/api/v1/swagger/docs" target="_blank" class="btn btn-sm btn-outline-primary">
+                    <i class="fas fa-external-link-alt me-1"></i> Ouvrir dans un nouvel onglet
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <!-- Container pour Swagger UI -->
+        <div id="swagger-ui"></div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="fas fa-info-circle me-2"></i> À propos de l'API
+            </div>
+            <div class="card-body">
+                <h5>Utilisation de l'API RESTful</h5>
+                <p>
+                    L'API OLOL Proxy permet d'interagir programmatiquement avec un cluster de serveurs Ollama.
+                    Vous pouvez utiliser cette API pour générer du texte, des embeddings, et gérer les serveurs du cluster.
+                </p>
+                
+                <h5>Authentication</h5>
+                <p>
+                    L'authentification pour l'API se fait via une clé API dans l'en-tête <code>X-API-Key</code>.
+                    Vous pouvez obtenir une clé API dans les paramètres de votre compte.
+                </p>
+                
+                <h5>Exemples d'utilisation</h5>
+                <div class="mb-3">
+                    <h6>Python</h6>
+                    <pre><code class="language-python">import requests
+
+api_url = "http://votre-serveur.com/api/v1"
+headers = {"X-API-Key": "votre-clé-api"}
+
+# Exemple de génération de texte
+response = requests.post(
+    f"{api_url}/generate",
+    headers=headers,
+    json={
+        "model": "llama2",
+        "prompt": "Expliquez-moi comment fonctionne l'apprentissage par renforcement.",
+        "options": {"temperature": 0.7}
+    }
+)
+
+print(response.json())</code></pre>
+                </div>
+                
+                <div>
+                    <h6>cURL</h6>
+                    <pre><code class="language-bash">curl -X POST "http://votre-serveur.com/api/v1/generate" \
+     -H "X-API-Key: votre-clé-api" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "model": "llama2",
+       "prompt": "Expliquez-moi comment fonctionne l\'apprentissage par renforcement.",
+       "options": {"temperature": 0.7}
+     }'</code></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Swagger UI JS -->
+<script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialiser Swagger UI
+    const ui = SwaggerUIBundle({
+        url: "/api/v1/swagger.json", // URL de la spécification OpenAPI
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        presets: [
+            SwaggerUIBundle.presets.apis,
+            SwaggerUIBundle.SwaggerUIStandalonePreset
+        ],
+        layout: "BaseLayout",
+        docExpansion: "list",
+        defaultModelsExpandDepth: 1,
+        defaultModelExpandDepth: 1,
+        displayRequestDuration: true,
+        filter: true,
+        syntaxHighlight: {
+            theme: document.querySelector('body').classList.contains('dark-mode') ? 'agate' : 'default'
+        }
+    });
+    
+    // Adapter la syntaxHighlight au thème 
+    function updateSwaggerTheme() {
+        const isDarkMode = document.querySelector('body').classList.contains('dark-mode');
+        if (ui.getConfigs) {
+            const configs = ui.getConfigs();
+            configs.syntaxHighlight.theme = isDarkMode ? 'agate' : 'default';
+        }
+    }
+    
+    // Observer le changement de thème
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.attributeName === 'class') {
+                updateSwaggerTheme();
+            }
+        });
+    });
+    
+    observer.observe(document.body, { attributes: true });
+});
+</script>
+{% endblock %}

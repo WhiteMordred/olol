@@ -130,6 +130,11 @@ def settings():
     """Render the settings page."""
     return render_template('settings.html')
 
+@app.route('/swagger')
+def swagger_ui():
+    """Render the Swagger UI integrated page."""
+    return render_template('swagger.html')
+
 # Helper functions for the web UI
 def get_cluster_stats():
     """Get cluster statistics for the dashboard."""
