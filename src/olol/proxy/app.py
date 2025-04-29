@@ -4,6 +4,7 @@ import threading
 import time
 import uuid
 from typing import Any, Dict, List, Optional
+from datetime import datetime
 
 from flask import Flask, Response, jsonify, request, render_template, stream_with_context, url_for
 
@@ -56,6 +57,20 @@ def yesno_filter(value, choices="oui,non"):
         choices_list = ["oui", "non"]
     
     return choices_list[0] if value else choices_list[1]
+
+# Ajout d'un filtre personnalisé date pour formater les timestamps
+@app.template_filter('date')
+def date_filter(value, format='%d/%m/%Y %H:%M:%S'):
+    """Formater un timestamp (nombre à virgule flottante) en date lisible."""
+    if not value:
+        return ""
+    try:
+        # Convertir le timestamp (secondes depuis epoch) en objet datetime
+        dt = datetime.fromtimestamp(float(value))
+        return dt.strftime(format)
+    except (ValueError, TypeError):
+        # En cas d'erreur, retourner la valeur inchangée
+        return value
 
 # Web routes
 @app.route('/')
