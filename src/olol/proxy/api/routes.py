@@ -8,6 +8,7 @@ import logging
 from typing import Any, Dict, Optional
 from flask import Blueprint, request, jsonify, Response, stream_with_context
 from .models import dict_to_generate_request, dict_to_chat_request, dict_to_embeddings_request
+from dataclasses import asdict
 
 # Configuration du logging
 logger = logging.getLogger(__name__)
@@ -105,7 +106,9 @@ def register_api_routes(app, api_service):
     def status():
         """Obtenir le status actuel du proxy"""
         try:
-            return api_service.get_status()
+            # Convertir l'objet StatusResponse en dictionnaire avant de le retourner
+            status_response = api_service.get_status()
+            return asdict(status_response)
         except Exception as e:
             logger.error(f"Erreur lors de la récupération du status: {str(e)}")
             return {'error': f"Erreur de status: {str(e)}"}, 500
