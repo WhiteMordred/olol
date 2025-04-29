@@ -126,9 +126,10 @@ class ConsoleUI:
         self.stdscr.addstr(0, 0, header, curses.color_pair(1) | curses.A_BOLD)
         
         # Import needed only here to avoid circular imports
-        from olol.proxy import app
-        cluster = app.cluster
-        use_distributed_inference = app.use_distributed_inference
+        # Importation directe depuis le module local pour éviter des problèmes avec Flask
+        from . import app
+        cluster = getattr(app, 'cluster', None)
+        use_distributed_inference = getattr(app, 'use_distributed_inference', False)
         
         # Server status
         server_count = 0
@@ -299,8 +300,9 @@ def run_console_ui(params=None):
     ui = ConsoleUI(params)
     try:
         # Import needed only here to avoid circular imports
-        from olol.proxy import app
-        cluster = app.cluster
+        # Importation directe depuis le module local pour éviter des problèmes avec Flask
+        from . import app
+        cluster = getattr(app, 'cluster', None)
         
         # Register listeners for discovery events to update UI
         if cluster and (params.get('verbose', False) or params.get('debug', False)):

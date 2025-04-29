@@ -16,8 +16,9 @@ health_check_interval = 30  # seconds
 def health_checker() -> None:
     """Background thread to check server health periodically."""
     # Import here to avoid circular imports
-    from olol.proxy import app
-    cluster = app.cluster
+    # Importation directe depuis le module local pour éviter des problèmes avec Flask
+    from . import app
+    cluster = getattr(app, 'cluster', None)
     
     if cluster is None:
         logger.error("Cluster not initialized for health checker")
