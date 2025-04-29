@@ -245,45 +245,6 @@
             </div>
         </div>
     </div>
-    
-    <!-- Health Status -->
-    <div class="col-lg-5">
-        <div class="card mb-4">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <div>
-                    <i class="fas fa-heartbeat me-1"></i>
-                    Santé du cluster
-                </div>
-                <div>
-                    <button type="button" class="btn btn-sm btn-outline-secondary auto-refresh-toggle" data-target="health-status" data-seconds="60">
-                        <i class="fas fa-sync-alt me-1"></i>
-                        <span class="status-text">Actualisation auto</span>
-                    </button>
-                </div>
-            </div>
-            <div class="card-body">
-                <canvas id="healthChartCanvas" height="200"></canvas>
-                <div class="row mt-3">
-                    <div class="col-md-6">
-                        <div class="small-stat">
-                            <div class="stat-label">Serveurs en ligne</div>
-                            <div class="stat-value text-success">
-                                {{ stats.servers.healthy }} / {{ stats.servers.total }}
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="small-stat">
-                            <div class="stat-label">Modèles disponibles</div>
-                            <div class="stat-value text-primary">
-                                {{ stats.models.available }} / {{ stats.models.total }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 </div>
 
 <div class="row mb-4">
