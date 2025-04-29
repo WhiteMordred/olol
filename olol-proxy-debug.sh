@@ -80,49 +80,101 @@ test_all_endpoints() {
   echo "                   TEST COMPLET DES ENDPOINTS API                   "
   echo "==================================================================="
   
+  # Définir un timeout plus long pour les tests qui impliquent des LLMs
+  GEN_TIMEOUT=30
+  NORM_TIMEOUT=10
+  
+  # Utiliser le modèle disponible, avec mistral par défaut
+  MODEL=$(curl -s -m $NORM_TIMEOUT http://$HOST:$PORT/api/models | jq -r '.models | keys | .[0] // "mistral:latest"')
+  echo "Modèle détecté/utilisé pour les tests: $MODEL"
+  
   # 1. GET /api/status - État du serveur
   echo -e "\n[TEST 1/8] GET /api/status - État du serveur"
-  curl -s -m 5 http://$HOST:$PORT/api/status | jq . || echo "Erreur: /api/status ne répond pas"
+  STATUS_RESP=$(curl -s -m $NORM_TIMEOUT http://$HOST:$PORT/api/status)
+  if [ $? -eq 0 ] && [ ! -z "$STATUS_RESP" ]; then
+    echo "$STATUS_RESP" | jq .
+  else
+    echo "❌ ERREUR: /api/status ne répond pas ou renvoie une réponse vide"
+  fi
   
   # 2. GET /api/models - Liste des modèles disponibles
   echo -e "\n[TEST 2/8] GET /api/models - Liste des modèles disponibles"
-  curl -s -m 5 http://$HOST:$PORT/api/models | jq . || echo "Erreur: /api/models ne répond pas"
+  MODELS_RESP=$(curl -s -m $NORM_TIMEOUT http://$HOST:$PORT/api/models)
+  if [ $? -eq 0 ] && [ ! -z "$MODELS_RESP" ]; then
+    echo "$MODELS_RESP" | jq .
+  else
+    echo "❌ ERREUR: /api/models ne répond pas ou renvoie une réponse vide"
+  fi
   
   # 3. GET /api/servers - Liste des serveurs du cluster
   echo -e "\n[TEST 3/8] GET /api/servers - Liste des serveurs du cluster"
-  curl -s -m 5 http://$HOST:$PORT/api/servers | jq . || echo "Erreur: /api/servers ne répond pas"
+  SERVERS_RESP=$(curl -s -m $NORM_TIMEOUT http://$HOST:$PORT/api/servers)
+  if [ $? -eq 0 ] && [ ! -z "$SERVERS_RESP" ]; then
+    echo "$SERVERS_RESP" | jq .
+  else
+    echo "❌ ERREUR: /api/servers ne répond pas ou renvoie une réponse vide"
+  fi
   
   # 4. POST /api/generate - Génération de texte
   echo -e "\n[TEST 4/8] POST /api/generate - Génération de texte"
-  curl -s -m 10 -X POST http://$HOST:$PORT/api/generate \
+  GEN_RESP=$(curl -s -m $GEN_TIMEOUT -X POST http://$HOST:$PORT/api/generate \
     -H "Content-Type: application/json" \
-    -d '{"model": "mistral", "prompt": "Expliquez brièvement ce quest un LLM.", "stream": false}' | jq . || echo "Erreur: /api/generate ne répond pas"
+    -d "{\"model\": \"$MODEL\", \"prompt\": \"Explique brièvement ce qu'est un LLM en une phrase.\", \"stream\": false}")
+  if [ $? -eq 0 ] && [ ! -z "$GEN_RESP" ]; then
+    echo "$GEN_RESP" | jq .
+    # Vérifier si la réponse contient une erreur
+    if echo "$GEN_RESP" | jq -e '.error' > /dev/null; then
+      echo "⚠️ AVERTISSEMENT: /api/generate a renvoyé une erreur"
+    fi
+  else
+    echo "❌ ERREUR: /api/generate ne répond pas ou renvoie une réponse vide"
+  fi
     
   # 5. POST /api/chat - Chat avec modèle
   echo -e "\n[TEST 5/8] POST /api/chat - Chat avec modèle"
-  curl -s -m 10 -X POST http://$HOST:$PORT/api/chat \
+  CHAT_RESP=$(curl -s -m $GEN_TIMEOUT -X POST http://$HOST:$PORT/api/chat \
     -H "Content-Type: application/json" \
-    -d '{"model": "mistral", "messages": [{"role": "user", "content": "Bonjour, comment ça va?"}], "stream": false}' | jq . || echo "Erreur: /api/chat ne répond pas"
+    -d "{\"model\": \"$MODEL\", \"messages\": [{\"role\": \"user\", \"content\": \"Bonjour, comment ça va?\"}], \"stream\": false}")
+  if [ $? -eq 0 ] && [ ! -z "$CHAT_RESP" ]; then
+    echo "$CHAT_RESP" | jq .
+    # Vérifier si la réponse contient une erreur
+    if echo "$CHAT_RESP" | jq -e '.error' > /dev/null; then
+      echo "⚠️ AVERTISSEMENT: /api/chat a renvoyé une erreur"
+    fi
+  else
+    echo "❌ ERREUR: /api/chat ne répond pas ou renvoie une réponse vide"
+  fi
     
   # 6. POST /api/embeddings - Obtention d'embeddings
   echo -e "\n[TEST 6/8] POST /api/embeddings - Obtention d'embeddings"
-  curl -s -m 10 -X POST http://$HOST:$PORT/api/embeddings \
+  EMB_RESP=$(curl -s -m $NORM_TIMEOUT -X POST http://$HOST:$PORT/api/embeddings \
     -H "Content-Type: application/json" \
-    -d '{"model": "mistral", "prompt": "Ceci est un test d'\''embedding"}' | jq . || echo "Erreur: /api/embeddings ne répond pas"
+    -d "{\"model\": \"$MODEL\", \"prompt\": \"Ceci est un test d'embedding\"}")
+  if [ $? -eq 0 ] && [ ! -z "$EMB_RESP" ]; then
+    echo "$EMB_RESP" | jq .
+    # Vérifier si la réponse contient une erreur
+    if echo "$EMB_RESP" | jq -e '.error' > /dev/null; then
+      echo "⚠️ AVERTISSEMENT: /api/embeddings a renvoyé une erreur"
+    fi
+  else
+    echo "❌ ERREUR: /api/embeddings ne répond pas ou renvoie une réponse vide"
+  fi
     
   # 7. GET /api/models/:model/context - Informations sur le contexte d'un modèle
   echo -e "\n[TEST 7/8] GET /api/models/:model/context - Informations sur le contexte"
-  curl -s -m 5 http://$HOST:$PORT/api/models/mistral/context | jq . || echo "Erreur: /api/models/:model/context ne répond pas"
+  CTX_RESP=$(curl -s -m $NORM_TIMEOUT http://$HOST:$PORT/api/models/$MODEL/context)
+  if [ $? -eq 0 ] && [ ! -z "$CTX_RESP" ]; then
+    echo "$CTX_RESP" | jq .
+  else
+    echo "❌ ERREUR: /api/models/$MODEL/context ne répond pas ou renvoie une réponse vide"
+  fi
     
   # 8. POST /api/transfer - Test de transfert de modèle
   echo -e "\n[TEST 8/8] POST /api/transfer - Test de transfert de modèle"
   # Récupérer d'abord la liste des serveurs
-  SERVERS_JSON=$(curl -s -m 5 http://$HOST:$PORT/api/servers)
-  
-  # Extraire les deux premiers serveurs s'ils existent
-  if [ ! -z "$SERVERS_JSON" ]; then
+  if [ ! -z "$SERVERS_RESP" ]; then
     # Utiliser jq pour extraire les clés du dictionnaire 'servers' (ce sont les adresses des serveurs)
-    SERVER_ADDRESSES=$(echo $SERVERS_JSON | jq -r '.servers | keys | .[0:2][]' 2>/dev/null)
+    SERVER_ADDRESSES=$(echo $SERVERS_RESP | jq -r '.servers | keys | .[0:2][]' 2>/dev/null)
     
     # Convertir en tableau
     readarray -t SERVER_ARRAY <<< "$SERVER_ADDRESSES"
@@ -131,19 +183,41 @@ test_all_endpoints() {
       SOURCE_SERVER="${SERVER_ARRAY[0]}"
       TARGET_SERVER="${SERVER_ARRAY[1]}"
       
-      echo "  Tentative de transfert du modèle 'mistral' de $SOURCE_SERVER vers $TARGET_SERVER"
-      curl -s -m 10 -X POST http://$HOST:$PORT/api/transfer \
+      echo "  Tentative de transfert du modèle '$MODEL' de $SOURCE_SERVER vers $TARGET_SERVER"
+      TRANSFER_RESP=$(curl -s -m $GEN_TIMEOUT -X POST http://$HOST:$PORT/api/transfer \
         -H "Content-Type: application/json" \
-        -d "{\"model\": \"mistral\", \"source\": \"$SOURCE_SERVER\", \"target\": \"$TARGET_SERVER\"}" | jq . || echo "Erreur: /api/transfer ne répond pas"
+        -d "{\"model\": \"$MODEL\", \"source\": \"$SOURCE_SERVER\", \"target\": \"$TARGET_SERVER\"}")
+      
+      if [ $? -eq 0 ] && [ ! -z "$TRANSFER_RESP" ]; then
+        echo "$TRANSFER_RESP" | jq .
+        # Vérifier si le transfert a réussi
+        if echo "$TRANSFER_RESP" | jq -e '.success == true' > /dev/null; then
+          echo "✅ Transfert initié avec succès"
+        else
+          echo "⚠️ AVERTISSEMENT: Le transfert a échoué"
+        fi
+      else
+        echo "❌ ERREUR: /api/transfer ne répond pas ou renvoie une réponse vide"
+      fi
     else
-      echo "  Pas assez de serveurs disponibles pour tester le transfert"
+      echo "  ⚠️ Pas assez de serveurs disponibles pour tester le transfert"
     fi
   else
-    echo "  Impossible de récupérer la liste des serveurs"
+    echo "  ❌ Impossible de récupérer la liste des serveurs pour le test de transfert"
   fi
   
+  # Résumé des tests
   echo -e "\n==================================================================="
-  echo "                      TEST DES ENDPOINTS TERMINÉ                     "
+  echo "                      RÉSUMÉ DES TESTS API                           "
+  echo "==================================================================="
+  echo "✅ /api/status       : $([ ! -z "$STATUS_RESP" ] && echo "OK" || echo "ÉCHEC")"
+  echo "✅ /api/models       : $([ ! -z "$MODELS_RESP" ] && echo "OK" || echo "ÉCHEC")"
+  echo "✅ /api/servers      : $([ ! -z "$SERVERS_RESP" ] && echo "OK" || echo "ÉCHEC")"
+  echo "✅ /api/generate     : $([ ! -z "$GEN_RESP" ] && (echo "$GEN_RESP" | jq -e '.error > 0' > /dev/null 2>&1 && echo "ERREUR" || echo "OK") || echo "ÉCHEC")"
+  echo "✅ /api/chat         : $([ ! -z "$CHAT_RESP" ] && (echo "$CHAT_RESP" | jq -e '.error > 0' > /dev/null 2>&1 && echo "ERREUR" || echo "OK") || echo "ÉCHEC")"
+  echo "✅ /api/embeddings   : $([ ! -z "$EMB_RESP" ] && (echo "$EMB_RESP" | jq -e '.error > 0' > /dev/null 2>&1 && echo "ERREUR" || echo "OK") || echo "ÉCHEC")"
+  echo "✅ /api/models/context: $([ ! -z "$CTX_RESP" ] && echo "OK" || echo "ÉCHEC")"
+  echo "✅ /api/transfer     : $([ ! -z "${TRANSFER_RESP:-}" ] && (echo "${TRANSFER_RESP:-{}}" | jq -e '.success == true' > /dev/null 2>&1 && echo "OK" || echo "ERREUR") || echo "NON TESTÉ")"
   echo "==================================================================="
 }
 

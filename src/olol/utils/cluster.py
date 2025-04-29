@@ -421,6 +421,67 @@ class ModelManager:
                 recommended = max(recommended, large_recommendation)
             
             return recommended
+    
+    def update_model_info(self, model_name: str, details: Dict[str, Any]) -> None:
+        """Update the information about a model with new details.
+        
+        Args:
+            model_name: Name of the model
+            details: Dictionary containing model details to update
+        """
+        with self.lock:
+            if model_name not in self.models:
+                self.models[model_name] = {}
+                
+            # Update the model details
+            self.models[model_name].update(details)
+            
+            # Extract and update special fields if present
+            if "context_length" in details:
+                self.set_model_context_length(model_name, details["context_length"],
+                                         details.get("max_context_length"))
+                
+            if "embedding_dimension" in details:
+                self.set_embedding_dimension(model_name, details["embedding_dimension"])
+                
+            if "parameters" in details:
+                self.set_model_parameter_count(model_name, details["parameters"])
+                
+            logger.debug(f"Updated model info for {model_name}: {details}")
+    
+    def get_all_models_with_details(self) -> Dict[str, Dict[str, Any]]:
+        """Get all models with their details.
+        
+        Returns:
+            Dict mapping model names to their details
+        """
+        with self.lock:
+            models_with_details = {}
+            
+            for model_name in self.model_server_map:
+                # Start with basic info - servers list
+                servers = self.model_server_map[model_name].copy()
+                model_info = {"servers": servers}
+                
+                # Add details from models dictionary
+                if model_name in self.models:
+                    model_info.update(self.models[model_name])
+                    
+                # Add context length information if available
+                if model_name in self.model_context_lengths:
+                    model_info["context"] = self.model_context_lengths[model_name].copy()
+                    
+                # Add embedding dimension if available
+                if model_name in self.model_embedding_dims:
+                    model_info["embedding_dim"] = self.model_embedding_dims[model_name]
+                    
+                # Add parameter count if available
+                if model_name in self.model_parameters:
+                    model_info["parameter_count"] = self.model_parameters[model_name]
+                    
+                models_with_details[model_name] = model_info
+                
+            return models_with_details
 
 
 class OllamaCluster:
@@ -566,32 +627,38 @@ class OllamaCluster:
                 # Still update, but don't log
                 self.server_health[server] = healthy
     
-    def update_model_availability(self, server: str, models: List[str], 
-                              model_details: Optional[Dict[str, Dict[str, Any]]] = None) -> None:
-        """Update which models are available on which servers.
+    def update_model_availability(self, server_address: str, models: List[str], 
+                              model_details: Dict[str, Any] = None) -> None:
+        """Update the availability of models on a server.
         
         Args:
-            server: Server address
-            models: List of model names available on this server
-            model_details: Optional dictionary mapping model names to their details
+            server_address: Address of the server in "host:port" format
+            models: List of model names available on the server
+            model_details: Optional dictionary of model details
         """
-        # Use the new model manager for the update
-        self.model_manager.update_server_models(server, models)
-        
-        # If we have details about specific models, register them
-        if model_details:
-            for model_name, details in model_details.items():
-                if model_name in models:  # Only register if the model is actually available
-                    self.model_manager.register_model(model_name, server, details)
-        
-        # Update server capabilities with model info
-        with self.capabilities_lock:
-            if server in self.server_capabilities:
-                self.server_capabilities[server]["models"] = models
+        with self.model_lock:
+            # Mettre à jour la carte modèle -> serveurs
+            for model in models:
+                if model not in self.model_server_map:
+                    self.model_server_map[model] = []
+                    
+                # Ajouter ce serveur s'il n'est pas déjà dans la liste
+                if server_address not in self.model_server_map[model]:
+                    self.model_server_map[model].append(server_address)
                 
-        # Log the updated model availability
-        logger.debug(f"Server {server} now has {len(models)} models: {', '.join(models[:5])}" + 
-                    (f" and {len(models)-5} more" if len(models) > 5 else ""))
+                # Si nous avons des détails sur ce modèle, mettons à jour le gestionnaire de modèles
+                if model_details and model in model_details and hasattr(self, 'model_manager'):
+                    try:
+                        params = model_details[model]
+                        if isinstance(params, dict):
+                            # Mettre à jour les infos du modèle avec les détails
+                            self.model_manager.update_model_info(model, params)
+                    except Exception as e:
+                        # Ignorer les erreurs pour éviter de bloquer la mise à jour
+                        pass
+                        
+            # Mettre à jour la carte serveur -> modèles également
+            self.server_model_map[server_address] = list(models)
     
     def remove_session(self, session_id: str) -> None:
         """Remove a session from the tracking map.

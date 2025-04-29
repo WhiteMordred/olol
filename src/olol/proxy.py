@@ -423,239 +423,102 @@ def health_checker() -> None:
         
     logger.info("Health checker started")
     
-    # Use the cluster's own lock for thread safety
-    # This ensures we're properly synchronized with other threads accessing the cluster
+    # Map pour stocker les modèles sur chaque serveur
+    server_model_map = {}
     
     while True:
         try:
-            # Make a copy of server addresses to avoid modifying during iteration
-            # Using the cluster's own lock for proper synchronization
+            # Faire une copie des adresses de serveurs pour éviter les modifications pendant l'itération
             with cluster.server_lock:
                 servers = list(cluster.server_addresses)
                 
-                # Filter out problematic servers:
-                # 1. Localhost entries if we have real servers
-                # 2. Invalid formatted addresses
-                
-                # First check if we have real remote servers (excluding localhost/loopback addresses)
-                has_real_servers = any(
-                    not server.startswith("127.0.0.1") and 
-                    not server.startswith("localhost") and
-                    not server.startswith("::1") and
-                    ":" in server  # Must have host:port format
-                    for server in servers
-                )
-                
-                if has_real_servers:
-                    # If we have real servers, filter out localhost/IPv6 loopback
-                    filtered_servers = []
-                    for server in servers:
-                        # Skip localhost and IPv6 loopback addresses
-                        if (server.startswith("127.0.0.1") or 
-                            server.startswith("localhost") or
-                            server.startswith("::1")):
-                            continue
-                        
-                        # Check if this is an IPv6 address with port
-                        is_ipv6_with_port = server.count(':') > 1 and ']' in server
-                            
-                        # Verify server has valid host:port format
-                        try:
-                            if is_ipv6_with_port:
-                                # IPv6 addresses with port format: [IPv6]:port
-                                # Extract the parts between brackets
-                                host = server[1:server.rindex(']')]
-                                port = server[server.rindex(']')+2:]  # +2 to skip ']:' 
-                            else:
-                                # IPv4 or hostname format: host:port
-                                host, port = server.rsplit(":", 1)
-                                
-                            # Validate port is numeric
-                            int(port)
-                            filtered_servers.append(server)
-                        except (ValueError, TypeError, IndexError):
-                            logger.warning(f"Skipping invalid server address: {server}")
-                            
-                    # Use filtered list only if we have valid servers
-                    if filtered_servers:
-                        servers = filtered_servers
-                
             for server in servers:
-                # Skip malformed addresses
+                # Ignorer les adresses invalides
                 if not isinstance(server, str) or not server:
                     logger.warning(f"Skipping invalid server address: {server}")
                     continue
                 
-                # Skip IPv6 loopback
-                if server == "[::1]:50052" or server == "::1:50052":
-                    logger.debug(f"Skipping IPv6 loopback: {server}")
-                    continue
-                
-                # Normalize IPv6 addresses: convert "::1:50052" to "[::1]:50052" format
-                if ':' in server and server.count(':') > 1 and ']' not in server:
-                    # This is likely an IPv6 address without brackets
-                    try:
-                        # Split at the last colon for the port
-                        last_colon = server.rindex(':')
-                        ipv6_part = server[:last_colon]
-                        port_part = server[last_colon+1:]
-                        
-                        # Create the proper [IPv6]:port format
-                        server = f"[{ipv6_part}]:{port_part}"
-                        logger.debug(f"Normalized IPv6 address to: {server}")
-                    except (ValueError, IndexError) as e:
-                        logger.warning(f"Failed to normalize IPv6 address {server}: {e}")
+                # Pour l'affichage dans les logs
+                short_server = server.split(":")[-1]
                 
                 client = None
                 try:
-                    # Create client with proper error handling
-                    try:
-                        client = create_grpc_client(server)
-                    except ValueError as format_err:
-                        logger.error(f"Server {server} health check failed: {format_err}")
-                        with cluster.health_lock:
-                            if server in cluster.server_health:
-                                # Only force health update on initial connection
-                                first_check = server not in cluster.server_health
-                                cluster.mark_server_health(server, False, force=first_check)
-                        continue
-                    
-                    # Try the explicit health check method
-                    try:
-                        health_status = client.check_health()
-                        if health_status:
-                            with cluster.health_lock:
-                                cluster.mark_server_health(server, True)
-                            
-                            # Also update the model availability
-                            try:
-                                # First get list of models
-                                models_response = client.list_models()
-                                models = [model.name for model in models_response.models]
-                                
-                                # Get details for each model
-                                model_details = {}
-                                for model_name in models[:5]:  # Limit to 5 models to avoid excessive API calls
-                                    try:
-                                        # Use the Show API to get model details
-                                        show_request = ollama_pb2.ShowRequest(model=model_name)
-                                        show_response = client.stub.Show(show_request)
-                                        
-                                        # Extract model details
-                                        model_info = {}
-                                        
-                                        # Get parameter size if available
-                                        if show_response.model.parameter_size:
-                                            model_info["parameters"] = show_response.model.parameter_size
-                                            # Also try to parse and set parameter count
-                                            try:
-                                                cluster.model_manager.set_model_parameter_count(
-                                                    model_name, show_response.model.parameter_size
-                                                )
-                                            except Exception:
-                                                pass
-                                        
-                                        # Get context length from template, system or modelfile
-                                        ctx_sources = [
-                                            show_response.template,
-                                            show_response.system,
-                                            show_response.modelfile
-                                        ]
-                                        
-                                        for source in ctx_sources:
-                                            if source:
-                                                ctx_length = cluster.model_manager.detect_context_length_from_modelfile(
-                                                    model_name, source
-                                                )
-                                                if ctx_length:
-                                                    model_info["context_length"] = ctx_length
-                                                    break
-                                        
-                                        # Store model parameters if any found
-                                        if model_info:
-                                            model_details[model_name] = model_info
-                                            
-                                    except Exception as show_err:
-                                        logger.debug(f"Error getting details for model {model_name}: {show_err}")
-                                        
-                                # Update the cluster with models and their details
-                                with cluster.model_lock:
-                                    cluster.update_model_availability(server, models, model_details)
-                                    
-                            except Exception as model_err:
-                                logger.warning(f"Server {server} is healthy but couldn't list models: {str(model_err)}")
-                        else:
-                            # Don't mark established servers as unhealthy from temporary failures
-                            logger.error(f"Server {server} health check failed")
-                            with cluster.health_lock:
-                                # Only force health update on initial connection
-                                first_check = server not in cluster.server_health
-                                cluster.mark_server_health(server, False, force=first_check)
-                    except AttributeError:
-                        # This might be a version mismatch - try another method
-                        logger.warning(f"Server {server} missing check_health method - attempting fallback")
-                        try:
-                            # Try list_models as a fallback health check
-                            models_response = client.list_models()
-                            with cluster.health_lock:
-                                cluster.mark_server_health(server, True)
-                            
-                            # Update model availability
-                            models = [model.name for model in models_response.models]
-                            
-                            # Try to get details for a few models
-                            model_details = {}
-                            for model_name in models[:3]:  # Limit to 3 in fallback path to be lighter
-                                try:
-                                    # Use the Show API to get model details
-                                    show_request = ollama_pb2.ShowRequest(model=model_name)
-                                    show_response = client.stub.Show(show_request)
-                                    
-                                    # Extract context length and other details
-                                    if show_response.modelfile:
-                                        cluster.model_manager.detect_context_length_from_modelfile(
-                                            model_name, show_response.modelfile
-                                        )
-                                except Exception:
-                                    pass
-                                    
-                            with cluster.model_lock:
-                                cluster.update_model_availability(server, models, model_details)
-                        except Exception as fallback_err:
-                            logger.error(f"Server {server} fallback health check failed: {fallback_err}")
-                            with cluster.health_lock:
-                                # Only force health update on initial connection
-                                first_check = server not in cluster.server_health
-                                cluster.mark_server_health(server, False, force=first_check)
-                    
-                except Exception as e:
-                    # Parse the error for better debugging
-                    if "Connection refused" in str(e):
-                        error_detail = f"Connection refused - server {server} may not be running"
-                    elif "UNAVAILABLE" in str(e):
-                        error_detail = f"Server {server} is unavailable - network issue or server down"
-                    elif "UNIMPLEMENTED" in str(e) or "Method not found" in str(e):
-                        error_detail = f"API version mismatch with server {server} - incompatible gRPC definitions"
-                    else:
-                        error_detail = str(e)
+                    # Format host:port simple
+                    if server.count(':') == 1:
+                        host, port_str = server.split(':')
+                        port = int(port_str)
+                        client = OllamaClient(host=host, port=port)
                         
-                    logger.error(f"Server health check failed: {error_detail}")
-                    
-                    # Mark as unhealthy but verify first that server still exists in cluster
+                        # Vérifier l'état de santé
+                        is_healthy = client.check_health()
+                        
+                        # Mise à jour de l'état de santé
+                        with cluster.health_lock:
+                            cluster.mark_server_health(server, is_healthy)
+                            
+                        # Si serveur en bonne santé, récupérer les modèles
+                        if is_healthy:
+                            # Récupérer les modèles
+                            try:
+                                models_response = client.list_models()
+                                models = []
+                                
+                                # Extraire les noms des modèles
+                                if hasattr(models_response, 'models'):
+                                    models = [model.name for model in models_response.models]
+                                    logger.info(f"Server {short_server} has {len(models)} models: {', '.join(models) if models else 'none'}")
+                                    
+                                    # Update the cluster with this server's models
+                                    # Add server -> models mapping 
+                                    server_model_map[server] = models
+                                    
+                                    # Update model -> server mapping in cluster
+                                    with cluster.model_lock:
+                                        for model_name in models:
+                                            if model_name not in cluster.model_server_map:
+                                                cluster.model_server_map[model_name] = []
+                                            
+                                            if server not in cluster.model_server_map[model_name]:
+                                                cluster.model_server_map[model_name].append(server)
+                                                
+                                    # Créer un dictionnaire de détails pour les modèles
+                                    model_details = {}
+                                    
+                                    # Pour les 3 premiers modèles, récupérer des détails supplémentaires
+                                    for model_name in models[:3]:  # Limite pour éviter trop d'appels API
+                                        try:
+                                            # Créer un dictionnaire pour ce modèle
+                                            model_details[model_name] = {
+                                                "parameters": "Not detected"
+                                            }
+                                            
+                                            # Pour des détails supplémentaires, on pourrait appeler d'autres méthodes ici
+                                            # Mais pour l'instant, on se contente des noms de modèles
+                                        except Exception as e:
+                                            logger.debug(f"Error getting details for model {model_name}: {e}")
+                                    
+                                    # Mise à jour de la disponibilité des modèles
+                                    cluster.model_manager.update_server_models(server, models)
+                                else:
+                                    logger.warning(f"Server {short_server} returned invalid model list")
+                            except Exception as model_err:
+                                logger.warning(f"Failed to list models on server {short_server}: {model_err}")
+                    else:
+                        # Format IPv6 non géré pour cette fonction simplifiée
+                        logger.debug(f"Skipping IPv6 address: {server}")
+                except Exception as e:
+                    logger.error(f"Health check failed for server {short_server}: {e}")
                     with cluster.health_lock:
-                        if server in cluster.server_health:
-                            # Only force health update on initial connection or severe error
-                            first_check = server not in cluster.server_health
-                            force_unhealthy = first_check or "Connection refused" in str(e)
-                            cluster.mark_server_health(server, False, force=force_unhealthy)
+                        cluster.mark_server_health(server, False)
                 finally:
                     if client:
                         client.close()
-                    
+            
+            # Pause entre les vérifications
             time.sleep(health_check_interval)
         except Exception as e:
-            logger.error(f"Error in health checker: {str(e)}")
-            time.sleep(5)  # Wait a bit and continue
+            logger.error(f"Error in health checker: {e}")
+            time.sleep(5)  # Wait a bit and try again
 
 
 @app.route('/api/generate', methods=['POST'])
@@ -1238,87 +1101,20 @@ def get_model_context(model_name):
         return jsonify({"error": "Model name required"}), 400
     
     try:
-        # Version simplifiée qui garantit une réponse
+        # Version ultra simplifiée qui garantit une réponse immédiate
+        # sans bloquer le serveur
         context_info = {
-            "current": 4096,  # Valeur par défaut
-            "max": 8192
+            "current": 4096,  # Valeur par défaut pour la plupart des modèles
+            "max": 8192       # Valeur par défaut pour la limite maximale  
         }
         
-        # Essayer de récupérer les informations spécifiques si disponibles
-        if hasattr(cluster, 'model_manager') and cluster.model_manager:
-            try:
-                # Récupérer les informations du modèle
-                custom_context = cluster.model_manager.get_model_context_length(model_name)
-                if custom_context:
-                    context_info.update(custom_context)
-            except Exception as e:
-                logger.warning(f"Error getting context for {model_name}: {str(e)}")
+        # Ne pas effectuer d'opérations bloquantes
+        # On retourne simplement les informations par défaut
         
-        # Essayer d'obtenir des informations plus précises sur le contexte
-        # en interrogeant directement les serveurs
-        with cluster.server_lock:
-            server_addresses = list(cluster.server_addresses)
-        
-        # Essayer jusqu'à 3 serveurs pour obtenir des informations
-        for server_address in server_addresses[:3]:
-            try:
-                if server_address.count(':') == 1:
-                    host, port_str = server_address.split(':')
-                    port = int(port_str)
-                    
-                    client = OllamaClient(host=host, port=port)
-                    try:
-                        # Vérifier si le serveur est sain
-                        is_healthy = client.check_health()
-                        if not is_healthy:
-                            continue
-                        
-                        # Vérifier si le modèle est disponible sur ce serveur
-                        with cluster.model_lock:
-                            if model_name not in cluster.model_server_map or server_address not in cluster.model_server_map[model_name]:
-                                continue
-                        
-                        # Interroger le serveur pour les détails du modèle
-                        from ..proto import ollama_pb2
-                        show_request = ollama_pb2.ShowRequest(model=model_name)
-                        show_response = client.stub.Show(show_request)
-                        
-                        # Essayer d'extraire les informations de contexte du modelfile
-                        if show_response.modelfile:
-                            # Rechercher des indicateurs de taille de contexte dans le modelfile
-                            modelfile = show_response.modelfile.lower()
-                            
-                            # Recherche des patterns communs pour la taille de contexte
-                            import re
-                            patterns = [
-                                r"context(?:\s+|=)(\d+)",
-                                r"ctx(?:\s+|=)(\d+)",
-                                r"context.size(?:\s+|=)(\d+)",
-                                r"context[_-]length(?:\s+|=)(\d+)",
-                                r"window(?:\s+|=)(\d+)"
-                            ]
-                            
-                            for pattern in patterns:
-                                match = re.search(pattern, modelfile)
-                                if match:
-                                    try:
-                                        context_info["current"] = int(match.group(1))
-                                        break
-                                    except (ValueError, TypeError):
-                                        pass
-                    except Exception as e:
-                        logger.debug(f"Error getting model details from {server_address}: {str(e)}")
-                    finally:
-                        client.close()
-            except Exception:
-                continue
-        
-        # Formatage de la réponse finale
         return jsonify({
             "model": model_name,
             "context": context_info
         })
-        
     except Exception as e:
         logger.error(f"Error getting model context: {str(e)}")
         # Renvoyer une réponse par défaut en cas d'erreur
