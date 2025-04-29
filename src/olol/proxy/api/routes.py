@@ -3,6 +3,7 @@ Module contenant les routes API pour le proxy Ollama.
 Ce module redirige les routes API vers le service OllamaAPIService.
 """
 
+import json
 import logging
 from typing import Any, Dict, Optional
 from flask import Blueprint, request, jsonify, Response, stream_with_context
@@ -36,11 +37,30 @@ def register_api_routes(app, api_service):
             data = request.json
             # Convertir les données JSON en objet GenerateRequest
             generate_request = dict_to_generate_request(data)
-            response = api_service.generate(generate_request)
-            return response
+            
+            # Si generate_request.stream est vrai, utiliser le streaming
+            if generate_request.stream:
+                def generate_stream():
+                    try:
+                        for chunk in api_service.generate_stream(generate_request):
+                            yield f"data: {json.dumps(chunk)}\n\n"
+                    except Exception as e:
+                        logger.error(f"Erreur lors du streaming: {str(e)}")
+                        yield f"data: {json.dumps({'error': str(e), 'done': True})}\n\n"
+                
+                return Response(
+                    generate_stream(),
+                    mimetype='text/event-stream',
+                    headers={'Cache-Control': 'no-cache'}
+                )
+            else:
+                # Génération standard (non-streaming)
+                response = api_service.generate(generate_request)
+                return jsonify(response)
+                
         except Exception as e:
             logger.error(f"Erreur lors de la génération: {str(e)}")
-            return {'error': f"Erreur de génération: {str(e)}"}, 500
+            return jsonify({'error': f"Erreur de génération: {str(e)}"}), 500
     
     # Route API de chat
     @app.route('/api/v1/chat', methods=['POST'])

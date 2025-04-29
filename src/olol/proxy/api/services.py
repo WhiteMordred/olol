@@ -46,7 +46,7 @@ class OllamaProxyService:
         Returns:
             Un tuple (client, host, port) ou (None, "", 0) si aucun serveur n'est disponible
         """
-        server_address = self.cluster_manager.get_best_server_for_model(model_name)
+        server_address = self.cluster_manager.get_optimal_server(model_name)
         if not server_address:
             return None, "", 0
             
@@ -397,9 +397,14 @@ class OllamaProxyService:
         from ..stats import request_stats
         
         distributed_available = False
+        distributed_enabled = False
+        
         try:
             from olol.rpc.coordinator import InferenceCoordinator
             distributed_available = True
+            # Vérifier si la fonctionnalité distributed_inference est configurée
+            # sans accéder directement à l'attribut qui pourrait ne pas exister
+            distributed_enabled = hasattr(self.cluster_manager, 'use_distributed_inference') and self.cluster_manager.use_distributed_inference
         except ImportError:
             pass
             
@@ -413,7 +418,7 @@ class OllamaProxyService:
             active_requests=request_stats["active_requests"],
             total_requests=request_stats["total_requests"],
             distributed_available=distributed_available,
-            distributed_enabled=self.cluster_manager.use_distributed_inference
+            distributed_enabled=distributed_enabled
         )
         
         # Ajouter les informations sur les serveurs
@@ -487,13 +492,18 @@ class OllamaProxyService:
         # Récupérer les informations sur les serveurs
         for server_address in self.cluster_manager.get_server_addresses():
             # Récupérer l'état de santé
-            is_healthy = self.cluster_manager.is_server_healthy(server_address)
+            is_healthy = self.cluster_manager.get_server_health(server_address)
             
             # Récupérer la charge
             server_load = self.cluster_manager.get_server_load(server_address)
             
-            # Récupérer les modèles
-            server_models = self.cluster_manager.get_models_for_server(server_address)
+            # Récupérer les modèles en utilisant les informations du cache global
+            # Pour chaque modèle, vérifier si ce serveur est dans la liste des serveurs
+            server_models = []
+            all_models = self.cluster_manager.get_all_models()
+            for model, servers in all_models.items():
+                if server_address in servers:
+                    server_models.append(model)
             
             # Créer l'objet ServerInfo
             servers_dict[server_address] = ServerInfo(
@@ -511,3 +521,170 @@ class OllamaProxyService:
         )
         
         return response
+        
+    def add_server(self, address: str, verify_health: bool = True) -> Dict[str, Any]:
+        """
+        Ajoute un nouveau serveur au cluster.
+        
+        Args:
+            address: L'adresse du serveur au format host:port
+            verify_health: Si True, vérifie la santé du serveur avant de l'ajouter
+            
+        Returns:
+            Un dictionnaire contenant le résultat de l'opération
+        """
+        try:
+            # Vérifier le format de l'adresse
+            if address.count(':') != 1:
+                return {
+                    "success": False,
+                    "error": "Format d'adresse invalide, utilisez host:port"
+                }
+            
+            # Ajouter au cluster via l'attribut _cluster de ClusterManager
+            if hasattr(self.cluster_manager, '_cluster') and self.cluster_manager._cluster:
+                with self.cluster_manager._cluster.server_lock:
+                    # Vérifier si le serveur existe déjà
+                    if address in self.cluster_manager._cluster.server_addresses:
+                        return {
+                            "success": False,
+                            "error": "Le serveur existe déjà dans le cluster"
+                        }
+                    
+                    # Vérifier la santé si nécessaire
+                    if verify_health:
+                        client = self.cluster_manager.get_client_for_server(address)
+                        if not client:
+                            return {
+                                "success": False,
+                                "error": "Impossible de créer un client pour ce serveur"
+                            }
+                        
+                        try:
+                            is_healthy = client.check_health()
+                            if not is_healthy:
+                                return {
+                                    "success": False,
+                                    "error": "Le serveur n'est pas en bonne santé"
+                                }
+                        finally:
+                            client.close()
+                    
+                    # Ajouter l'adresse à la liste
+                    self.cluster_manager._cluster.server_addresses.append(address)
+                    
+                    # Marquer comme sain dans le cache de santé
+                    with self.cluster_manager._cluster.health_lock:
+                        self.cluster_manager._cluster.server_health[address] = True
+                    
+                    # Initialiser la charge à 0
+                    with self.cluster_manager._cluster.server_lock:
+                        self.cluster_manager._cluster.server_loads[address] = 0.0
+                    
+                    # Mettre à jour le cache dans le gestionnaire
+                    self.cluster_manager.refresh_cache()
+                    
+                    # Découvrir les modèles disponibles sur ce serveur
+                    try:
+                        host, port_str = address.split(':')
+                        port = int(port_str)
+                        client = OllamaClient(host=host, port=port)
+                        
+                        try:
+                            models_response = client.list_models()
+                            
+                            if hasattr(models_response, 'models'):
+                                with self.cluster_manager._cluster.model_lock:
+                                    for model in models_response.models:
+                                        model_name = model.name
+                                        if model_name not in self.cluster_manager._cluster.model_server_map:
+                                            self.cluster_manager._cluster.model_server_map[model_name] = set([address])
+                                        else:
+                                            self.cluster_manager._cluster.model_server_map[model_name].add(address)
+                        finally:
+                            client.close()
+                    except Exception as e:
+                        logger.warning(f"Erreur lors de la découverte des modèles pour {address}: {e}")
+                        # On continue même en cas d'erreur car le serveur est ajouté
+                    
+                    return {
+                        "success": True,
+                        "address": address,
+                        "message": "Serveur ajouté avec succès"
+                    }
+            else:
+                return {
+                    "success": False,
+                    "error": "Gestionnaire de cluster non initialisé"
+                }
+        
+        except Exception as e:
+            logger.error(f"Erreur lors de l'ajout du serveur {address}: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+    
+    def remove_server(self, address: str) -> Dict[str, Any]:
+        """
+        Supprime un serveur du cluster.
+        
+        Args:
+            address: L'adresse du serveur à supprimer
+            
+        Returns:
+            Un dictionnaire contenant le résultat de l'opération
+        """
+        try:
+            # Supprimer du cluster via l'attribut _cluster de ClusterManager
+            if hasattr(self.cluster_manager, '_cluster') and self.cluster_manager._cluster:
+                with self.cluster_manager._cluster.server_lock:
+                    # Vérifier si le serveur existe
+                    if address not in self.cluster_manager._cluster.server_addresses:
+                        return {
+                            "success": False,
+                            "error": "Le serveur n'existe pas dans le cluster"
+                        }
+                    
+                    # Supprimer de la liste des adresses
+                    self.cluster_manager._cluster.server_addresses.remove(address)
+                    
+                    # Supprimer du cache de santé
+                    with self.cluster_manager._cluster.health_lock:
+                        if address in self.cluster_manager._cluster.server_health:
+                            del self.cluster_manager._cluster.server_health[address]
+                    
+                    # Supprimer du cache de charge
+                    with self.cluster_manager._cluster.server_lock:
+                        if address in self.cluster_manager._cluster.server_loads:
+                            del self.cluster_manager._cluster.server_loads[address]
+                    
+                    # Supprimer des mappages de modèles
+                    with self.cluster_manager._cluster.model_lock:
+                        for model_name, servers in list(self.cluster_manager._cluster.model_server_map.items()):
+                            if address in servers:
+                                servers.remove(address)
+                                # Si plus aucun serveur ne propose ce modèle, supprimer l'entrée
+                                if not servers:
+                                    del self.cluster_manager._cluster.model_server_map[model_name]
+                    
+                    # Mettre à jour le cache dans le gestionnaire
+                    self.cluster_manager.refresh_cache()
+                    
+                    return {
+                        "success": True,
+                        "address": address,
+                        "message": "Serveur supprimé avec succès"
+                    }
+            else:
+                return {
+                    "success": False,
+                    "error": "Gestionnaire de cluster non initialisé"
+                }
+        
+        except Exception as e:
+            logger.error(f"Erreur lors de la suppression du serveur {address}: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
