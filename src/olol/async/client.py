@@ -74,6 +74,8 @@ class AsyncOllamaClient:
                       options: Optional[Dict[str, str]] = None) -> AsyncIterator[ollama_pb2.GenerateResponse]:
         """Generate text from a model.
         
+        This method automatically falls back to RunModel if the server doesn't support Generate.
+        
         Args:
             model: Name of the model to use
             prompt: Text prompt to send to the model
@@ -93,10 +95,65 @@ class AsyncOllamaClient:
                 stream=stream,
                 options=options or {}
             )
-            async for response in self.stub.Generate(request):
-                yield response
-        except grpclib.exceptions.GRPCError as e:
-            logger.error(f"gRPC error: {e}")
+            try:
+                # Essayer d'abord la méthode moderne Generate
+                async for response in self.stub.Generate(request):
+                    yield response
+            except grpclib.exceptions.GRPCError as e:
+                # Si la commande "generate" n'est pas reconnue, utiliser RunModel
+                if "unknown command" in str(e) and "generate" in str(e).lower():
+                    logger.warning(f"Server doesn't support Generate API, falling back to RunModel. Error: {str(e)}")
+                    async for response in self._generate_with_runmodel(model, prompt, stream, options):
+                        yield response
+                else:
+                    # Autre erreur gRPC, la propager
+                    logger.error(f"gRPC error: {str(e)}")
+                    raise
+        except Exception as e:
+            logger.error(f"Generate error: {str(e)}")
+            raise
+            
+    async def _generate_with_runmodel(self, model: str, prompt: str, 
+                                    stream: bool = True, 
+                                    options: Optional[Dict[str, str]] = None) -> AsyncIterator[ollama_pb2.GenerateResponse]:
+        """Implementation fallback using RunModel instead of Generate.
+        
+        Args:
+            model: Name of the model to use
+            prompt: Text prompt to send to the model
+            stream: Whether to stream the response (ignored in this implementation)
+            options: Optional dictionary of model parameters
+            
+        Returns:
+            AsyncIterator with a single GenerateResponse
+        """
+        try:
+            # Convertir les options en paramètres pour RunModel
+            parameters = {}
+            if options:
+                parameters = options
+                
+            # Créer une requête RunModel
+            request = ollama_pb2.ModelRequest(
+                model_name=model,
+                prompt=prompt
+            )
+            
+            # Exécuter RunModel (non-streaming)
+            response = await self.stub.RunModel(request)
+            
+            # Créer une réponse compatible avec l'interface Generate
+            generate_response = ollama_pb2.GenerateResponse(
+                model=model,
+                response=response.output if hasattr(response, 'output') else str(response),
+                done=True,
+                total_duration=int(response.completion_time * 1000) if hasattr(response, 'completion_time') else 0
+            )
+            
+            # Retourner la réponse comme un générateur asynchrone
+            yield generate_response
+        except Exception as e:
+            logger.error(f"RunModel fallback error: {str(e)}")
             raise
     
     async def chat(self, model: str, messages: List[Dict[str, str]], 

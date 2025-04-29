@@ -660,14 +660,12 @@ def health_checker() -> None:
 
 @app.route('/api/generate', methods=['POST'])
 def generate():
-    """Handle generation requests by proxying to a cluster node or using distributed inference."""
-    # Version simplifiée qui garantit une réponse
-    
+    """Handle generation requests by proxying to a cluster node."""
     # Mise à jour des statistiques
     update_request_stats('generate')
     
-    # Vérification de base des données de la requête
     try:
+        # Validation des données de la requête
         data = request.json
         if not data:
             return jsonify({"error": "Invalid JSON"}), 400
@@ -682,22 +680,18 @@ def generate():
             
         # Options par défaut
         options = data.get('options', {})
-        stream = data.get('stream', False)  # Par défaut, pas de streaming pour simplifier
+        stream = data.get('stream', False)
         
-        # Sélectionner un serveur disponible sans risque de blocage
+        # Sélectionner un serveur disponible
         server_address = None
         if cluster:
             try:
-                # Liste des serveurs sains
                 healthy_servers = []
                 for server in cluster.server_addresses:
                     try:
-                        # Format host:port simple
                         if server.count(':') == 1:
                             host, port_str = server.split(':')
                             port = int(port_str)
-                            
-                            # Création d'un client léger pour tester rapidement la connexion
                             client = OllamaClient(host=host, port=port)
                             try:
                                 is_healthy = client.check_health()
@@ -710,11 +704,9 @@ def generate():
                     except:
                         continue
                         
-                # Utiliser le premier serveur sain si disponible
                 if healthy_servers:
                     server_address = healthy_servers[0]
             except:
-                # En cas d'erreur, ne pas bloquer
                 pass
                 
         # Si aucun serveur n'est disponible
@@ -725,9 +717,8 @@ def generate():
                 "done": True
             }), 503
             
-        # Créer un client gRPC
+        # Créer un client gRPC et appeler l'API
         try:
-            # Format host:port simple
             host, port_str = server_address.split(':')
             port = int(port_str)
             client = None
@@ -735,31 +726,25 @@ def generate():
             # Pour le non-streaming, on fait une requête simple
             if not stream:
                 try:
-                    # Utiliser la méthode generate() qui existe bien dans OllamaClient
                     client = OllamaClient(host=host, port=port)
+                    logger.debug(f"Calling generate on {host}:{port} for model {model}")
                     
-                    # Définir un timeout court pour éviter le blocage
-                    import time
-                    start_time = time.time()
-                    max_time = 7  # 7 secondes maximum
-                    
+                    # Utiliser directement la méthode generate du client
+                    # Assurez-vous que 'stream=False' pour obtenir une réponse complète
                     response_text = ""
                     final_response = None
                     
-                    # Appel à generate avec un timeout
+                    # Le client utilise generate qui appelle la méthode gRPC Generate
                     for resp in client.generate(model, prompt, False, options):
                         final_response = resp
                         if hasattr(resp, 'response'):
                             response_text += resp.response
-                        # Vérifier si on a dépassé le temps maximal
-                        if time.time() - start_time > max_time:
-                            break
                     
-                    # Formater la réponse au format attendu par l'API generate
+                    # Formater la réponse au format attendu
                     return jsonify({
                         "model": model,
                         "response": response_text,
-                        "done": True if final_response and hasattr(final_response, 'done') and final_response.done else True
+                        "done": True
                     })
                 except Exception as e:
                     logger.error(f"Error in generate API: {str(e)}")
@@ -774,17 +759,11 @@ def generate():
             # En mode streaming
             else:
                 def generate_stream():
+                    client = None
                     try:
                         client = OllamaClient(host=host, port=port)
                         
-                        # Réponse immédiate pour éviter le timeout
-                        yield json.dumps({
-                            "model": model,
-                            "response": "Starting generation...",
-                            "done": False
-                        }) + '\n'
-                        
-                        # Appel à generate avec streaming
+                        # Utiliser directement la méthode generate avec streaming
                         for resp in client.generate(model, prompt, True, options):
                             if hasattr(resp, 'response'):
                                 yield json.dumps({
@@ -837,7 +816,7 @@ def generate():
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
-    """Handle chat requests in a simplified manner that guarantees response."""
+    """Handle chat requests by converting to RunModel for compatibility."""
     # Update request stats
     update_request_stats('chat')
     
