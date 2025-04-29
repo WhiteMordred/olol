@@ -6,6 +6,7 @@ Ce module redirige les routes API vers le service OllamaAPIService.
 import logging
 from typing import Any, Dict, Optional
 from flask import Blueprint, request, jsonify, Response, stream_with_context
+from .models import dict_to_generate_request, dict_to_chat_request, dict_to_embeddings_request
 
 # Configuration du logging
 logger = logging.getLogger(__name__)
@@ -33,12 +34,9 @@ def register_api_routes(app, api_service):
         """Générer du texte à partir d'un prompt"""
         try:
             data = request.json
-            response = api_service.generate(
-                model=data.get('model'),
-                prompt=data.get('prompt'),
-                stream=data.get('stream', False),
-                options=data.get('options', {})
-            )
+            # Convertir les données JSON en objet GenerateRequest
+            generate_request = dict_to_generate_request(data)
+            response = api_service.generate(generate_request)
             return response
         except Exception as e:
             logger.error(f"Erreur lors de la génération: {str(e)}")
@@ -50,12 +48,9 @@ def register_api_routes(app, api_service):
         """Échanger avec un modèle en format conversation"""
         try:
             data = request.json
-            response = api_service.chat(
-                model=data.get('model'),
-                messages=data.get('messages'),
-                stream=data.get('stream', False),
-                options=data.get('options', {})
-            )
+            # Convertir les données JSON en objet ChatRequest
+            chat_request = dict_to_chat_request(data)
+            response = api_service.chat(chat_request)
             return response
         except Exception as e:
             logger.error(f"Erreur lors du chat: {str(e)}")
@@ -67,11 +62,9 @@ def register_api_routes(app, api_service):
         """Générer des embeddings à partir d'un texte"""
         try:
             data = request.json
-            response = api_service.embeddings(
-                model=data.get('model'),
-                prompt=data.get('prompt'),
-                options=data.get('options', {})
-            )
+            # Convertir les données JSON en objet EmbeddingsRequest
+            embeddings_request = dict_to_embeddings_request(data)
+            response = api_service.embeddings(embeddings_request)
             return response
         except Exception as e:
             logger.error(f"Erreur lors de la génération d'embeddings: {str(e)}")
