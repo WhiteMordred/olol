@@ -108,8 +108,8 @@ class RichUI:
         minutes, seconds = divmod(remainder, 60)
         uptime_str = f"{hours:02}:{minutes:02}:{seconds:02}"
         
-        spinner = Spinner("dots")
-        spinner_text = spinner.render()
+        # Utiliser un caractère fixe au lieu de spinner pour éviter l'erreur de render()
+        spinner_text = "•"
         grid = Table.grid(expand=True)
         grid.add_column(justify="left", ratio=1)
         grid.add_column(justify="right")
