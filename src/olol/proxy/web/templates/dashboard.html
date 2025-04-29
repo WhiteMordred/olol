@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - OLOL Proxy{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-12">
+        <h2 class="mb-4">Dashboard</h2>
+    </div>
+</div>
+
+<!-- Vue d'ensemble du cluster -->
+<div class="row mb-4">
+    <div class="col-lg-3 col-md-6">
+        <div class="card bg-primary text-white mb-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title">Serveurs</h5>
+                        <h2 id="servers-count">{{ stats.servers.total }}</h2>
+                    </div>
+                    <div>
+                        <i class="fas fa-server fa-3x"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer d-flex align-items-center justify-content-between">
+                <span>{{ stats.servers.healthy }} en ligne</span>
+                <a href="/servers" class="text-white">Plus d'infos <i class="fas fa-angle-right"></i></a>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="card bg-success text-white mb-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title">Modèles</h5>
+                        <h2 id="models-count">{{ stats.models.total }}</h2>
+                    </div>
+                    <div>
+                        <i class="fas fa-brain fa-3x"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer d-flex align-items-center justify-content-between">
+                <span>{{ stats.models.available }} disponibles</span>
+                <a href="/models" class="text-white">Plus d'infos <i class="fas fa-angle-right"></i></a>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="card bg-warning text-white mb-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title">Charge moyenne</h5>
+                        <h2 id="avg-load">{{ "%.2f"|format(stats.load.average) }}</h2>
+                    </div>
+                    <div>
+                        <i class="fas fa-microchip fa-3x"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer d-flex align-items-center justify-content-between">
+                <span>Max: {{ "%.2f"|format(stats.load.max) }}</span>
+                <a href="/stats" class="text-white">Plus d'infos <i class="fas fa-angle-right"></i></a>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="card bg-info text-white mb-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title">Latence</h5>
+                        <h2 id="avg-latency">{{ "%.1f"|format(stats.latency.average) }} ms</h2>
+                    </div>
+                    <div>
+                        <i class="fas fa-clock fa-3x"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer d-flex align-items-center justify-content-between">
+                <span>Min: {{ "%.1f"|format(stats.latency.min) }} ms</span>
+                <a href="/stats" class="text-white">Plus d'infos <i class="fas fa-angle-right"></i></a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Graphiques -->
+<div class="row mb-4">
+    <!-- Graphique de charge des serveurs -->
+    <div class="col-lg-6">
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="fas fa-chart-line me-1"></i>
+                    Charge des serveurs (dernière heure)
+                </div>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        Période
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item load-time-selector" href="#" data-time="1">1 heure</a></li>
+                        <li><a class="dropdown-item load-time-selector" href="#" data-time="6">6 heures</a></li>
+                        <li><a class="dropdown-item load-time-selector" href="#" data-time="24">24 heures</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="card-body">
+                <canvas id="serverLoadChart" height="225"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Graphique de santé des serveurs -->
+    <div class="col-lg-6">
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="fas fa-heartbeat me-1"></i>
+                    Santé des serveurs (dernière heure)
+                </div>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        Période
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item health-time-selector" href="#" data-time="1">1 heure</a></li>
+                        <li><a class="dropdown-item health-time-selector" href="#" data-time="6">6 heures</a></li>
+                        <li><a class="dropdown-item health-time-selector" href="#" data-time="24">24 heures</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="card-body">
+                <canvas id="serverHealthChart" height="225"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Activité récente et modèles populaires -->
+<div class="row">
+    <!-- Liste des serveurs -->
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="fas fa-server me-1"></i>
+                    Serveurs du cluster
+                </div>
+                <a href="/servers" class="btn btn-sm btn-primary">Voir tous</a>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>Adresse</th>
+                                <th>État</th>
+                                <th>Charge</th>
+                                <th>Modèles</th>
+                                <th>Latence</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for server in servers %}
+                            <tr>
+                                <td>{{ server.address }}</td>
+                                <td>
+                                    {% if server.healthy %}
+                                    <span class="badge bg-success">En ligne</span>
+                                    {% else %}
+                                    <span class="badge bg-danger">Hors ligne</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ "%.2f"|format(server.load) }}</td>
+                                <td>{{ server.models|length }}</td>
+                                <td>{{ "%.1f"|format(server.latency_ms) }} ms</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center">Aucun serveur disponible</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modèles populaires -->
+    <div class="col-lg-4">
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="fas fa-brain me-1"></i>
+                    Modèles populaires
+                </div>
+                <a href="/models" class="btn btn-sm btn-primary">Voir tous</a>
+            </div>
+            <div class="card-body">
+                <div class="list-group">
+                    {% for model in popular_models %}
+                    <a href="/models/{{ model.name }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                        {{ model.name }}
+                        <span class="badge bg-primary rounded-pill">{{ model.servers|length }} serveur{% if model.servers|length > 1 %}s{% endif %}</span>
+                    </a>
+                    {% else %}
+                    <div class="list-group-item">Aucun modèle disponible</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- État du système -->
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-info-circle me-1"></i>
+                Informations système
+            </div>
+            <div class="card-body">
+                <ul class="list-group">
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Uptime
+                        <span>{{ stats.uptime }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Version
+                        <span>{{ stats.version }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Mode cluster
+                        <span class="badge bg-success">Actif</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Données pour les graphiques (à remplacer par des données dynamiques)
+const loadChartData = {{ load_chart_data|tojson }};
+const healthChartData = {{ health_chart_data|tojson }};
+
+// Initialiser les graphiques quand le DOM est chargé
+document.addEventListener('DOMContentLoaded', function() {
+    // Graphique de charge
+    const loadCtx = document.getElementById('serverLoadChart');
+    const loadChart = new Chart(loadCtx, {
+        type: 'line',
+        data: loadChartData,
+        options: {
+            responsive: true,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                },
+                tooltip: {
+                    enabled: true
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Charge'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Heure'
+                    }
+                }
+            }
+        }
+    });
+    
+    // Graphique de santé
+    const healthCtx = document.getElementById('serverHealthChart');
+    const healthChart = new Chart(healthCtx, {
+        type: 'line',
+        data: healthChartData,
+        options: {
+            responsive: true,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                },
+                tooltip: {
+                    enabled: true
+                }
+            },
+            scales: {
+                y: {
+                    min: 0,
+                    max: 1,
+                    ticks: {
+                        stepSize: 1,
+                        callback: function(value) {
+                            return value === 0 ? 'Hors ligne' : 'En ligne';
+                        }
+                    },
+                    title: {
+                        display: true,
+                        text: 'État'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Heure'
+                    }
+                }
+            }
+        }
+    });
+    
+    // Gestion des sélecteurs de période
+    document.querySelectorAll('.load-time-selector').forEach(item => {
+        item.addEventListener('click', event => {
+            event.preventDefault();
+            const hours = event.target.getAttribute('data-time');
+            updateLoadChart(hours);
+        });
+    });
+    
+    document.querySelectorAll('.health-time-selector').forEach(item => {
+        item.addEventListener('click', event => {
+            event.preventDefault();
+            const hours = event.target.getAttribute('data-time');
+            updateHealthChart(hours);
+        });
+    });
+    
+    // Fonctions pour mettre à jour les graphiques
+    function updateLoadChart(hours) {
+        fetch(`/api/chart/load?hours=${hours}`)
+            .then(response => response.json())
+            .then(data => {
+                loadChart.data = data;
+                loadChart.update();
+            });
+    }
+    
+    function updateHealthChart(hours) {
+        fetch(`/api/chart/health?hours=${hours}`)
+            .then(response => response.json())
+            .then(data => {
+                healthChart.data = data;
+                healthChart.update();
+            });
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,272 @@
+/* OLOL Proxy - Feuille de style personnalisée */
+
+:root {
+    --primary-color: #3498db;
+    --secondary-color: #2c3e50;
+    --success-color: #2ecc71;
+    --danger-color: #e74c3c;
+    --warning-color: #f39c12;
+    --info-color: #3498db;
+    --light-color: #ecf0f1;
+    --dark-color: #2c3e50;
+}
+
+/* Styles généraux */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8f9fa;
+    color: #333;
+}
+
+/* Barre de navigation */
+.navbar-brand img {
+    margin-right: 10px;
+}
+
+/* Cartes */
+.card {
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.card-header {
+    background-color: rgba(0, 0, 0, 0.03);
+    font-weight: 600;
+}
+
+/* Tableaux */
+.table th {
+    font-weight: 600;
+    border-top: none;
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(52, 152, 219, 0.05);
+}
+
+/* Badges et labels */
+.badge {
+    font-weight: 500;
+    padding: 6px 10px;
+    border-radius: 4px;
+}
+
+/* Boutons */
+.btn {
+    border-radius: 6px;
+    font-weight: 500;
+    padding: 8px 16px;
+}
+
+.btn-sm {
+    padding: 4px 8px;
+}
+
+/* Barres de progression */
+.progress {
+    height: 8px;
+    margin-top: 8px;
+    border-radius: 4px;
+}
+
+/* Alertes */
+.alert {
+    border-radius: 8px;
+    border: none;
+}
+
+/* Formulaires */
+.form-control {
+    border-radius: 6px;
+    box-shadow: none;
+    border: 1px solid #dee2e6;
+}
+
+.form-control:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25);
+}
+
+/* Modals */
+.modal-content {
+    border-radius: 10px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.modal-header {
+    border-radius: 10px 10px 0 0;
+    background-color: #f8f9fa;
+}
+
+/* Footer */
+footer {
+    margin-top: 30px;
+    padding: 20px 0;
+}
+
+/* Styles pour les cartes statistiques */
+.stat-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-card .icon-bg {
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    opacity: 0.1;
+    font-size: 5rem;
+    transform: rotate(15deg);
+}
+
+/* Style pour les graphiques */
+.chart-container {
+    position: relative;
+    height: 300px;
+    width: 100%;
+}
+
+/* Style pour les pages de détail */
+.detail-header {
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.detail-header h2 {
+    margin: 0;
+    color: var(--dark-color);
+}
+
+/* Style pour la page santé */
+.health-indicator {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 5px;
+}
+
+.health-indicator.healthy {
+    background-color: var(--success-color);
+}
+
+.health-indicator.unhealthy {
+    background-color: var(--danger-color);
+}
+
+.health-indicator.warning {
+    background-color: var(--warning-color);
+}
+
+/* Style pour les widgets du dashboard */
+.dashboard-widget {
+    height: 100%;
+    overflow: hidden;
+}
+
+.small-stat {
+    text-align: center;
+    padding: 15px;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.small-stat .stat-value {
+    font-size: 1.8rem;
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
+.small-stat .stat-label {
+    font-size: 0.9rem;
+    color: #6c757d;
+    text-transform: uppercase;
+}
+
+/* Style pour la page modèle */
+.model-card {
+    transition: transform 0.2s;
+}
+
+.model-card:hover {
+    transform: translateY(-3px);
+}
+
+.model-card .card-body {
+    padding: 15px;
+}
+
+.model-card .model-name {
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+.model-card .model-info {
+    font-size: 0.85rem;
+    color: #6c757d;
+}
+
+/* Style pour les notifications */
+.notification-badge {
+    position: absolute;
+    top: 0;
+    right: 0;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+}
+
+/* Style pour les différents thèmes */
+body.dark-mode {
+    background-color: #222;
+    color: #eee;
+}
+
+body.dark-mode .card {
+    background-color: #333;
+    color: #eee;
+}
+
+body.dark-mode .form-control {
+    background-color: #444;
+    border-color: #555;
+    color: #eee;
+}
+
+/* Adaptation mobile */
+@media (max-width: 767.98px) {
+    .card-title {
+        font-size: 1.1rem;
+    }
+    
+    .table {
+        font-size: 0.9rem;
+    }
+    
+    .btn {
+        padding: 6px 12px;
+    }
+}
+
+/* Animations */
+.fade-in {
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.slide-in {
+    animation: slideIn 0.5s ease-out;
+}
+
+@keyframes slideIn {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}

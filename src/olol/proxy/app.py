@@ -5,7 +5,7 @@ import time
 import uuid
 from typing import Any, Dict, List, Optional
 
-from flask import Flask, Response, jsonify, request, stream_with_context
+from flask import Flask, Response, jsonify, request, render_template, stream_with_context, url_for
 
 from olol.sync.client import OllamaClient
 from olol.utils.cluster import OllamaCluster
@@ -15,6 +15,12 @@ from .stats import update_request_stats, request_stats, stats_lock
 from .console_ui import RichUI as ConsoleUI, run_console_ui, ui_exit_event
 from .utils import create_grpc_client, adjust_context_length
 from .health import health_checker
+
+# Import API modules
+from .api.routes import register_api_routes
+from .api.swagger import init_swagger
+from .cluster.manager import get_cluster_manager, ClusterManager
+from .cluster.health import get_health_monitor, start_health_monitoring
 
 try:
     from olol.rpc.coordinator import InferenceCoordinator
@@ -27,10 +33,13 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # Global variables for Flask app
-app = Flask(__name__)
+app = Flask(__name__, 
+            static_folder='web/static', 
+            template_folder='web/templates')
 app.config['DEBUG'] = True
 app.config['PROPAGATE_EXCEPTIONS'] = True
 cluster: Optional[OllamaCluster] = None
+cluster_manager: Optional[ClusterManager] = None
 coordinator: Optional['InferenceCoordinator'] = None
 health_check_interval = 30  # seconds
 use_distributed_inference = False  # Set to True to enable distributed inference
@@ -39,767 +48,282 @@ use_distributed_inference = False  # Set to True to enable distributed inference
 ui_active = False
 ui_thread = None
 
+# Web routes
+@app.route('/')
+def index():
+    """Render the dashboard page."""
+    return render_template('dashboard.html', 
+                          stats=get_cluster_stats(), 
+                          servers=get_servers_list(),
+                          popular_models=get_popular_models(),
+                          load_chart_data=get_load_chart_data(),
+                          health_chart_data=get_health_chart_data())
 
-@app.route('/api/generate', methods=['POST'])
-def generate():
-    """Handle generation requests by proxying to a cluster node."""
-    # Mise à jour des statistiques
-    update_request_stats('generate')
-    
-    try:
-        # Validation des données de la requête
-        data = request.json
-        if not data:
-            return jsonify({"error": "Invalid JSON"}), 400
-            
-        model = data.get('model')
-        if not model:
-            return jsonify({"error": "Model name required"}), 400
-            
-        prompt = data.get('prompt', '')
-        if not prompt:
-            return jsonify({"error": "Prompt required"}), 400
-            
-        # Options par défaut
-        options = data.get('options', {})
-        stream = data.get('stream', False)
-        
-        # Sélectionner un serveur disponible
-        server_address = None
-        if cluster:
-            try:
-                healthy_servers = []
-                for server in cluster.server_addresses:
-                    try:
-                        if server.count(':') == 1:
-                            host, port_str = server.split(':')
-                            port = int(port_str)
-                            client = OllamaClient(host=host, port=port)
-                            try:
-                                is_healthy = client.check_health()
-                                if is_healthy:
-                                    healthy_servers.append(server)
-                            except:
-                                pass
-                            finally:
-                                client.close()
-                    except:
-                        continue
-                        
-                if healthy_servers:
-                    server_address = healthy_servers[0]
-            except:
-                pass
-                
-        # Si aucun serveur n'est disponible
-        if not server_address:
-            return jsonify({
-                "error": "No healthy servers available",
-                "model": model,
-                "done": True
-            }), 503
-            
-        # Créer un client gRPC et appeler l'API
-        try:
-            host, port_str = server_address.split(':')
-            port = int(port_str)
-            client = None
-            
-            # Pour le non-streaming, on fait une requête simple
-            if not stream:
-                try:
-                    client = OllamaClient(host=host, port=port)
-                    logger.debug(f"Calling generate on {host}:{port} for model {model}")
-                    
-                    # Utiliser directement la méthode generate du client
-                    # Assurez-vous que 'stream=False' pour obtenir une réponse complète
-                    response_text = ""
-                    final_response = None
-                    
-                    # Le client utilise generate qui appelle la méthode gRPC Generate
-                    for resp in client.generate(model, prompt, False, options):
-                        final_response = resp
-                        if hasattr(resp, 'response'):
-                            response_text += resp.response
-                    
-                    # Formater la réponse au format attendu
-                    return jsonify({
-                        "model": model,
-                        "response": response_text,
-                        "done": True
-                    })
-                except Exception as e:
-                    logger.error(f"Error in generate API: {str(e)}")
-                    return jsonify({
-                        "model": model,
-                        "response": f"Error: {str(e)}",
-                        "done": True
-                    }), 500
-                finally:
-                    if client:
-                        client.close()
-            # En mode streaming
-            else:
-                def generate_stream():
-                    client = None
-                    try:
-                        client = OllamaClient(host=host, port=port)
-                        
-                        # Utiliser directement la méthode generate avec streaming
-                        for resp in client.generate(model, prompt, True, options):
-                            if hasattr(resp, 'response'):
-                                yield json.dumps({
-                                    "model": model,
-                                    "response": resp.response,
-                                    "done": resp.done if hasattr(resp, 'done') else False
-                                }) + '\n'
-                            
-                            if hasattr(resp, 'done') and resp.done:
-                                break
-                        
-                        # Message de fin si nécessaire
-                        yield json.dumps({
-                            "model": model,
-                            "response": "",
-                            "done": True
-                        }) + '\n'
-                        
-                    except Exception as e:
-                        # En cas d'erreur, renvoyer un message d'erreur
-                        yield json.dumps({
-                            "model": model,
-                            "response": f"Error: {str(e)}",
-                            "done": True
-                        }) + '\n'
-                    finally:
-                        if client:
-                            client.close()
-                    
-                return Response(stream_with_context(generate_stream()), 
-                              mimetype='application/json')
-                
-        except Exception as e:
-            return jsonify({
-                "error": str(e),
-                "model": model,
-                "done": True
-            }), 500
-            
-    except Exception as e:
-        # En cas d'erreur générale
-        return jsonify({
-            "error": f"Error processing request: {str(e)}",
-            "done": True
-        }), 500
-    finally:
-        # Mise à jour des statistiques
-        update_request_stats('generate', increment=False)
-
-
-@app.route('/api/chat', methods=['POST'])
-def chat():
-    """Handle chat requests by converting to RunModel for compatibility."""
-    # Update request stats
-    update_request_stats('chat')
-    
-    try:
-        # Validation de base
-        if not request.json:
-            return jsonify({"error": "Invalid JSON"}), 400
-        
-        data = request.json
-        model = data.get('model')
-        if not model:
-            return jsonify({"error": "Model required"}), 400
-        
-        # Récupérer les messages
-        messages = data.get('messages', [])
-        if not messages:
-            return jsonify({"error": "Messages required"}), 400
-        
-        # Options par défaut
-        options = data.get('options', {})
-        stream = data.get('stream', False)  # Par défaut, pas de streaming pour simplifier
-        
-        # Sélectionner un serveur disponible sans risque de blocage
-        server_address = None
-        if cluster:
-            try:
-                # Liste des serveurs sains
-                healthy_servers = []
-                for server in cluster.server_addresses:
-                    try:
-                        # Format host:port simple
-                        if server.count(':') == 1:
-                            host, port_str = server.split(':')
-                            port = int(port_str)
-                            
-                            # Création d'un client léger pour tester rapidement la connexion
-                            client = OllamaClient(host=host, port=port)
-                            try:
-                                is_healthy = client.check_health()
-                                if is_healthy:
-                                    healthy_servers.append(server)
-                            except:
-                                pass
-                            finally:
-                                client.close()
-                    except:
-                        continue
-                        
-                # Utiliser le premier serveur sain si disponible
-                if healthy_servers:
-                    server_address = healthy_servers[0]
-            except:
-                # En cas d'erreur, ne pas bloquer
-                pass
-        
-        # Si aucun serveur n'est disponible
-        if not server_address:
-            return jsonify({
-                "error": "No healthy servers available",
-                "model": model,
-                "done": True
-            }), 503
-        
-        # Créer un client gRPC
-        try:
-            # Format host:port simple
-            host, port_str = server_address.split(':')
-            port = int(port_str)
-            client = OllamaClient(host=host, port=port)
-            
-            # Pour le non-streaming, on fait une requête simple
-            if not stream:
-                try:
-                    # Définir un timeout court pour éviter le blocage
-                    import time
-                    start_time = time.time()
-                    max_time = 7  # 7 secondes maximum
-                    
-                    # Appel à chat avec un timeout
-                    response = None
-                    for resp in client.chat(model, messages, False, options):
-                        response = resp
-                        # Vérifier si on a dépassé le temps maximal
-                        if time.time() - start_time > max_time:
-                            break
-                    
-                    if response:
-                        return jsonify(response)
-                    else:
-                        return jsonify({
-                            "model": model,
-                            "message": {
-                                "role": "assistant",
-                                "content": "Timeout waiting for response"
-                            },
-                            "done": True
-                        })
-                finally:
-                    client.close()
-            # En mode streaming
-            else:
-                client.close()
-                
-                def generate_stream():
-                    # Réponse immédiate pour éviter le timeout
-                    yield json.dumps({
-                        "model": model,
-                        "message": {
-                            "role": "assistant",
-                            "content": "Starting chat response..."
-                        },
-                        "done": False
-                    }) + '\n'
-                    
-                    # Simuler une génération de texte en plusieurs étapes
-                    responses = [
-                        "Processing your request for model " + model,
-                        "Please note that streaming chat is currently in maintenance mode",
-                        "For full responses, please use stream: false in your request",
-                        "Thank you for your patience"
-                    ]
-                    
-                    for i, text in enumerate(responses):
-                        # Attendre un peu entre les réponses
-                        time.sleep(0.5)
-                        yield json.dumps({
-                            "model": model,
-                            "message": {
-                                "role": "assistant",
-                                "content": text
-                            },
-                            "done": i == len(responses) - 1
-                        }) + '\n'
-                
-                return Response(stream_with_context(generate_stream()), 
-                              mimetype='application/json')
-        
-        except Exception as e:
-            return jsonify({
-                "error": str(e),
-                "model": model,
-                "done": True
-            }), 500
-            
-    except Exception as e:
-        # En cas d'erreur générale
-        return jsonify({
-            "error": f"Error processing chat request: {str(e)}",
-            "done": True
-        }), 500
-    finally:
-        # Mise à jour des statistiques
-        update_request_stats('chat', increment=False)
-
-
-@app.route('/api/embeddings', methods=['POST'])
-def embeddings():
-    """Handle embedding requests in a simplified manner that guarantees response."""
-    # Update request stats
-    update_request_stats('embedding')
-    
-    try:
-        # Validation de base des données de la requête
-        data = request.json
-        if not data:
-            return jsonify({"error": "Invalid JSON"}), 400
-            
-        model = data.get('model')
-        if not model:
-            return jsonify({"error": "Model name required"}), 400
-            
-        prompt = data.get('prompt', '')
-        if not prompt:
-            return jsonify({"error": "Prompt required"}), 400
-            
-        # Options par défaut
-        options = data.get('options', {})
-        
-        # Sélectionner un serveur disponible sans risque de blocage
-        server_address = None
-        if cluster:
-            try:
-                # Liste des serveurs sains
-                healthy_servers = []
-                for server in cluster.server_addresses:
-                    try:
-                        # Format host:port simple
-                        if server.count(':') == 1:
-                            host, port_str = server.split(':')
-                            port = int(port_str)
-                            
-                            # Création d'un client léger pour tester rapidement la connexion
-                            client = OllamaClient(host=host, port=port)
-                            try:
-                                is_healthy = client.check_health()
-                                if is_healthy:
-                                    healthy_servers.append(server)
-                            except:
-                                pass
-                            finally:
-                                client.close()
-                    except:
-                        continue
-                        
-                # Utiliser le premier serveur sain si disponible
-                if healthy_servers:
-                    server_address = healthy_servers[0]
-            except:
-                # En cas d'erreur, ne pas bloquer
-                pass
-                
-        # Si aucun serveur n'est disponible
-        if not server_address:
-            return jsonify({
-                "error": "No healthy servers available",
-                "model": model,
-                "done": True
-            }), 503
-            
-        # Créer un client gRPC
-        try:
-            # Format host:port simple
-            host, port_str = server_address.split(':')
-            port = int(port_str)
-            client = OllamaClient(host=host, port=port)
-            
-            try:
-                # Définir un timeout court pour éviter le blocage
-                import time
-                start_time = time.time()
-                max_time = 5  # 5 secondes maximum
-                
-                # Appel à embeddings avec un timeout
-                response = client.embeddings(model, prompt, options)
-                
-                # Vérifier si on a dépassé le temps maximal
-                if time.time() - start_time > max_time:
-                    return jsonify({
-                        "model": model,
-                        "embedding": [],
-                        "error": "Timeout waiting for response"
-                    })
-                    
-                # Réponse standard
-                if hasattr(response, 'embeddings'):
-                    return jsonify({
-                        "model": model,
-                        "embedding": list(response.embeddings),
-                    })
-                else:
-                    # En cas de réponse incorrecte
-                    return jsonify({
-                        "model": model,
-                        "embedding": [],
-                        "error": "Invalid response format from server"
-                    })
-                    
-            except Exception as e:
-                # Gérer les erreurs d'API
-                return jsonify({
-                    "model": model,
-                    "embedding": [],
-                    "error": f"API error: {str(e)}"
-                })
-        except Exception as e:
-            # En cas d'erreur de connexion
-            return jsonify({
-                "error": str(e),
-                "model": model,
-                "embedding": []
-            }), 500
-            
-    except Exception as e:
-        # En cas d'erreur générale
-        return jsonify({
-            "error": f"Error processing request: {str(e)}",
-            "embedding": []
-        }), 500
-    finally:
-        # Mise à jour des statistiques
-        update_request_stats('embedding', increment=False)
-
-
-@app.route('/api/status', methods=['GET'])
-def status():
-    """Return the current status of the cluster and distributed inference."""
-    # Version ultra simplifiée qui garantit une réponse immédiate
-    response = {
-        "timestamp": time.time(),
-        "server_time": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "proxy_uptime": int(time.time() - request_stats["start_time"]),
-        "active_requests": request_stats["active_requests"],
-        "total_requests": request_stats["total_requests"],
-        "distributed_available": DISTRIBUTED_INFERENCE_AVAILABLE,
-        "distributed_enabled": use_distributed_inference,
+@app.route('/servers')
+def servers():
+    """Render the servers management page."""
+    stats = {
+        'total': 0,
+        'online': 0,
+        'offline': 0,
+        'capacity': 0
     }
     
-    # Ne pas accéder aux verrous pour éviter tout blocage
-    if cluster:
-        try:
-            response["server_count"] = len(cluster.server_addresses)
-            # Copier les adresses sans utiliser de verrou
-            response["server_addresses"] = list(cluster.server_addresses)
-        except:
-            response["server_count"] = 0
+    servers_list = get_servers_list()
     
-    return jsonify(response)
+    # Calculate stats
+    stats['total'] = len(servers_list)
+    stats['online'] = sum(1 for server in servers_list if server['healthy'])
+    stats['offline'] = stats['total'] - stats['online']
+    
+    return render_template('servers.html', stats=stats, servers=servers_list)
 
-@app.route('/api/models', methods=['GET'])
-def list_models():
-    """Return a list of all models available across the cluster."""
-    # Version ultra simplifiée qui garantit une réponse immédiate
-    response = {
-        "timestamp": time.time(),
-        "models": {}
+@app.route('/models')
+def models():
+    """Render the models page."""
+    return render_template('models.html', models=get_models_list())
+
+@app.route('/health')
+def health():
+    """Render the health monitoring page."""
+    health_monitor = get_health_monitor()
+    health_report = health_monitor.get_health_report()
+    
+    return render_template('health.html', report=health_report)
+
+@app.route('/playground')
+def playground():
+    """Render the model playground page."""
+    model_name = request.args.get('model', '')
+    models = get_models_list()
+    
+    return render_template('playground.html', 
+                          selected_model=model_name,
+                          models=models)
+
+@app.route('/settings')
+def settings():
+    """Render the settings page."""
+    return render_template('settings.html')
+
+# Helper functions for the web UI
+def get_cluster_stats():
+    """Get cluster statistics for the dashboard."""
+    stats = {
+        'servers': {'total': 0, 'healthy': 0},
+        'models': {'total': 0, 'available': 0},
+        'load': {'average': 0.0, 'max': 0.0},
+        'latency': {'average': 0.0, 'min': 0.0},
+        'uptime': format_uptime(time.time() - request_stats["start_time"]),
+        'version': '1.0.0'
     }
     
-    # Ne pas accéder aux verrous pour éviter tout blocage
-    if cluster is None:
-        response["error"] = "Cluster not initialized"
-        return jsonify(response)
-    
-    # Collecter les modèles sans utiliser trop de verrous
-    try:
-        # Accès minimaliste aux données, sans verrous imbriqués
-        models_list = []
+    # Get cluster manager data
+    cm = get_cluster_manager()
+    if cm:
+        servers = cm.get_server_addresses()
+        stats['servers']['total'] = len(servers)
+        stats['servers']['healthy'] = len(cm.get_healthy_servers())
         
-        # Essayer d'obtenir la liste des modèles depuis le client
-        for server_address in cluster.server_addresses:
+        # Get models data
+        models_dict = cm.get_all_models()
+        stats['models']['total'] = len(models_dict)
+        stats['models']['available'] = len([m for m in models_dict if any(models_dict[m])])
+        
+        # Calculate load statistics
+        if servers:
+            loads = [cm.get_server_load(server) for server in servers]
+            stats['load']['average'] = sum(loads) / len(loads) if loads else 0
+            stats['load']['max'] = max(loads) if loads else 0
+    
+    return stats
+
+def get_servers_list():
+    """Get server list data for UI."""
+    servers = []
+    cm = get_cluster_manager()
+    
+    if cm:
+        for addr in cm.get_server_addresses():
+            server_info = {
+                'address': addr,
+                'healthy': cm.get_server_health(addr),
+                'load': cm.get_server_load(addr),
+                'latency_ms': 0.0,  # Will be set from health monitor if available
+                'models': cm.get_all_models()
+            }
+            
+            # Try to get latency from health monitor
+            health_monitor = get_health_monitor()
+            server_latency = 0.0
             try:
-                # Créer un client temporaire sans utiliser get_best_connection_endpoint
-                # qui pourrait bloquer
-                client = None
-                try:
-                    # Format host:port simple
-                    if server_address.count(':') == 1:
-                        host, port_str = server_address.split(':')
-                        port = int(port_str)
-                        client = OllamaClient(host=host, port=port)
-                        
-                        # Essayer de récupérer les modèles avec un timeout court
-                        models_response = client.list_models()
-                        
-                        # Ajouter les modèles à la liste
-                        if hasattr(models_response, 'models'):
-                            for model in models_response.models:
-                                model_name = model.name
-                                if model_name not in models_list:
-                                    models_list.append(model_name)
-                except Exception as e:
-                    pass
-                finally:
-                    if client:
-                        client.close()
+                report = health_monitor.get_health_report()
+                if addr in report['servers']:
+                    server_latency = report['servers'][addr].get('latency_ms', 0.0)
             except Exception:
-                # Ignorer les erreurs pour chaque serveur
-                continue
+                pass
                 
-        # Ajouter les modèles à la réponse
-        response["models"] = {model: {"available": True} for model in models_list}
-        response["model_count"] = len(models_list)
-        
-    except Exception as e:
-        # En cas d'erreur générale, renvoyer quand même une réponse
-        response["error"] = f"Error collecting models: {str(e)}"
+            server_info['latency_ms'] = server_latency
+            
+            # Get models available on this server
+            models = []
+            all_models = cm.get_all_models()
+            for model_name, servers_list in all_models.items():
+                if addr in servers_list:
+                    models.append(model_name)
+            server_info['models'] = models
+            
+            servers.append(server_info)
     
-    return jsonify(response)
+    return servers
 
-@app.route('/api/models/<model_name>/context', methods=['GET'])
-def get_model_context(model_name):
-    """Get context information for a specific model."""
-    if cluster is None:
-        return jsonify({"error": "Cluster not initialized"}), 500
+def get_models_list():
+    """Get model list data for UI."""
+    models = []
+    cm = get_cluster_manager()
     
-    if not model_name:
-        return jsonify({"error": "Model name required"}), 400
-    
-    try:
-        # Version ultra simplifiée qui garantit une réponse immédiate
-        # sans bloquer le serveur
-        context_info = {
-            "current": 4096,  # Valeur par défaut pour la plupart des modèles
-            "max": 8192       # Valeur par défaut pour la limite maximale  
-        }
-        
-        # Ne pas effectuer d'opérations bloquantes
-        # On retourne simplement les informations par défaut
-        
-        return jsonify({
-            "model": model_name,
-            "context": context_info
-        })
-    except Exception as e:
-        logger.error(f"Error getting model context: {str(e)}")
-        # Renvoyer une réponse par défaut en cas d'erreur
-        return jsonify({
-            "model": model_name,
-            "context": {
-                "current": 4096,
-                "max": 8192,
-                "error": str(e)
+    if cm:
+        all_models = cm.get_all_models()
+        for model_name, servers_list in all_models.items():
+            model_info = {
+                'name': model_name,
+                'servers': list(servers_list),
+                'available': len(servers_list) > 0,
+                'size': 0,
+                'version': 'unknown',
+                'modified_at': None
             }
-        })
-
-@app.route('/api/servers', methods=['GET'])
-def list_servers():
-    """Return a list of all servers in the cluster without blocking."""
-    if cluster is None:
-        return jsonify({"error": "Cluster not initialized"}), 500
+            models.append(model_info)
     
-    response = {
-        "servers": {},
-        "count": 0
+    return models
+
+def get_popular_models(limit=5):
+    """Get list of popular models for dashboard."""
+    models = get_models_list()
+    # Sort by number of servers (more servers = more popular)
+    models.sort(key=lambda m: len(m['servers']), reverse=True)
+    return models[:limit]
+
+def get_load_chart_data():
+    """Generate load chart data for dashboard."""
+    # Default empty chart data
+    chart_data = {
+        'labels': [],
+        'datasets': []
     }
     
-    try:
-        # Récupérer la liste des serveurs sans verrou
-        server_addresses = []
-        try:
-            # Copier rapidement la liste pour éviter les verrous trop longs
-            with cluster.server_lock:
-                server_addresses = list(cluster.server_addresses)
-        except:
-            # En cas d'erreur, continuer avec une liste vide
-            pass
-        
-        # Obtenir les informations de base sur chaque serveur
-        # SANS appeler les serveurs directement - utiliser uniquement les données en cache
-        server_info = {}
-        for server in server_addresses:
-            # Valeurs par défaut
-            is_healthy = False
-            server_load = 0
-            server_models = []
-            
-            try:
-                # Récupérer l'état de santé en cache (très rapide)
-                with cluster.health_lock:
-                    is_healthy = cluster.server_health.get(server, False)
-                
-                # Récupérer la charge en cache
-                with cluster.server_lock:
-                    server_load = cluster.server_loads.get(server, 0)
-                
-                # Récupérer les modèles en cache
-                with cluster.model_lock:
-                    # Parcourir la liste des modèles et trouver ceux sur ce serveur
-                    for model, servers in cluster.model_server_map.items():
-                        if server in servers:
-                            server_models.append(model)
-            except:
-                # Ignorer les erreurs et continuer avec les valeurs par défaut
-                pass
-            
-            # Construire l'information du serveur
-            server_info[server] = {
-                "address": server,
-                "healthy": is_healthy,
-                "load": server_load,
-                "models": server_models
-            }
-        
-        response["servers"] = server_info
-        response["count"] = len(server_info)
-        
-    except Exception as e:
-        # Ajouter l'erreur à la réponse mais continuer à renvoyer les données
-        response["error"] = str(e)
+    cm = get_cluster_manager()
+    if not cm:
+        return chart_data
     
-    # Ajouter un timestamp à la réponse
-    response["timestamp"] = time.time()
+    # Get servers
+    servers = cm.get_server_addresses()
+    if not servers:
+        return chart_data
     
-    return jsonify(response)
+    # Create a sample dataset for demonstration
+    # In a real implementation, this would use historical data from the health monitor
+    chart_data['labels'] = [f"{i}m ago" for i in range(60, 0, -5)]
+    datasets = []
+    
+    # Generate random-like data for each server
+    for i, server in enumerate(servers[:5]):  # Limit to 5 servers for clarity
+        base_load = cm.get_server_load(server)
+        
+        # Generate data points with small variations
+        import random
+        data_points = []
+        for _ in range(len(chart_data['labels'])):
+            variation = random.uniform(-0.05, 0.05)
+            load = max(0, min(1, base_load + variation))
+            data_points.append(load)
+        
+        # Generate a color based on index
+        colors = ['rgba(255, 99, 132, 0.5)', 'rgba(54, 162, 235, 0.5)', 
+                 'rgba(255, 206, 86, 0.5)', 'rgba(75, 192, 192, 0.5)', 
+                 'rgba(153, 102, 255, 0.5)']
+        color = colors[i % len(colors)]
+        
+        datasets.append({
+            'label': server,
+            'data': data_points,
+            'backgroundColor': color,
+            'borderColor': color.replace('0.5', '1'),
+            'borderWidth': 1,
+            'fill': False
+        })
+    
+    chart_data['datasets'] = datasets
+    return chart_data
 
-@app.route('/api/transfer', methods=['POST'])
-def transfer_model():
-    """Request a model transfer between servers."""
-    if not request:
-        return jsonify({"error": "Empty request"}), 400
-        
-    data = request.json
-    if not data:
-        return jsonify({"error": "Invalid JSON"}), 400
+def get_health_chart_data():
+    """Generate health chart data for dashboard."""
+    # Default empty chart data
+    chart_data = {
+        'labels': [],
+        'datasets': []
+    }
     
-    # Get required parameters
-    model = data.get('model')
-    source_server = data.get('source')
-    target_server = data.get('target')
+    cm = get_cluster_manager()
+    if not cm:
+        return chart_data
     
-    if not model or not source_server or not target_server:
-        return jsonify({
-            "error": "Missing required parameters",
-            "required": ["model", "source", "target"]
-        }), 400
+    # Get servers
+    servers = cm.get_server_addresses()
+    if not servers:
+        return chart_data
     
-    # Check that source and target servers exist
-    with cluster.server_lock:
-        if source_server not in cluster.server_addresses:
-            return jsonify({"error": f"Source server {source_server} not found"}), 404
-        if target_server not in cluster.server_addresses:
-            return jsonify({"error": f"Target server {target_server} not found"}), 404
+    # Create a sample dataset for demonstration
+    # In a real implementation, this would use historical data from the health monitor
+    chart_data['labels'] = [f"{i}m ago" for i in range(60, 0, -5)]
+    datasets = []
     
-    # Request the model transfer
-    success = False
-    try:
-        # Vérifier que le modèle existe sur le serveur source
-        source_client = None
-        try:
-            # Format host:port simple
-            if source_server.count(':') == 1:
-                host, port_str = source_server.split(':')
-                port = int(port_str)
-                source_client = OllamaClient(host=host, port=port)
-                
-                # Vérifier si le serveur source est sain
-                is_healthy = source_client.check_health()
-                if not is_healthy:
-                    return jsonify({"error": f"Source server {source_server} is not healthy"}), 503
-                
-                # Vérifier si le modèle existe sur le serveur source
-                models_response = source_client.list_models()
-                model_exists = False
-                for model_info in models_response.models:
-                    if model_info.name == model:
-                        model_exists = True
-                        break
-                
-                if not model_exists:
-                    return jsonify({"error": f"Model {model} not found on source server {source_server}"}), 404
-        finally:
-            if source_client:
-                source_client.close()
+    # Generate health data for each server
+    for i, server in enumerate(servers[:5]):  # Limit to 5 servers for clarity
+        current_health = 1 if cm.get_server_health(server) else 0
         
-        # Vérifier que le serveur cible est accessible
-        target_client = None
-        try:
-            # Format host:port simple
-            if target_server.count(':') == 1:
-                host, port_str = target_server.split(':')
-                port = int(port_str)
-                target_client = OllamaClient(host=host, port=port)
-                
-                # Vérifier si le serveur cible est sain
-                is_healthy = target_client.check_health()
-                if not is_healthy:
-                    return jsonify({"error": f"Target server {target_server} is not healthy"}), 503
-        finally:
-            if target_client:
-                target_client.close()
+        # Generate data points with occasional health changes
+        import random
+        data_points = []
+        for _ in range(len(chart_data['labels'])):
+            # 90% chance to keep same status, 10% to change
+            if random.random() < 0.1:
+                current_health = 1 - current_health  # Flip between 0 and 1
+            data_points.append(current_health)
         
-        # Implémenter la logique de transfert
-        target_client = None
-        try:
-            # Format host:port simple
-            if target_server.count(':') == 1:
-                host, port_str = target_server.split(':')
-                port = int(port_str)
-                target_client = OllamaClient(host=host, port=port)
-                
-                # Utiliser l'API Pull pour télécharger le modèle
-                # Cela fonctionne car Pull téléchargera depuis le registre Ollama
-                pull_iterator = target_client.pull_model(model)
-                
-                # Inutile de consommer l'itérateur complet, la demande est envoyée
-                for _ in pull_iterator:
-                    # On peut ajouter une logique ici pour suivre la progression
-                    # mais pour simplifier, on sort après le premier message
-                    success = True
-                    break
-        finally:
-            if target_client:
-                target_client.close()
+        # Generate a color based on index
+        colors = ['rgba(54, 162, 235, 0.5)', 'rgba(255, 99, 132, 0.5)', 
+                 'rgba(255, 206, 86, 0.5)', 'rgba(75, 192, 192, 0.5)', 
+                 'rgba(153, 102, 255, 0.5)']
+        color = colors[i % len(colors)]
         
-        # Mettre à jour l'état du cluster
-        if success:
-            with cluster.model_lock:
-                if model not in cluster.model_server_map:
-                    cluster.model_server_map[model] = []
-                if target_server not in cluster.model_server_map[model]:
-                    cluster.model_server_map[model].append(target_server)
-            
-            return jsonify({
-                "success": True,
-                "message": f"Model {model} transfer requested from {source_server} to {target_server}"
-            })
-        else:
-            return jsonify({
-                "success": False,
-                "error": f"Failed to initiate model transfer"
-            }), 500
-            
-    except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": f"Failed to transfer model: {str(e)}"
-        }), 500
-    except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": f"Failed to transfer model: {str(e)}"
-        }), 500
+        datasets.append({
+            'label': server,
+            'data': data_points,
+            'backgroundColor': color,
+            'borderColor': color.replace('0.5', '1'),
+            'borderWidth': 1,
+            'fill': False,
+            'stepped': True
+        })
+    
+    chart_data['datasets'] = datasets
+    return chart_data
+
+def format_uptime(seconds):
+    """Format uptime in seconds to human readable format."""
+    days, remainder = divmod(seconds, 86400)
+    hours, remainder = divmod(remainder, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    
+    if days > 0:
+        return f"{int(days)}j {int(hours)}h {int(minutes)}m"
+    elif hours > 0:
+        return f"{int(hours)}h {int(minutes)}m"
+    elif minutes > 0:
+        return f"{int(minutes)}m {int(seconds)}s"
+    else:
+        return f"{int(seconds)}s"
 
 def run_proxy(host: str = "0.0.0.0", port: int = 8000, 
            server_addresses: List[str] = None,
@@ -809,6 +333,7 @@ def run_proxy(host: str = "0.0.0.0", port: int = 8000,
            enable_discovery: bool = True,
            preferred_interface: Optional[str] = None,
            enable_ui: bool = True,
+           enable_web: bool = True,
            verbose: bool = False,
            debug: bool = False) -> None:
     """Start the proxy server.
@@ -823,10 +348,11 @@ def run_proxy(host: str = "0.0.0.0", port: int = 8000,
         enable_discovery: Enable auto-discovery of RPC servers
         preferred_interface: Preferred network interface IP address for connections
         enable_ui: Whether to enable the console UI
+        enable_web: Whether to enable the web interface and Swagger API
         verbose: Enable verbose logging and detailed UI status updates 
         debug: Enable debug mode with maximum verbosity
     """
-    global cluster, coordinator, use_distributed_inference, ui_thread, ui_active
+    global cluster, cluster_manager, coordinator, use_distributed_inference, ui_thread, ui_active
     
     if server_addresses is None or not server_addresses:
         server_addresses = ["localhost:50051"]
@@ -859,6 +385,13 @@ def run_proxy(host: str = "0.0.0.0", port: int = 8000,
     
     # Initialize the cluster for regular load balancing
     cluster = OllamaCluster(server_addresses)
+    
+    # Initialize the cluster manager (refactored version)
+    cluster_manager = get_cluster_manager()
+    cluster_manager.initialize({"server_addresses": server_addresses})
+    
+    # Start health monitoring
+    start_health_monitoring()
     
     # Initialize coordinator for distributed inference if enabled
     if use_distributed_inference:
@@ -942,6 +475,9 @@ def run_proxy(host: str = "0.0.0.0", port: int = 8000,
                     logger.info(f"Adding newly discovered server: {server_address}")
                     # Update the cluster with the new server and its connection details
                     cluster.add_server(server_address, connection_details)
+                    
+                    # Also update the cluster manager
+                    cluster_manager.initialize({"server_addresses": list(cluster.server_addresses)})
                 else:
                     # Update connection details for existing server
                     cluster.register_connection_details(server_address, connection_details)
@@ -1008,6 +544,17 @@ def run_proxy(host: str = "0.0.0.0", port: int = 8000,
             logging.getLogger().setLevel(logging.WARNING)
             # But keep our own logger at INFO for important messages
             logger.setLevel(logging.INFO)
+    
+    # Register API routes and Swagger if web interface is enabled
+    if enable_web:
+        # Register API routes
+        register_api_routes(app)
+        
+        # Register Swagger blueprint
+        swagger_bp = init_swagger()
+        app.register_blueprint(swagger_bp, url_prefix='/api/docs')
+        
+        logger.info("Web interface and API enabled")
     
     # Start the Flask app
     logger.info(f"Starting proxy server on {host}:{port}")
