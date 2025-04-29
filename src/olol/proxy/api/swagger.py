@@ -36,7 +36,7 @@ ollama_ns = api.namespace('api', description='Opérations de l\'API Ollama')
 cluster_ns = api.namespace('cluster', description='Opérations de gestion du cluster')
 
 # Service API Ollama
-ollama_service = OllamaAPIService()
+ollama_service = OllamaProxyService()
 
 # Modèles pour la documentation
 # Modèle pour la requête de génération
