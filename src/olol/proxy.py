@@ -381,23 +381,36 @@ def create_grpc_client(server_address: str) -> OllamaClient:
     Returns:
         OllamaClient instance
     """
-    # Check if this is an IPv6 address with port
-    is_ipv6_with_port = server_address.count(':') > 1 and ']' in server_address
-    
     try:
-        if is_ipv6_with_port:
-            # IPv6 addresses with port format: [IPv6]:port
-            # Extract the parts between brackets
-            host = server_address[1:server_address.rindex(']')]
-            port = server_address[server_address.rindex(']')+2:]  # +2 to skip ']:' 
+        # Cas simple - format host:port
+        if server_address.count(':') == 1:
+            host, port_str = server_address.split(':')
+            port = int(port_str)
+            logger.debug(f"Connexion vers {host}:{port} (format IPv4/hostname)")
+            return OllamaClient(host=host, port=port)
+        
+        # Cas IPv6 - format [IPv6]:port
+        elif ']' in server_address:
+            host = server_address[1:server_address.index(']')]
+            port_str = server_address.split(']:', 1)[1]
+            port = int(port_str)
+            logger.debug(f"Connexion vers {host}:{port} (format IPv6 avec crochets)")
+            return OllamaClient(host=host, port=port)
+        
+        # Cas IPv6 sans crochets
         else:
-            # IPv4 or hostname format: host:port
-            host, port = server_address.rsplit(":", 1)
+            # Trouver le dernier ':' qui sépare l'adresse du port
+            last_colon = server_address.rindex(':')
+            host = server_address[:last_colon]
+            port_str = server_address[last_colon+1:]
+            port = int(port_str)
+            logger.debug(f"Connexion vers {host}:{port} (format IPv6 sans crochets)")
+            return OllamaClient(host=host, port=port)
             
-        return OllamaClient(host=host, port=int(port))
     except (ValueError, IndexError) as e:
-        logger.error(f"Invalid server address format: {server_address} - {str(e)}")
-        raise ValueError(f"Invalid server address format: {server_address}") from e
+        error_msg = f"Format d'adresse de serveur invalide: {server_address} - {str(e)}"
+        logger.error(error_msg)
+        raise ValueError(error_msg) from e
 
 
 def health_checker() -> None:
@@ -1137,70 +1150,69 @@ def embeddings():
 @app.route('/api/status', methods=['GET'])
 def status():
     """Return the current status of the cluster and distributed inference."""
-    if cluster is None:
-        return jsonify({"error": "Cluster not initialized"}), 500
-    
     try:
-        # Get base cluster status avec une limite de temps pour éviter les blocages
-        status_data = None
-        from threading import Timer
-        from functools import partial
-        
-        # On utilise une fonction pour récupérer le statut avec un timeout
-        def get_status_with_timeout(timeout=3):
-            try:
-                logger.debug(f"Collecte des données de statut du cluster avec timeout={timeout}s")
-                return cluster.get_cluster_status()
-            except Exception as e:
-                logger.error(f"Erreur lors de la récupération du statut du cluster: {str(e)}")
-                return {
-                    "servers": {},
-                    "models": {},
-                    "model_count": 0,
-                    "server_count": len(cluster.server_addresses) if cluster else 0,
-                    "healthy_server_count": 0,
-                    "sessions": 0,
-                    "error": str(e)
-                }
-        
-        # On tente d'obtenir le statut, avec une valeur par défaut en cas d'échec
-        status_data = get_status_with_timeout()
-        
-        # Ajouter des informations sur l'inférence distribuée
-        status_data["distributed_inference"] = {
-            "available": DISTRIBUTED_INFERENCE_AVAILABLE,
-            "enabled": use_distributed_inference,
-            "active": use_distributed_inference and DISTRIBUTED_INFERENCE_AVAILABLE and coordinator is not None,
-            "server_count": len(coordinator.client.server_addresses) if coordinator else 0
-        }
-        
-        # Ajouter des informations sur les modèles partitionnés
-        if coordinator and hasattr(coordinator, "model_partitions"):
-            try:
-                distributed_models = list(coordinator.model_partitions.keys())
-                status_data["distributed_inference"]["partitioned_models"] = distributed_models
-            except Exception as e:
-                logger.warning(f"Erreur lors de la récupération des modèles partitionnés : {str(e)}")
-                status_data["distributed_inference"]["partitioned_models"] = []
-        
-        # Ajouter des informations sur les serveurs actifs
-        status_data["active_requests"] = request_stats["active_requests"]
-        status_data["total_requests"] = request_stats["total_requests"]
-        
-        # Ajout d'un timestamp pour le débogage
-        import time
-        status_data["timestamp"] = time.time()
-        status_data["server_time"] = time.strftime("%Y-%m-%d %H:%M:%S")
-        
-        return jsonify(status_data)
-    except Exception as e:
-        # Fournir un minimum d'informations en cas d'erreur
-        logger.error(f"Erreur lors de la génération de la réponse /api/status : {str(e)}")
-        return jsonify({
-            "error": f"Erreur lors de la génération du statut: {str(e)}",
+        # Version basique qui garantit une réponse
+        basic_status = {
+            "timestamp": time.time(),
+            "server_time": time.strftime("%Y-%m-%d %H:%M:%S"),
             "server_count": len(cluster.server_addresses) if cluster else 0,
             "distributed_available": DISTRIBUTED_INFERENCE_AVAILABLE,
             "distributed_enabled": use_distributed_inference,
+            "proxy_uptime": int(time.time() - request_stats["start_time"]),
+            "active_requests": request_stats["active_requests"],
+            "total_requests": request_stats["total_requests"]
+        }
+        
+        # Essayer d'obtenir plus d'informations, mais ne pas bloquer si ça échoue
+        if cluster:
+            try:
+                # Récupérer les informations sur les serveurs sans verrous imbriqués
+                servers_info = {}
+                with cluster.server_lock:
+                    for server in cluster.server_addresses:
+                        servers_info[server] = {"load": cluster.server_loads.get(server, 0)}
+                
+                with cluster.health_lock:
+                    for server in servers_info:
+                        servers_info[server]["healthy"] = cluster.server_health.get(server, False)
+                
+                basic_status["servers"] = servers_info
+                basic_status["healthy_server_count"] = sum(1 for s in servers_info.values() if s.get("healthy", False))
+            except Exception as e:
+                basic_status["servers_error"] = str(e)
+            
+            try:
+                # Récupérer les informations sur les modèles
+                with cluster.model_lock:
+                    models_count = len(cluster.model_server_map)
+                    # Limiter à 10 modèles pour éviter une réponse trop volumineuse
+                    models_sample = {k: list(v) for k, v in list(cluster.model_server_map.items())[:10]}
+                
+                basic_status["models_count"] = models_count
+                basic_status["models_sample"] = models_sample
+            except Exception as e:
+                basic_status["models_error"] = str(e)
+                
+            # Informations sur l'inférence distribuée si disponible
+            if use_distributed_inference and coordinator:
+                try:
+                    basic_status["distributed_inference"] = {
+                        "active": True,
+                        "server_count": len(coordinator.client.server_addresses) if hasattr(coordinator.client, "server_addresses") else 0
+                    }
+                except Exception as e:
+                    basic_status["distributed_inference"] = {"active": True, "error": str(e)}
+        
+        # Garantir une réponse, même si des parties ont échoué
+        return jsonify(basic_status)
+        
+    except Exception as e:
+        # Réponse minimale garantie en cas d'erreur
+        logger.error(f"Erreur critique dans /api/status : {str(e)}")
+        return jsonify({
+            "error": f"Erreur critique : {str(e)}",
+            "timestamp": time.time(),
+            "server_time": time.strftime("%Y-%m-%d %H:%M:%S")
         }), 500
 
 @app.route('/api/models', methods=['GET'])
