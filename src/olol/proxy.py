@@ -37,8 +37,8 @@ app.config['DEBUG'] = True
 app.config['PROPAGATE_EXCEPTIONS'] = True
 cluster: Optional[OllamaCluster] = None
 coordinator: Optional[InferenceCoordinator] = None
-health_check_interval = 30  # seconds
-use_distributed_inference = False  # Set to True to enable distributed inference
+health_check_interval = 30  
+use_distributed_inference = False  
 
 # UI state
 ui_active = False
