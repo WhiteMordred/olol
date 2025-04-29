@@ -10,7 +10,7 @@ from flask import Blueprint, request, jsonify
 from flask_restx import Api, Resource, fields, Namespace
 from typing import Dict, Any, Optional, List
 
-from olol.proxy.api.services import OllamaAPIService
+from olol.proxy.api.services import OllamaProxyService
 from olol.proxy.cluster.health import get_health_monitor
 
 # Configuration du logging

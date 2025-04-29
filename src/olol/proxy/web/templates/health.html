@@ -1,0 +1,784 @@
+{% extends "base.html" %}
+
+{% block title %}Surveillance Santé - OLOL Proxy{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-12">
+        <h2 class="mb-4">Surveillance de la Santé du Cluster</h2>
+    </div>
+</div>
+
+<!-- Résumé de la santé -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="health-metric health-good">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <div class="metric-label">Serveurs en ligne</div>
+                    <div class="metric-value">{{ report.cluster_health.healthy_servers }}/{{ report.cluster_health.total_servers }}</div>
+                </div>
+                <div class="metric-icon">
+                    <i class="fas fa-server fa-2x text-success"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="health-metric {% if report.cluster_health.average_load < 0.7 %}health-good{% elif report.cluster_health.average_load < 0.9 %}health-warning{% else %}health-critical{% endif %}">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <div class="metric-label">Charge moyenne</div>
+                    <div class="metric-value">{{ "%.1f"|format(report.cluster_health.average_load * 100) }}%</div>
+                </div>
+                <div class="metric-icon">
+                    <i class="fas fa-tachometer-alt fa-2x {% if report.cluster_health.average_load < 0.7 %}text-success{% elif report.cluster_health.average_load < 0.9 %}text-warning{% else %}text-danger{% endif %}"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="health-metric {% if report.cluster_health.average_latency < 100 %}health-good{% elif report.cluster_health.average_latency < 250 %}health-warning{% else %}health-critical{% endif %}">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <div class="metric-label">Latence moyenne</div>
+                    <div class="metric-value">{{ "%.1f"|format(report.cluster_health.average_latency) }} ms</div>
+                </div>
+                <div class="metric-icon">
+                    <i class="fas fa-stopwatch fa-2x {% if report.cluster_health.average_latency < 100 %}text-success{% elif report.cluster_health.average_latency < 250 %}text-warning{% else %}text-danger{% endif %}"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="health-metric health-good">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <div class="metric-label">Dernière vérification</div>
+                    <div class="metric-value" id="lastCheckTime">{{ report.timestamp | date }}</div>
+                </div>
+                <div class="metric-icon">
+                    <i class="fas fa-clock fa-2x text-info"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Actions -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <button id="checkHealthBtn" class="btn btn-primary">
+                        <i class="fas fa-sync-alt me-1"></i> Vérifier maintenant
+                    </button>
+                    
+                    <button class="btn btn-success auto-refresh-toggle" id="autoRefreshBtn" data-target="health-data" data-seconds="30">
+                        <i class="fas fa-sync-alt me-1"></i>
+                        <span class="status-text">Actualisation auto</span>
+                    </button>
+                    
+                    <div class="btn-group ms-2">
+                        <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                            Exporter
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" id="exportJsonBtn">Format JSON</a></li>
+                            <li><a class="dropdown-item" href="#" id="exportCsvBtn">Format CSV</a></li>
+                            <li><a class="dropdown-item" href="#" id="exportPdfBtn">Format PDF</a></li>
+                        </ul>
+                    </div>
+                    
+                    <div class="ms-auto">
+                        <span class="text-muted me-2">Dernière actualisation:</span>
+                        <span id="last-refresh">{{ report.timestamp | date }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Graphiques de surveillance -->
+<div class="row mb-4">
+    <div class="col-lg-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="fas fa-chart-area me-1"></i> Historique de charge
+            </div>
+            <div class="card-body">
+                <canvas id="loadHistoryChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="fas fa-chart-line me-1"></i> Historique de latence
+            </div>
+            <div class="card-body">
+                <canvas id="latencyHistoryChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Santé détaillée des serveurs -->
+<div class="row">
+    <div class="col-12">
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="fas fa-server me-1"></i> Santé détaillée des serveurs
+                </div>
+                <div class="input-group" style="max-width: 300px;">
+                    <input type="text" class="form-control form-control-sm" id="serverSearchInput" placeholder="Filtrer les serveurs...">
+                    <button class="btn btn-outline-secondary btn-sm" type="button" id="serverSearchBtn">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover" id="serversHealthTable">
+                        <thead>
+                            <tr>
+                                <th>Serveur</th>
+                                <th>État</th>
+                                <th>Charge</th>
+                                <th>Latence</th>
+                                <th>Temps de réponse moyen</th>
+                                <th>Mémoire</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for server_name, server in report.servers.items() %}
+                            <tr>
+                                <td>{{ server_name }}</td>
+                                <td>
+                                    <span class="badge bg-{% if server.healthy %}success{% else %}danger{% endif %}">
+                                        {% if server.healthy %}En ligne{% else %}Hors ligne{% endif %}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="progress" style="height: 6px;">
+                                        <div class="progress-bar 
+                                        {% if server.load < 0.5 %}bg-success
+                                        {% elif server.load < 0.8 %}bg-warning
+                                        {% else %}bg-danger{% endif %}" 
+                                        style="width: {{ server.load * 100 }}%"></div>
+                                    </div>
+                                    <small class="text-muted">{{ "%.0f"|format(server.load * 100) }}%</small>
+                                </td>
+                                <td>{{ "%.1f"|format(server.latency_ms) }} ms</td>
+                                <td>{{ "%.1f"|format(server.avg_response_time) }} ms</td>
+                                <td>
+                                    <div class="progress" style="height: 6px;">
+                                        <div class="progress-bar 
+                                        {% if server.memory_usage < 0.5 %}bg-success
+                                        {% elif server.memory_usage < 0.8 %}bg-warning
+                                        {% else %}bg-danger{% endif %}" 
+                                        style="width: {{ server.memory_usage * 100 }}%"></div>
+                                    </div>
+                                    <small class="text-muted">{{ "%.0f"|format(server.memory_usage * 100) }}% ({{ server.memory_used | filesizeformat }}/{{ server.memory_total | filesizeformat }})</small>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-info view-history-btn" data-server="{{ server_name }}">
+                                        <i class="fas fa-history"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-primary restart-service-btn" data-server="{{ server_name }}">
+                                        <i class="fas fa-redo"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="7" class="text-center">Aucun serveur disponible</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Historique des problèmes -->
+<div class="row">
+    <div class="col-12">
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="fas fa-exclamation-triangle me-1"></i> Historique des problèmes
+            </div>
+            <div class="card-body">
+                {% if report.issues and report.issues|length > 0 %}
+                <div class="timeline">
+                    {% for issue in report.issues %}
+                    <div class="timeline-item">
+                        <div class="timeline-point 
+                            {% if issue.severity == 'critical' %}bg-danger
+                            {% elif issue.severity == 'warning' %}bg-warning
+                            {% else %}bg-info{% endif %}">
+                            <i class="fas 
+                                {% if issue.severity == 'critical' %}fa-times
+                                {% elif issue.severity == 'warning' %}fa-exclamation
+                                {% else %}fa-info{% endif %}">
+                            </i>
+                        </div>
+                        <div class="timeline-content">
+                            <div class="timeline-header">
+                                <span class="badge bg-
+                                    {% if issue.severity == 'critical' %}danger
+                                    {% elif issue.severity == 'warning' %}warning
+                                    {% else %}info{% endif %}">
+                                    {{ issue.severity|upper }}
+                                </span>
+                                <span class="timeline-time">{{ issue.timestamp | date }}</span>
+                            </div>
+                            <div class="timeline-body">
+                                <h6>{{ issue.title }}</h6>
+                                <p>{{ issue.description }}</p>
+                                {% if issue.server %}
+                                <div class="text-muted">Serveur: {{ issue.server }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle me-2"></i> Aucun problème détecté.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal d'historique du serveur -->
+<div class="modal fade" id="serverHistoryModal" tabindex="-1" aria-labelledby="serverHistoryModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="serverHistoryModalLabel">Historique du serveur</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-4">
+                    <canvas id="serverHistoryChart" height="250"></canvas>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped" id="serverHistoryTable">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>État</th>
+                                <th>Charge</th>
+                                <th>Latence</th>
+                                <th>Mémoire</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Rempli dynamiquement -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+                <button type="button" class="btn btn-primary" id="exportServerHistoryBtn">Exporter l'historique</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast pour les notifications -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="healthToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header">
+            <strong class="me-auto" id="toastTitle">Notification</strong>
+            <small id="toastTime">À l'instant</small>
+            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body" id="toastMessage"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Données simulées pour les graphiques
+    const timestamps = [
+        {% for i in range(10) %}
+        new Date(Date.now() - {{ i * 300000 }}),
+        {% endfor %}
+    ].reverse();
+    
+    const formattedLabels = timestamps.map(date => {
+        return date.getHours().toString().padStart(2, '0') + ':' + 
+               date.getMinutes().toString().padStart(2, '0');
+    });
+    
+    // Graphique d'historique de charge
+    const loadChartCtx = document.getElementById('loadHistoryChart').getContext('2d');
+    const loadData = {
+        labels: formattedLabels,
+        datasets: [
+            {% for server_name, server in report.servers.items() %}
+            {
+                label: '{{ server_name }}',
+                data: [
+                    {% for i in range(10) %}
+                    Math.random() * 0.3 + {{ server.load }} - 0.15,
+                    {% endfor %}
+                ],
+                borderColor: getRandomColor(),
+                tension: 0.4,
+                fill: false
+            },
+            {% endfor %}
+        ]
+    };
+    
+    const loadHistoryChart = new Chart(loadChartCtx, {
+        type: 'line',
+        data: loadData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 1,
+                    ticks: {
+                        callback: function(value) {
+                            return (value * 100).toFixed(0) + '%';
+                        }
+                    },
+                    title: {
+                        display: true,
+                        text: 'Charge CPU'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Heure'
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            label += (context.parsed.y * 100).toFixed(1) + '%';
+                            return label;
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    // Graphique d'historique de latence
+    const latencyChartCtx = document.getElementById('latencyHistoryChart').getContext('2d');
+    const latencyData = {
+        labels: formattedLabels,
+        datasets: [
+            {% for server_name, server in report.servers.items() %}
+            {
+                label: '{{ server_name }}',
+                data: [
+                    {% for i in range(10) %}
+                    Math.random() * 30 + {{ server.latency_ms }} - 15,
+                    {% endfor %}
+                ],
+                borderColor: getRandomColor(),
+                tension: 0.4,
+                fill: false
+            },
+            {% endfor %}
+        ]
+    };
+    
+    const latencyHistoryChart = new Chart(latencyChartCtx, {
+        type: 'line',
+        data: latencyData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Latence (ms)'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Heure'
+                    }
+                }
+            }
+        }
+    });
+    
+    // Fonction pour générer des couleurs aléatoires
+    function getRandomColor() {
+        const letters = '0123456789ABCDEF';
+        let color = '#';
+        for (let i = 0; i < 6; i++) {
+            color += letters[Math.floor(Math.random() * 16)];
+        }
+        return color;
+    }
+    
+    // Fonction pour afficher les toasts
+    function showToast(title, message, type = 'info') {
+        const toast = document.getElementById('healthToast');
+        const toastTitle = document.getElementById('toastTitle');
+        const toastMessage = document.getElementById('toastMessage');
+        const toastTime = document.getElementById('toastTime');
+        
+        toastTitle.textContent = title;
+        toastMessage.textContent = message;
+        toastTime.textContent = 'À l\'instant';
+        
+        toast.classList.remove('bg-success', 'bg-danger', 'bg-warning', 'bg-info', 'text-white');
+        
+        switch(type) {
+            case 'success':
+                toast.classList.add('bg-success', 'text-white');
+                break;
+            case 'error':
+                toast.classList.add('bg-danger', 'text-white');
+                break;
+            case 'warning':
+                toast.classList.add('bg-warning');
+                break;
+            case 'info':
+            default:
+                toast.classList.add('bg-info', 'text-white');
+                break;
+        }
+        
+        const bsToast = new bootstrap.Toast(toast);
+        bsToast.show();
+    }
+    
+    // Recherche de serveurs
+    const serverSearchInput = document.getElementById('serverSearchInput');
+    const serverSearchBtn = document.getElementById('serverSearchBtn');
+    
+    function filterServers() {
+        const query = serverSearchInput.value.toLowerCase();
+        const rows = document.querySelectorAll('#serversHealthTable tbody tr');
+        
+        rows.forEach(row => {
+            const serverName = row.cells[0].textContent.toLowerCase();
+            if (serverName.includes(query)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+    
+    serverSearchBtn.addEventListener('click', filterServers);
+    serverSearchInput.addEventListener('keyup', function(e) {
+        if (e.key === 'Enter') {
+            filterServers();
+        }
+    });
+    
+    // Bouton d'actualisation manuelle
+    document.getElementById('checkHealthBtn').addEventListener('click', function() {
+        this.disabled = true;
+        this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Vérification...';
+        
+        // Simuler une vérification de santé
+        setTimeout(() => {
+            this.disabled = false;
+            this.innerHTML = '<i class="fas fa-sync-alt me-1"></i> Vérifier maintenant';
+            
+            // Mettre à jour les timestamps
+            document.getElementById('lastCheckTime').textContent = new Date().toLocaleString();
+            document.getElementById('last-refresh').textContent = new Date().toLocaleString();
+            
+            showToast('Vérification terminée', 'La santé du cluster a été mise à jour.', 'success');
+        }, 2000);
+    });
+    
+    // Gestion de l'actualisation automatique
+    document.getElementById('autoRefreshBtn').addEventListener('click', function() {
+        this.classList.toggle('active');
+        const isActive = this.classList.contains('active');
+        const statusText = this.querySelector('.status-text');
+        
+        if (isActive) {
+            statusText.textContent = 'Actualisation active';
+            
+            // Démarrer l'actualisation automatique
+            window.healthRefreshInterval = setInterval(() => {
+                // Mettre à jour les timestamps
+                document.getElementById('lastCheckTime').textContent = new Date().toLocaleString();
+                document.getElementById('last-refresh').textContent = new Date().toLocaleString();
+                
+                // Simuler des changements dans les données des graphiques
+                loadHistoryChart.data.datasets.forEach(dataset => {
+                    dataset.data.shift();
+                    const baseValue = Math.random() * 0.3 + 0.3; // Entre 30% et 60%
+                    dataset.data.push(baseValue);
+                });
+                loadHistoryChart.update();
+                
+                latencyHistoryChart.data.datasets.forEach(dataset => {
+                    dataset.data.shift();
+                    const baseValue = Math.random() * 50 + 50; // Entre 50ms et 100ms
+                    dataset.data.push(baseValue);
+                });
+                latencyHistoryChart.update();
+                
+                // Afficher une notification d'actualisation
+                showToast('Actualisation automatique', 'Les données de santé ont été mises à jour.', 'info');
+            }, 30000); // Toutes les 30 secondes
+        } else {
+            statusText.textContent = 'Actualisation auto';
+            clearInterval(window.healthRefreshInterval);
+        }
+    });
+    
+    // Affichage de l'historique d'un serveur
+    document.querySelectorAll('.view-history-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const serverName = this.getAttribute('data-server');
+            showServerHistory(serverName);
+        });
+    });
+    
+    function showServerHistory(serverName) {
+        // Mettre à jour le titre du modal
+        document.getElementById('serverHistoryModalLabel').textContent = `Historique - ${serverName}`;
+        
+        // Générer des données d'historique simulées
+        const historyTimestamps = [];
+        const loadHistory = [];
+        const latencyHistory = [];
+        const memoryHistory = [];
+        const statusHistory = [];
+        
+        // Données pour les 24 dernières heures, par intervalle d'une heure
+        for (let i = 24; i >= 0; i--) {
+            const timestamp = new Date(Date.now() - i * 3600 * 1000); // i heures plus tôt
+            historyTimestamps.push(timestamp);
+            
+            const load = Math.random() * 0.3 + 0.3; // Entre 30% et 60%
+            loadHistory.push(load);
+            
+            const latency = Math.random() * 50 + 50; // Entre 50ms et 100ms
+            latencyHistory.push(latency);
+            
+            const memory = Math.random() * 0.2 + 0.4; // Entre 40% et 60%
+            memoryHistory.push(memory);
+            
+            const status = Math.random() > 0.1; // 90% de chance d'être en ligne
+            statusHistory.push(status);
+        }
+        
+        // Formater les labels pour le graphique
+        const formattedHistoryLabels = historyTimestamps.map(date => {
+            return date.getHours().toString().padStart(2, '0') + ':00';
+        });
+        
+        // Créer le graphique d'historique
+        const serverHistoryCtx = document.getElementById('serverHistoryChart').getContext('2d');
+        if (window.serverHistoryChart) {
+            window.serverHistoryChart.destroy();
+        }
+        
+        window.serverHistoryChart = new Chart(serverHistoryCtx, {
+            type: 'line',
+            data: {
+                labels: formattedHistoryLabels,
+                datasets: [
+                    {
+                        label: 'Charge (%)',
+                        data: loadHistory.map(val => val * 100),
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                        fill: true,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Latence (ms)',
+                        data: latencyHistory,
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                        fill: true,
+                        yAxisID: 'y1'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                scales: {
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: 'Charge (%)'
+                        },
+                        max: 100
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'Latence (ms)'
+                        },
+                        grid: {
+                            drawOnChartArea: false
+                        }
+                    }
+                }
+            }
+        });
+        
+        // Remplir le tableau d'historique
+        const tableBody = document.querySelector('#serverHistoryTable tbody');
+        tableBody.innerHTML = '';
+        
+        for (let i = 0; i < historyTimestamps.length; i++) {
+            const row = document.createElement('tr');
+            
+            const timeCell = document.createElement('td');
+            timeCell.textContent = historyTimestamps[i].toLocaleString();
+            row.appendChild(timeCell);
+            
+            const statusCell = document.createElement('td');
+            const statusBadge = document.createElement('span');
+            statusBadge.className = `badge bg-${statusHistory[i] ? 'success' : 'danger'}`;
+            statusBadge.textContent = statusHistory[i] ? 'En ligne' : 'Hors ligne';
+            statusCell.appendChild(statusBadge);
+            row.appendChild(statusCell);
+            
+            const loadCell = document.createElement('td');
+            loadCell.textContent = (loadHistory[i] * 100).toFixed(1) + '%';
+            row.appendChild(loadCell);
+            
+            const latencyCell = document.createElement('td');
+            latencyCell.textContent = latencyHistory[i].toFixed(1) + ' ms';
+            row.appendChild(latencyCell);
+            
+            const memoryCell = document.createElement('td');
+            memoryCell.textContent = (memoryHistory[i] * 100).toFixed(1) + '%';
+            row.appendChild(memoryCell);
+            
+            tableBody.appendChild(row);
+        }
+        
+        // Afficher le modal
+        const modal = new bootstrap.Modal(document.getElementById('serverHistoryModal'));
+        modal.show();
+    }
+    
+    // Gestion du redémarrage de service
+    document.querySelectorAll('.restart-service-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const serverName = this.getAttribute('data-server');
+            
+            if (confirm(`Êtes-vous sûr de vouloir redémarrer le service sur ${serverName} ?`)) {
+                // Afficher l'indicateur de chargement
+                this.disabled = true;
+                this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+                
+                // Simuler un redémarrage
+                setTimeout(() => {
+                    this.disabled = false;
+                    this.innerHTML = '<i class="fas fa-redo"></i>';
+                    
+                    showToast('Service redémarré', `Le service a été redémarré avec succès sur ${serverName}.`, 'success');
+                }, 3000);
+            }
+        });
+    });
+    
+    // Exportation des données
+    document.getElementById('exportJsonBtn').addEventListener('click', function() {
+        // Simuler l'exportation
+        showToast('Export en cours', 'Exportation des données au format JSON...', 'info');
+        
+        // Simuler un délai de traitement
+        setTimeout(() => {
+            showToast('Export terminé', 'Les données ont été exportées avec succès.', 'success');
+            
+            // Dans une implémentation réelle, on déclencherait un téléchargement
+            // Ici, on simule
+            const link = document.createElement('a');
+            link.href = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify({ message: "Exemple d'export" }));
+            link.download = `health_report_${new Date().toISOString().split('T')[0]}.json`;
+            link.click();
+        }, 1000);
+    });
+    
+    document.getElementById('exportCsvBtn').addEventListener('click', function() {
+        showToast('Export en cours', 'Exportation des données au format CSV...', 'info');
+        
+        setTimeout(() => {
+            showToast('Export terminé', 'Les données ont été exportées avec succès.', 'success');
+            
+            const link = document.createElement('a');
+            link.href = 'data:text/csv;charset=utf-8,server,status,load,latency\nlocalhost:50051,online,45.2,78.5';
+            link.download = `health_report_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+        }, 1000);
+    });
+    
+    document.getElementById('exportPdfBtn').addEventListener('click', function() {
+        showToast('Export en cours', 'Préparation du rapport PDF...', 'info');
+        
+        setTimeout(() => {
+            showToast('Export terminé', 'Le rapport PDF a été généré avec succès.', 'success');
+            
+            // Dans une implémentation réelle, on générerait un PDF côté serveur
+            // et on fournirait un lien de téléchargement
+        }, 2000);
+    });
+    
+    // Export de l'historique d'un serveur
+    document.getElementById('exportServerHistoryBtn').addEventListener('click', function() {
+        showToast('Export en cours', 'Exportation de l\'historique du serveur...', 'info');
+        
+        setTimeout(() => {
+            showToast('Export terminé', 'L\'historique a été exporté avec succès.', 'success');
+            
+            const link = document.createElement('a');
+            link.href = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify({ message: "Exemple d'export d'historique" }));
+            link.download = `server_history_${new Date().toISOString().split('T')[0]}.json`;
+            link.click();
+        }, 1000);
+    });
+});
+</script>
+{% endblock %}
