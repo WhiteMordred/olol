@@ -1150,70 +1150,27 @@ def embeddings():
 @app.route('/api/status', methods=['GET'])
 def status():
     """Return the current status of the cluster and distributed inference."""
-    try:
-        # Version basique qui garantit une réponse
-        basic_status = {
-            "timestamp": time.time(),
-            "server_time": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "server_count": len(cluster.server_addresses) if cluster else 0,
-            "distributed_available": DISTRIBUTED_INFERENCE_AVAILABLE,
-            "distributed_enabled": use_distributed_inference,
-            "proxy_uptime": int(time.time() - request_stats["start_time"]),
-            "active_requests": request_stats["active_requests"],
-            "total_requests": request_stats["total_requests"]
-        }
-        
-        # Essayer d'obtenir plus d'informations, mais ne pas bloquer si ça échoue
-        if cluster:
-            try:
-                # Récupérer les informations sur les serveurs sans verrous imbriqués
-                servers_info = {}
-                with cluster.server_lock:
-                    for server in cluster.server_addresses:
-                        servers_info[server] = {"load": cluster.server_loads.get(server, 0)}
-                
-                with cluster.health_lock:
-                    for server in servers_info:
-                        servers_info[server]["healthy"] = cluster.server_health.get(server, False)
-                
-                basic_status["servers"] = servers_info
-                basic_status["healthy_server_count"] = sum(1 for s in servers_info.values() if s.get("healthy", False))
-            except Exception as e:
-                basic_status["servers_error"] = str(e)
-            
-            try:
-                # Récupérer les informations sur les modèles
-                with cluster.model_lock:
-                    models_count = len(cluster.model_server_map)
-                    # Limiter à 10 modèles pour éviter une réponse trop volumineuse
-                    models_sample = {k: list(v) for k, v in list(cluster.model_server_map.items())[:10]}
-                
-                basic_status["models_count"] = models_count
-                basic_status["models_sample"] = models_sample
-            except Exception as e:
-                basic_status["models_error"] = str(e)
-                
-            # Informations sur l'inférence distribuée si disponible
-            if use_distributed_inference and coordinator:
-                try:
-                    basic_status["distributed_inference"] = {
-                        "active": True,
-                        "server_count": len(coordinator.client.server_addresses) if hasattr(coordinator.client, "server_addresses") else 0
-                    }
-                except Exception as e:
-                    basic_status["distributed_inference"] = {"active": True, "error": str(e)}
-        
-        # Garantir une réponse, même si des parties ont échoué
-        return jsonify(basic_status)
-        
-    except Exception as e:
-        # Réponse minimale garantie en cas d'erreur
-        logger.error(f"Erreur critique dans /api/status : {str(e)}")
-        return jsonify({
-            "error": f"Erreur critique : {str(e)}",
-            "timestamp": time.time(),
-            "server_time": time.strftime("%Y-%m-%d %H:%M:%S")
-        }), 500
+    # Version ultra simplifiée qui garantit une réponse immédiate
+    response = {
+        "timestamp": time.time(),
+        "server_time": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "proxy_uptime": int(time.time() - request_stats["start_time"]),
+        "active_requests": request_stats["active_requests"],
+        "total_requests": request_stats["total_requests"],
+        "distributed_available": DISTRIBUTED_INFERENCE_AVAILABLE,
+        "distributed_enabled": use_distributed_inference,
+    }
+    
+    # Ne pas accéder aux verrous pour éviter tout blocage
+    if cluster:
+        try:
+            response["server_count"] = len(cluster.server_addresses)
+            # Copier les adresses sans utiliser de verrou
+            response["server_addresses"] = list(cluster.server_addresses)
+        except:
+            response["server_count"] = 0
+    
+    return jsonify(response)
 
 @app.route('/api/models', methods=['GET'])
 def list_models():
