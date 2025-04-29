@@ -52,7 +52,7 @@
                     <span class="d-none d-sm-inline">Paramètres</span>
                 </a>
                 <div class="sidebar-divider"></div>
-                <a href="/api/v1/swagger/docs" class="list-group-item list-group-item-action py-3" target="_blank">
+                <a href="/swagger" class="list-group-item list-group-item-action py-3 {% if request.path == '/swagger' %}active{% endif %}">
                     <i class="fas fa-book fa-fw me-2"></i>
                     <span class="d-none d-sm-inline">API Swagger</span>
                 </a>
@@ -77,7 +77,7 @@
                                 <i class="fas fa-cogs me-2"></i> Paramètres
                             </a></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="/api/v1/swagger/docs" target="_blank">
+                            <li><a class="dropdown-item" href="/swagger">
                                 <i class="fas fa-book me-2"></i> Documentation API
                             </a></li>
                         </ul>
@@ -179,7 +179,7 @@
                                 </a>
                                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
                                     <li><a class="dropdown-item" href="/settings">Paramètres</a></li>
-                                    <li><a class="dropdown-item" href="/api/v1/swagger/docs" target="_blank">Documentation API</a></li>
+                                    <li><a class="dropdown-item" href="/swagger">Documentation API</a></li>
                                     <li><hr class="dropdown-divider"></li>
                                     <li><a class="dropdown-item" href="https://github.com/username/olol" target="_blank">GitHub</a></li>
                                 </ul>
