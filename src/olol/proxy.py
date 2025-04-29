@@ -11,10 +11,10 @@ from flask import Flask, Response, jsonify, request, stream_with_context
 
 from .sync.client import OllamaClient
 from .utils.cluster import OllamaCluster
-from .health import health_checker
-from .stats import update_request_stats, request_stats, stats_lock
-from .console_ui import ConsoleUI, run_console_ui
-from .utils import create_grpc_client, adjust_context_length
+from .proxy.health import health_checker
+from .proxy.stats import update_request_stats, request_stats, stats_lock
+from .proxy.console_ui import ConsoleUI, run_console_ui
+from .proxy.utils import create_grpc_client, adjust_context_length
 
 # Main entry point
 if __name__ == "__main__":

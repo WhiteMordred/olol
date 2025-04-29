@@ -4,7 +4,7 @@ import logging
 import time
 from typing import Dict, List, Optional
 
-from .sync.client import OllamaClient
+from ..sync.client import OllamaClient
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
