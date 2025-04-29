@@ -14,6 +14,7 @@ from dataclasses import asdict
 from olol.proxy.api.services import OllamaProxyService
 from olol.proxy.cluster.manager import ClusterManager
 from olol.proxy.cluster.health import get_health_monitor
+from .models import dict_to_generate_request, dict_to_chat_request, dict_to_embeddings_request
 
 # Configuration du logging
 logger = logging.getLogger(__name__)
@@ -27,22 +28,18 @@ api = Api(
     version='1.0',
     title='OLOL - Proxy API pour Ollama',
     description='API de proxy pour interagir avec un cluster de serveurs Ollama',
-    doc='/docs',  # Modifié de '/docs' à '/' pour éviter la duplication dans l'URL
+    doc='/docs',
     validate=True
 )
 
 # Namespace pour les endpoints principaux
-ollama_ns = api.namespace('api/v1', description='Opérations de l\'API Ollama')
-
-# Namespace pour les endpoints du cluster
-cluster_ns = api.namespace('cluster/v1', description='Opérations de gestion du cluster')
+api_ns = api.namespace('api/v1', description='Opérations de l\'API Ollama')
 
 # Service API Ollama
 cluster_manager = ClusterManager()
 ollama_service = OllamaProxyService(cluster_manager=cluster_manager)
 
 # Modèles pour la documentation
-# Modèle pour la requête de génération
 generate_options = api.model('GenerateOptions', {
     'temperature': fields.Float(description='Température pour la génération', required=False, default=0.8),
     'top_p': fields.Float(description='Top-p pour la génération', required=False),
@@ -75,7 +72,6 @@ generate_response = api.model('GenerateResponse', {
     'eval_duration': fields.Integer(description='Durée d\'évaluation en nanosecondes')
 })
 
-# Modèle pour le chat
 chat_message = api.model('ChatMessage', {
     'role': fields.String(required=True, description='Rôle dans la conversation (system, user, assistant)'),
     'content': fields.String(required=True, description='Contenu du message'),
@@ -100,7 +96,6 @@ chat_response = api.model('ChatResponse', {
     'eval_duration': fields.Integer(description='Durée d\'évaluation en nanosecondes')
 })
 
-# Modèle pour les embeddings
 embeddings_request = api.model('EmbeddingsRequest', {
     'model': fields.String(required=True, description='Nom du modèle à utiliser'),
     'prompt': fields.String(required=True, description='Texte pour lequel générer l\'embedding'),
@@ -112,7 +107,6 @@ embeddings_response = api.model('EmbeddingsResponse', {
     'embedding': fields.List(fields.Float, description='Vecteur d\'embedding généré')
 })
 
-# Modèles pour le statut et les informations
 model_context = api.model('ModelContextInfo', {
     'current': fields.Integer(description='Taille du contexte actuel', default=4096),
     'max': fields.Integer(description='Taille maximum du contexte', default=8192)
@@ -162,187 +156,277 @@ health_report = api.model('HealthReport', {
     'servers': fields.Raw(description='Détails par serveur')
 })
 
-# Erreur
 error_response = api.model('ErrorResponse', {
     'error': fields.String(description='Message d\'erreur')
 })
 
-
-@ollama_ns.route('/generate')
+@api_ns.route('/generate')
 class Generate(Resource):
-    @ollama_ns.doc('generate_text')
-    @ollama_ns.expect(generate_request, validate=True)
-    @ollama_ns.response(200, 'Succès', generate_response)
-    @ollama_ns.response(400, 'Requête invalide', error_response)
-    @ollama_ns.response(500, 'Erreur serveur', error_response)
-    @ollama_ns.response(503, 'Service indisponible', error_response)
+    @api_ns.doc('generate_text')
+    @api_ns.expect(generate_request, validate=True)
+    @api_ns.response(200, 'Succès', generate_response)
+    @api_ns.response(400, 'Requête invalide', error_response)
+    @api_ns.response(500, 'Erreur serveur', error_response)
     def post(self):
         """Générer du texte à partir d'un prompt"""
         try:
             data = request.json
-            response = ollama_service.generate(
-                model=data.get('model'),
-                prompt=data.get('prompt'),
-                stream=data.get('stream', False),
-                options=data.get('options', {})
-            )
+            generate_request = dict_to_generate_request(data)
+            
+            if generate_request.stream:
+                return {"error": "Le streaming n'est pas supporté dans Swagger UI"}, 400
+            
+            response = ollama_service.generate(generate_request)
+            if hasattr(response, '__dict__') and not isinstance(response, dict):
+                return asdict(response)
             return response
         except Exception as e:
             logger.error(f"Erreur lors de la génération: {str(e)}")
             return {'error': f"Erreur de génération: {str(e)}"}, 500
 
-
-@ollama_ns.route('/chat')
+@api_ns.route('/chat')
 class Chat(Resource):
-    @ollama_ns.doc('chat_conversation')
-    @ollama_ns.expect(chat_request, validate=True)
-    @ollama_ns.response(200, 'Succès', chat_response)
-    @ollama_ns.response(400, 'Requête invalide', error_response)
-    @ollama_ns.response(500, 'Erreur serveur', error_response)
-    @ollama_ns.response(503, 'Service indisponible', error_response)
+    @api_ns.doc('chat_conversation')
+    @api_ns.expect(chat_request, validate=True)
+    @api_ns.response(200, 'Succès', chat_response)
+    @api_ns.response(400, 'Requête invalide', error_response)
+    @api_ns.response(500, 'Erreur serveur', error_response)
     def post(self):
         """Échanger avec un modèle en format conversation"""
         try:
             data = request.json
-            response = ollama_service.chat(
-                model=data.get('model'),
-                messages=data.get('messages'),
-                stream=data.get('stream', False),
-                options=data.get('options', {})
-            )
+            chat_request = dict_to_chat_request(data)
+            response = ollama_service.chat(chat_request)
+            if hasattr(response, '__dict__') and not isinstance(response, dict):
+                return asdict(response)
             return response
         except Exception as e:
             logger.error(f"Erreur lors du chat: {str(e)}")
             return {'error': f"Erreur de chat: {str(e)}"}, 500
 
-
-@ollama_ns.route('/embeddings')
+@api_ns.route('/embeddings')
 class Embeddings(Resource):
-    @ollama_ns.doc('generate_embeddings')
-    @ollama_ns.expect(embeddings_request, validate=True)
-    @ollama_ns.response(200, 'Succès', embeddings_response)
-    @ollama_ns.response(400, 'Requête invalide', error_response)
-    @ollama_ns.response(500, 'Erreur serveur', error_response)
-    @ollama_ns.response(503, 'Service indisponible', error_response)
+    @api_ns.doc('generate_embeddings')
+    @api_ns.expect(embeddings_request, validate=True)
+    @api_ns.response(200, 'Succès', embeddings_response)
+    @api_ns.response(500, 'Erreur serveur', error_response)
     def post(self):
         """Générer des embeddings à partir d'un texte"""
         try:
             data = request.json
-            response = ollama_service.embeddings(
-                model=data.get('model'),
-                prompt=data.get('prompt'),
-                options=data.get('options', {})
-            )
+            embeddings_request = dict_to_embeddings_request(data)
+            response = ollama_service.embeddings(embeddings_request)
+            if hasattr(response, '__dict__') and not isinstance(response, dict):
+                return asdict(response)
             return response
         except Exception as e:
             logger.error(f"Erreur lors de la génération d'embeddings: {str(e)}")
             return {'error': f"Erreur d'embeddings: {str(e)}"}, 500
 
-
-@ollama_ns.route('/models')
+@api_ns.route('/models')
 class Models(Resource):
-    @ollama_ns.doc('list_models')
-    @ollama_ns.response(200, 'Succès', models_response)
-    @ollama_ns.response(500, 'Erreur serveur', error_response)
+    @api_ns.doc('list_models')
+    @api_ns.response(200, 'Succès', models_response)
+    @api_ns.response(500, 'Erreur serveur', error_response)
     def get(self):
-        """Lister tous les modèles disponibles sur le cluster"""
+        """Lister tous les modèles disponibles"""
         try:
-            models_resp = ollama_service.list_models()
-            # Convertir l'objet ModelsResponse en dictionnaire pour permettre la sérialisation JSON
-            if hasattr(models_resp, '__dict__') and not isinstance(models_resp, dict):
-                return asdict(models_resp)
-            return models_resp
+            models_response = ollama_service.list_models()
+            if hasattr(models_response, '__dict__') and not isinstance(models_response, dict):
+                return asdict(models_response)
+            return models_response
         except Exception as e:
             logger.error(f"Erreur lors de la récupération des modèles: {str(e)}")
             return {'error': f"Erreur de récupération des modèles: {str(e)}"}, 500
 
-
-@cluster_ns.route('/servers')
-class Servers(Resource):
-    @cluster_ns.doc('list_servers')
-    @cluster_ns.response(200, 'Succès', servers_response)
-    @cluster_ns.response(500, 'Erreur serveur', error_response)
-    def get(self):
-        """Lister tous les serveurs du cluster avec leurs détails"""
-        try:
-            servers_resp = ollama_service.list_servers()
-            # Convertir l'objet ServersResponse en dictionnaire pour permettre la sérialisation JSON
-            if hasattr(servers_resp, '__dict__') and not isinstance(servers_resp, dict):
-                return asdict(servers_resp)
-            return servers_resp
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération des serveurs: {str(e)}")
-            return {'error': f"Erreur de récupération des serveurs: {str(e)}"}, 500
-
-
-@cluster_ns.route('/health')
-class ClusterHealth(Resource):
-    @cluster_ns.doc('get_health')
-    @cluster_ns.response(200, 'Succès', health_report)
-    @cluster_ns.response(500, 'Erreur serveur', error_response)
-    def get(self):
-        """Obtenir un rapport de santé détaillé du cluster"""
-        try:
-            health_monitor = get_health_monitor()
-            return health_monitor.get_health_report()
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération du rapport de santé: {str(e)}")
-            return {'error': f"Erreur de rapport de santé: {str(e)}"}, 500
-
-
-@cluster_ns.route('/health/stats')
-class ClusterHealthStats(Resource):
-    @cluster_ns.doc('get_health_stats')
-    @cluster_ns.response(200, 'Succès')
-    @cluster_ns.response(500, 'Erreur serveur', error_response)
-    def get(self):
-        """Obtenir des statistiques agrégées sur la santé du cluster"""
-        try:
-            hours = request.args.get('hours', 24, type=int)
-            health_monitor = get_health_monitor()
-            return health_monitor.get_cluster_health_stats(hours=hours)
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération des statistiques de santé: {str(e)}")
-            return {'error': f"Erreur de statistiques: {str(e)}"}, 500
-
-
-@cluster_ns.route('/health/server/<string:server>')
-class ServerHealth(Resource):
-    @cluster_ns.doc('get_server_health')
-    @cluster_ns.response(200, 'Succès')
-    @cluster_ns.response(404, 'Serveur non trouvé', error_response)
-    @cluster_ns.response(500, 'Erreur serveur', error_response)
-    def get(self, server):
-        """Obtenir l'historique de santé d'un serveur spécifique"""
-        try:
-            hours = request.args.get('hours', 24, type=int)
-            health_monitor = get_health_monitor()
-            history = health_monitor.get_health_history(server=server, hours=hours)
-            if not history.get('health') and not history.get('load'):
-                return {'error': 'Serveur non trouvé ou aucune donnée disponible'}, 404
-            return history
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération de santé du serveur: {str(e)}")
-            return {'error': f"Erreur de récupération: {str(e)}"}, 500
-
-
-@ollama_ns.route('/status')
+@api_ns.route('/status')
 class Status(Resource):
-    @ollama_ns.doc('get_status')
-    @ollama_ns.response(200, 'Succès', status_response)
-    @ollama_ns.response(500, 'Erreur serveur', error_response)
+    @api_ns.doc('get_status')
+    @api_ns.response(200, 'Succès', status_response)
+    @api_ns.response(500, 'Erreur serveur', error_response)
     def get(self):
         """Obtenir le statut actuel du proxy"""
         try:
-            status_resp = ollama_service.get_status()
-            # Convertir l'objet StatusResponse en dictionnaire pour permettre la sérialisation JSON
-            if hasattr(status_resp, '__dict__') and not isinstance(status_resp, dict):
-                return asdict(status_resp)
-            return status_resp
+            status_response = ollama_service.get_status()
+            if hasattr(status_response, '__dict__') and not isinstance(status_response, dict):
+                return asdict(status_response)
+            return status_response
         except Exception as e:
             logger.error(f"Erreur lors de la récupération du statut: {str(e)}")
             return {'error': f"Erreur de statut: {str(e)}"}, 500
 
+@api_ns.route('/servers')
+class Servers(Resource):
+    @api_ns.doc('list_servers')
+    @api_ns.response(200, 'Succès', servers_response)
+    @api_ns.response(500, 'Erreur serveur', error_response)
+    def get(self):
+        """Lister tous les serveurs du cluster"""
+        try:
+            servers_response = ollama_service.list_servers()
+            if hasattr(servers_response, '__dict__') and not isinstance(servers_response, dict):
+                return asdict(servers_response)
+            return servers_response
+        except Exception as e:
+            logger.error(f"Erreur lors de la récupération des serveurs: {str(e)}")
+            return {'error': f"Erreur de récupération des serveurs: {str(e)}"}, 500
+    
+    @api_ns.doc('add_server')
+    @api_ns.expect(api.model('ServerAddRequest', {
+        'address': fields.String(required=True, description='Adresse du serveur (host:port)'),
+        'verify_health': fields.Boolean(required=False, default=True, description='Vérifier la santé du serveur')
+    }))
+    @api_ns.response(200, 'Succès')
+    @api_ns.response(400, 'Requête invalide', error_response)
+    @api_ns.response(500, 'Erreur serveur', error_response)
+    def post(self):
+        """Ajouter un nouveau serveur au cluster"""
+        try:
+            data = request.json
+            response = ollama_service.add_server(
+                address=data.get('address'),
+                verify_health=data.get('verify_health', True)
+            )
+            if hasattr(response, '__dict__') and not isinstance(response, dict):
+                return asdict(response)
+            return response
+        except Exception as e:
+            logger.error(f"Erreur lors de l'ajout du serveur: {str(e)}")
+            return {'error': f"Erreur d'ajout de serveur: {str(e)}"}, 500
+
+@api_ns.route('/servers/<string:server>')
+class ServerDetails(Resource):
+    @api_ns.doc('get_server')
+    @api_ns.response(200, 'Succès')
+    @api_ns.response(404, 'Serveur non trouvé', error_response)
+    @api_ns.response(500, 'Erreur serveur', error_response)
+    def get(self, server):
+        """Obtenir les détails d'un serveur"""
+        try:
+            response = ollama_service.get_server_details(server)
+            if hasattr(response, '__dict__') and not isinstance(response, dict):
+                return asdict(response)
+            return response
+        except Exception as e:
+            logger.error(f"Erreur lors de la récupération des détails du serveur: {str(e)}")
+            return {'error': f"Erreur de récupération des détails: {str(e)}"}, 500
+    
+    @api_ns.doc('remove_server')
+    @api_ns.response(200, 'Succès')
+    @api_ns.response(404, 'Serveur non trouvé', error_response)
+    @api_ns.response(500, 'Erreur serveur', error_response)
+    def delete(self, server):
+        """Supprimer un serveur du cluster"""
+        try:
+            response = ollama_service.remove_server(server)
+            if hasattr(response, '__dict__') and not isinstance(response, dict):
+                return asdict(response)
+            return response
+        except Exception as e:
+            logger.error(f"Erreur lors de la suppression du serveur: {str(e)}")
+            return {'error': f"Erreur de suppression de serveur: {str(e)}"}, 500
+
+@api_ns.route('/servers/<string:server>/check_health')
+class ServerHealth(Resource):
+    @api_ns.doc('check_server_health')
+    @api_ns.response(200, 'Succès')
+    @api_ns.response(404, 'Serveur non trouvé', error_response)
+    @api_ns.response(500, 'Erreur serveur', error_response)
+    def post(self, server):
+        """Vérifier la santé d'un serveur"""
+        try:
+            response = ollama_service.check_server_health(server)
+            if hasattr(response, '__dict__') and not isinstance(response, dict):
+                return asdict(response)
+            return response
+        except Exception as e:
+            logger.error(f"Erreur lors de la vérification de santé du serveur: {str(e)}")
+            return {'error': f"Erreur de vérification de santé: {str(e)}"}, 500
+
+@api_ns.route('/health')
+class Health(Resource):
+    @api_ns.doc('get_health')
+    @api_ns.response(200, 'Succès', health_report)
+    @api_ns.response(500, 'Erreur serveur', error_response)
+    def get(self):
+        """Obtenir un rapport de santé détaillé du cluster"""
+        try:
+            response = ollama_service.get_health_report()
+            if hasattr(response, '__dict__') and not isinstance(response, dict):
+                return asdict(response)
+            return response
+        except Exception as e:
+            logger.error(f"Erreur lors de la récupération du rapport de santé: {str(e)}")
+            return {'error': f"Erreur de rapport de santé: {str(e)}"}, 500
+
+@api_ns.route('/health/stats')
+class HealthStats(Resource):
+    @api_ns.doc('get_health_stats')
+    @api_ns.response(200, 'Succès')
+    @api_ns.response(500, 'Erreur serveur', error_response)
+    def get(self):
+        """Obtenir des statistiques agrégées sur la santé du cluster"""
+        try:
+            hours = request.args.get('hours', 24, type=int)
+            response = ollama_service.get_health_stats(hours=hours)
+            if hasattr(response, '__dict__') and not isinstance(response, dict):
+                return asdict(response)
+            return response
+        except Exception as e:
+            logger.error(f"Erreur lors de la récupération des statistiques de santé: {str(e)}")
+            return {'error': f"Erreur de statistiques: {str(e)}"}, 500
+
+@api_ns.route('/health/server/<string:server>')
+class ServerHealthHistory(Resource):
+    @api_ns.doc('get_server_health_history')
+    @api_ns.response(200, 'Succès')
+    @api_ns.response(404, 'Serveur non trouvé', error_response)
+    @api_ns.response(500, 'Erreur serveur', error_response)
+    def get(self, server):
+        """Obtenir l'historique de santé d'un serveur"""
+        try:
+            hours = request.args.get('hours', 24, type=int)
+            response = ollama_service.get_server_health_history(server=server, hours=hours)
+            if hasattr(response, '__dict__') and not isinstance(response, dict):
+                return asdict(response)
+            return response
+        except Exception as e:
+            logger.error(f"Erreur lors de la récupération de l'historique de santé: {str(e)}")
+            return {'error': f"Erreur d'historique de santé: {str(e)}"}, 500
+
+@api_ns.route('/chart/load')
+class LoadChartData(Resource):
+    @api_ns.doc('get_load_chart_data')
+    @api_ns.response(200, 'Succès')
+    @api_ns.response(500, 'Erreur serveur', error_response)
+    def get(self):
+        """Obtenir les données pour le graphique de charge des serveurs"""
+        try:
+            hours = request.args.get('hours', 1, type=int)
+            response = ollama_service.get_load_chart_data(hours=hours)
+            if hasattr(response, '__dict__') and not isinstance(response, dict):
+                return asdict(response)
+            return response
+        except Exception as e:
+            logger.error(f"Erreur lors de la récupération des données du graphique: {str(e)}")
+            return {'error': f"Erreur de données de graphique: {str(e)}"}, 500
+
+@api_ns.route('/chart/health')
+class HealthChartData(Resource):
+    @api_ns.doc('get_health_chart_data')
+    @api_ns.response(200, 'Succès')
+    @api_ns.response(500, 'Erreur serveur', error_response)
+    def get(self):
+        """Obtenir les données pour le graphique de santé des serveurs"""
+        try:
+            hours = request.args.get('hours', 1, type=int)
+            response = ollama_service.get_health_chart_data(hours=hours)
+            if hasattr(response, '__dict__') and not isinstance(response, dict):
+                return asdict(response)
+            return response
+        except Exception as e:
+            logger.error(f"Erreur lors de la récupération des données du graphique: {str(e)}")
+            return {'error': f"Erreur de données de graphique: {str(e)}"}, 500
 
 def init_swagger():
     """
