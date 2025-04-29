@@ -1,6 +1,5 @@
 """HTTP proxy for load balancing Ollama gRPC servers."""
 
-import curses
 import json
 import logging
 import threading
@@ -12,6 +11,15 @@ from flask import Flask, Response, jsonify, request, stream_with_context
 
 from .sync.client import OllamaClient
 from .utils.cluster import OllamaCluster
+from .health import health_checker
+from .stats import update_request_stats, request_stats, stats_lock
+from .console_ui import ConsoleUI, run_console_ui
+from .utils import create_grpc_client, adjust_context_length
+
+# Main entry point
+if __name__ == "__main__":
+    # Default configuration
+    run_proxy()
 
 try:
     from .rpc.coordinator import InferenceCoordinator
@@ -25,8 +33,8 @@ logger = logging.getLogger(__name__)
 
 # Global variables for Flask app
 app = Flask(__name__)
-app.config['DEBUG'] = True  # Activer le mode debug
-app.config['PROPAGATE_EXCEPTIONS'] = True  # Propager les exceptions pour faciliter le débogage
+app.config['DEBUG'] = True
+app.config['PROPAGATE_EXCEPTIONS'] = True
 cluster: Optional[OllamaCluster] = None
 coordinator: Optional[InferenceCoordinator] = None
 health_check_interval = 30  # seconds
@@ -36,489 +44,6 @@ use_distributed_inference = False  # Set to True to enable distributed inference
 ui_active = False
 ui_thread = None
 ui_exit_event = threading.Event()
-request_stats = {
-    "total_requests": 0,
-    "active_requests": 0,
-    "generate_requests": 0,
-    "chat_requests": 0,
-    "embedding_requests": 0,
-    "server_stats": {},
-    "start_time": time.time()
-}
-stats_lock = threading.Lock()
-
-
-class ConsoleUI:
-    """Curses-based console UI for OLOL proxy with stats and spinner."""
-    
-    def __init__(self, params=None):
-        """Initialize the console UI.
-        
-        Args:
-            params: Dictionary of parameters controlling UI behavior
-        """
-        self.stdscr = None
-        self.spinner_chars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
-        self.spinner_idx = 0
-        self.last_update = 0
-        self.update_interval = 0.1  # seconds
-        
-        # Status messages
-        self.status_messages = []
-        self.max_status_messages = 10
-        
-        # Verbosity settings
-        self.verbose = params.get("verbose", False) if params else False
-        self.debug = params.get("debug", False) if params else False
-        
-        # Add first status message
-        self.add_status_message("Console UI started")
-        
-    def start(self):
-        """Start the UI in curses mode."""
-        try:
-            # Initialize curses
-            self.stdscr = curses.initscr()
-            curses.start_color()
-            curses.use_default_colors()
-            curses.init_pair(1, curses.COLOR_GREEN, -1)  # Green text
-            curses.init_pair(2, curses.COLOR_CYAN, -1)   # Cyan text
-            curses.init_pair(3, curses.COLOR_YELLOW, -1) # Yellow text
-            curses.init_pair(4, curses.COLOR_RED, -1)    # Red text
-            curses.curs_set(0)  # Hide cursor
-            self.stdscr.clear()
-            
-            # Run the main display loop
-            self._display_loop()
-        except Exception as e:
-            self.stop()
-            logger.error(f"UI error: {str(e)}")
-        finally:
-            self.stop()
-            
-    def add_status_message(self, message):
-        """Add a status message to the display queue.
-        
-        Args:
-            message: Status message to display
-        """
-        # Add timestamp
-        timestamp = time.strftime("%H:%M:%S", time.localtime())
-        self.status_messages.append(f"{timestamp} - {message}")
-        
-        # Trim if too many messages
-        if len(self.status_messages) > self.max_status_messages:
-            self.status_messages.pop(0)
-            
-    def stop(self):
-        """Clean up and restore terminal."""
-        if self.stdscr:
-            curses.endwin()
-            self.stdscr = None
-            
-    def _update_spinner(self):
-        """Update the spinner animation."""
-        self.spinner_idx = (self.spinner_idx + 1) % len(self.spinner_chars)
-        return self.spinner_chars[self.spinner_idx]
-        
-    def _display_loop(self):
-        """Main display loop for the UI."""
-        while not ui_exit_event.is_set():
-            current_time = time.time()
-            
-            # Only update at specified interval to reduce CPU usage
-            if current_time - self.last_update >= self.update_interval:
-                self.last_update = current_time
-                self._render_screen()
-                
-            # Sleep a bit to avoid high CPU usage
-            time.sleep(0.05)
-            
-    def _render_screen(self):
-        """Render the UI screen with current stats."""
-        if not self.stdscr:
-            return
-            
-        self.stdscr.clear()
-        height, width = self.stdscr.getmaxyx()
-        
-        # Get current stats
-        with stats_lock:
-            stats = request_stats.copy()
-            server_stats = stats["server_stats"].copy()
-            
-        # Calculate uptime
-        uptime_seconds = int(time.time() - stats["start_time"])
-        hours, remainder = divmod(uptime_seconds, 3600)
-        minutes, seconds = divmod(remainder, 60)
-        uptime_str = f"{hours:02}:{minutes:02}:{seconds:02}"
-        
-        # Header with spinner animation
-        spinner = self._update_spinner()
-        header = f" {spinner} OLOL Proxy Server Status"
-        self.stdscr.addstr(0, 0, header, curses.color_pair(1) | curses.A_BOLD)
-        
-        # Server status
-        server_count = 0
-        healthy_count = 0
-        
-        if cluster:
-            with cluster.health_lock:
-                server_count = len(cluster.server_addresses)
-                healthy_count = sum(1 for v in cluster.server_health.values() if v)
-        
-        server_status = f" Servers: {healthy_count}/{server_count} healthy"
-        self.stdscr.addstr(1, 0, server_status, curses.color_pair(2))
-        
-        # Distributed mode indicator
-        dist_status = f" Distributed Inference: {'ENABLED' if use_distributed_inference else 'DISABLED'}"
-        self.stdscr.addstr(1, width - len(dist_status) - 1, dist_status, 
-                           curses.color_pair(1) if use_distributed_inference else curses.color_pair(3))
-        
-        # Request stats
-        active_req_str = f" Active Requests: {stats['active_requests']}"
-        total_req_str = f" Total Requests: {stats['total_requests']}"
-        uptime_display = f" Uptime: {uptime_str}"
-        
-        self.stdscr.addstr(2, 0, active_req_str, curses.color_pair(3))
-        self.stdscr.addstr(2, width - len(total_req_str) - 1, total_req_str, curses.color_pair(3))
-        self.stdscr.addstr(3, 0, uptime_display, curses.color_pair(3))
-        
-        # Request type breakdown
-        gen_str = f" Generate: {stats['generate_requests']}"
-        chat_str = f" Chat: {stats['chat_requests']}"
-        embed_str = f" Embeddings: {stats['embedding_requests']}"
-        
-        self.stdscr.addstr(4, 0, gen_str)
-        self.stdscr.addstr(4, 25, chat_str)
-        self.stdscr.addstr(4, 45, embed_str)
-        
-        # Status messages section (if verbose)
-        row = 6
-        if self.verbose or self.debug:
-            status_title = " Status Messages:"
-            self.stdscr.addstr(row, 0, status_title, curses.A_BOLD)
-            row += 1
-            
-            max_visible_messages = min(5, len(self.status_messages))
-            for i in range(max_visible_messages):
-                msg_idx = len(self.status_messages) - max_visible_messages + i
-                if msg_idx >= 0 and msg_idx < len(self.status_messages):
-                    message = self.status_messages[msg_idx]
-                    # Truncate if too long
-                    if len(message) > width - 4:
-                        message = message[:width - 7] + "..."
-                    self.stdscr.addstr(row, 2, message)
-                    row += 1
-            
-            # Separator
-            self.stdscr.addstr(row, 2, "-" * (width - 4))
-            row += 1
-        
-        # Server details (if available)
-        if cluster:
-            # Draw server table header
-            if server_count > 0:
-                self.stdscr.addstr(row, 0, " Servers:", curses.A_BOLD)
-                row += 1
-                self.stdscr.addstr(row, 2, "Address".ljust(30) + "Health".ljust(10) + "Load".ljust(10) + "Models")
-                row += 1
-                self.stdscr.addstr(row, 2, "-" * (width - 4))
-                row += 1
-                
-                # Draw each server row
-                for idx, server in enumerate(cluster.server_addresses):
-                    if row >= height - 3:
-                        break  # Don't exceed screen height
-                        
-                    # Get server health and load
-                    with cluster.health_lock, cluster.server_lock:
-                        healthy = cluster.server_health.get(server, False)
-                        load = cluster.server_loads.get(server, 0)
-                    
-                    # Get model count
-                    model_count = 0
-                    with cluster.model_lock:
-                        for models in cluster.model_server_map.values():
-                            if server in models:
-                                model_count += 1
-                    
-                    # Format status text with color
-                    if healthy:
-                        health_text = "Healthy"
-                        health_color = curses.color_pair(1)  # Green
-                    else:
-                        health_text = "Unhealthy"
-                        health_color = curses.color_pair(4)  # Red
-                        
-                    # Draw server row
-                    self.stdscr.addstr(row, 2, server.ljust(30))
-                    self.stdscr.addstr(row, 32, health_text.ljust(10), health_color)
-                    self.stdscr.addstr(row, 42, str(load).ljust(10))
-                    self.stdscr.addstr(row, 52, f"{model_count} models")
-                    row += 1
-                    
-                # Add space for models if in verbose/debug mode
-                if (self.verbose or self.debug) and row < height - 5 and cluster.model_manager:
-                    row += 1
-                    self.stdscr.addstr(row, 0, " Available Models:", curses.A_BOLD)
-                    row += 1
-                    
-                    # Show up to 3 most recently used models
-                    with cluster.model_lock:
-                        try:
-                            # Try to get models with details, but fall back to get_all_models if that method doesn't exist
-                            if hasattr(cluster.model_manager, 'get_all_models_with_details'):
-                                model_details = cluster.model_manager.get_all_models_with_details()
-                            else:
-                                model_details = cluster.model_manager.get_all_models()
-                                
-                            for model_name, details in list(model_details.items())[:3]:
-                                if row >= height - 3:
-                                    break
-                                
-                                # Try to get context length
-                                ctx_info = None
-                                if hasattr(cluster.model_manager, 'get_model_context_length'):
-                                    ctx_info = cluster.model_manager.get_model_context_length(model_name)
-                                ctx_size = ctx_info.get("current", "?") if ctx_info else "?"
-                                
-                                # Get servers count
-                                if isinstance(details, dict) and "servers" in details:
-                                    servers_count = len(details.get("servers", []))
-                                else:
-                                    # If details is a list, it's the server list itself
-                                    servers_count = len(details) if isinstance(details, list) else 0
-                                
-                                model_info = f" {model_name} (Context: {ctx_size}, Servers: {servers_count})"
-                                if len(model_info) > width - 4:
-                                    model_info = model_info[:width - 7] + "..."
-                                
-                                self.stdscr.addstr(row, 2, model_info)
-                                row += 1
-                        except Exception as e:
-                            # Just show error in debug mode, otherwise skip
-                            if self.debug:
-                                self.stdscr.addstr(row, 2, f"Error showing models: {str(e)}")
-                                row += 1
-            
-        # Verbosity indicator
-        if self.debug:
-            mode_str = " [DEBUG MODE]"
-            self.stdscr.addstr(height - 1, width - len(mode_str) - 1, mode_str, curses.color_pair(4) | curses.A_BOLD)
-        elif self.verbose:
-            mode_str = " [VERBOSE]"
-            self.stdscr.addstr(height - 1, width - len(mode_str) - 1, mode_str, curses.color_pair(3) | curses.A_BOLD)
-            
-        # Footer
-        footer = " Press Ctrl+C to exit"
-        self.stdscr.addstr(height - 1, 0, footer, curses.A_REVERSE)
-        
-        # Refresh screen
-        self.stdscr.refresh()
-
-
-def update_request_stats(request_type: str, increment: bool = True) -> None:
-    """Update request statistics.
-    
-    Args:
-        request_type: Type of request ('chat', 'generate', 'embedding')
-        increment: True to increment, False to decrement (for active requests)
-    """
-    with stats_lock:
-        # Always increment total
-        if increment:
-            request_stats["total_requests"] += 1
-            request_stats[f"{request_type}_requests"] += 1
-            
-        # Update active count
-        delta = 1 if increment else -1
-        request_stats["active_requests"] += delta
-        
-        # Ensure we don't go negative
-        if request_stats["active_requests"] < 0:
-            request_stats["active_requests"] = 0
-
-
-def run_console_ui(params=None):
-    """Run the console UI in a separate thread.
-    
-    Args:
-        params: Dictionary of parameters controlling UI behavior
-    """
-    ui = ConsoleUI(params)
-    try:
-        # Register listeners for discovery events to update UI
-        if cluster and (params.get('verbose', False) or params.get('debug', False)):
-            # Add a custom function to receive notifications when servers are discovered
-            def handle_server_discovered(server_address, details=None):
-                # Add server discovery to status messages
-                ui.add_status_message(f"Server discovered: {server_address}")
-                
-            # Set up a callback for server discovery
-            # First check if OllamaCluster has support for callbacks
-            try:
-                if hasattr(cluster, 'register_discovery_callback'):
-                    cluster.register_discovery_callback(handle_server_discovered)
-            except Exception:
-                # If registration fails, just continue without callbacks
-                pass
-            
-        # Start the UI
-        ui.start()
-    except KeyboardInterrupt:
-        ui_exit_event.set()
-    finally:
-        ui.stop()
-
-
-def create_grpc_client(server_address: str) -> OllamaClient:
-    """Create a new gRPC client for a given server.
-    
-    Args:
-        server_address: Server address in "host:port" or "[IPv6]:port" format
-        
-    Returns:
-        OllamaClient instance
-    """
-    try:
-        # Cas simple - format host:port
-        if server_address.count(':') == 1:
-            host, port_str = server_address.split(':')
-            port = int(port_str)
-            logger.debug(f"Connexion vers {host}:{port} (format IPv4/hostname)")
-            return OllamaClient(host=host, port=port)
-        
-        # Cas IPv6 - format [IPv6]:port
-        elif ']' in server_address:
-            host = server_address[1:server_address.index(']')]
-            port_str = server_address.split(']:', 1)[1]
-            port = int(port_str)
-            logger.debug(f"Connexion vers {host}:{port} (format IPv6 avec crochets)")
-            return OllamaClient(host=host, port=port)
-        
-        # Cas IPv6 sans crochets
-        else:
-            # Trouver le dernier ':' qui sépare l'adresse du port
-            last_colon = server_address.rindex(':')
-            host = server_address[:last_colon]
-            port_str = server_address[last_colon+1:]
-            port = int(port_str)
-            logger.debug(f"Connexion vers {host}:{port} (format IPv6 sans crochets)")
-            return OllamaClient(host=host, port=port)
-            
-    except (ValueError, IndexError) as e:
-        error_msg = f"Format d'adresse de serveur invalide: {server_address} - {str(e)}"
-        logger.error(error_msg)
-        raise ValueError(error_msg) from e
-
-
-def health_checker() -> None:
-    """Background thread to check server health periodically."""
-    global cluster
-    
-    if cluster is None:
-        logger.error("Cluster not initialized for health checker")
-        return
-        
-    logger.info("Health checker started")
-    
-    # Map pour stocker les modèles sur chaque serveur
-    server_model_map = {}
-    
-    while True:
-        try:
-            # Faire une copie des adresses de serveurs pour éviter les modifications pendant l'itération
-            with cluster.server_lock:
-                servers = list(cluster.server_addresses)
-                
-            for server in servers:
-                # Ignorer les adresses invalides
-                if not isinstance(server, str) or not server:
-                    logger.warning(f"Skipping invalid server address: {server}")
-                    continue
-                
-                # Pour l'affichage dans les logs
-                short_server = server.split(":")[-1]
-                
-                client = None
-                try:
-                    # Format host:port simple
-                    if server.count(':') == 1:
-                        host, port_str = server.split(':')
-                        port = int(port_str)
-                        client = OllamaClient(host=host, port=port)
-                        
-                        # Vérifier l'état de santé
-                        is_healthy = client.check_health()
-                        
-                        # Mise à jour de l'état de santé
-                        with cluster.health_lock:
-                            cluster.mark_server_health(server, is_healthy)
-                            
-                        # Si serveur en bonne santé, récupérer les modèles
-                        if is_healthy:
-                            # Récupérer les modèles
-                            try:
-                                models_response = client.list_models()
-                                models = []
-                                
-                                # Extraire les noms des modèles
-                                if hasattr(models_response, 'models'):
-                                    models = [model.name for model in models_response.models]
-                                    logger.info(f"Server {short_server} has {len(models)} models: {', '.join(models) if models else 'none'}")
-                                    
-                                    # Update the cluster with this server's models
-                                    # Add server -> models mapping 
-                                    server_model_map[server] = models
-                                    
-                                    # Update model -> server mapping in cluster
-                                    with cluster.model_lock:
-                                        for model_name in models:
-                                            if model_name not in cluster.model_server_map:
-                                                cluster.model_server_map[model_name] = []
-                                            
-                                            if server not in cluster.model_server_map[model_name]:
-                                                cluster.model_server_map[model_name].append(server)
-                                                
-                                    # Créer un dictionnaire de détails pour les modèles
-                                    model_details = {}
-                                    
-                                    # Pour les 3 premiers modèles, récupérer des détails supplémentaires
-                                    for model_name in models[:3]:  # Limite pour éviter trop d'appels API
-                                        try:
-                                            # Créer un dictionnaire pour ce modèle
-                                            model_details[model_name] = {
-                                                "parameters": "Not detected"
-                                            }
-                                            
-                                            # Pour des détails supplémentaires, on pourrait appeler d'autres méthodes ici
-                                            # Mais pour l'instant, on se contente des noms de modèles
-                                        except Exception as e:
-                                            logger.debug(f"Error getting details for model {model_name}: {e}")
-                                    
-                                    # Mise à jour de la disponibilité des modèles
-                                    cluster.model_manager.update_server_models(server, models)
-                                else:
-                                    logger.warning(f"Server {short_server} returned invalid model list")
-                            except Exception as model_err:
-                                logger.warning(f"Failed to list models on server {short_server}: {model_err}")
-                    else:
-                        # Format IPv6 non géré pour cette fonction simplifiée
-                        logger.debug(f"Skipping IPv6 address: {server}")
-                except Exception as e:
-                    logger.error(f"Health check failed for server {short_server}: {e}")
-                    with cluster.health_lock:
-                        cluster.mark_server_health(server, False)
-                finally:
-                    if client:
-                        client.close()
-            
-            # Pause entre les vérifications
-            time.sleep(health_check_interval)
-        except Exception as e:
-            logger.error(f"Error in health checker: {e}")
-            time.sleep(5)  # Wait a bit and try again
 
 
 @app.route('/api/generate', methods=['POST'])
@@ -835,49 +360,6 @@ def chat():
         update_request_stats('chat', increment=False)
 
 
-def adjust_context_length(model_name: str, prompt: str, options: Dict[str, Any]) -> Dict[str, Any]:
-    """Analyze input and adjust context length for optimal performance.
-    
-    Args:
-        model_name: Name of the model being used
-        prompt: Input prompt or combined message content
-        options: Original request options
-        
-    Returns:
-        Adjusted options with optimized context length
-    """
-    # Make a copy of options to avoid modifying the original
-    adjusted = options.copy() if options else {}
-    
-    # Check if user explicitly set context_length or num_ctx
-    user_specified = (
-        'context_length' in adjusted or 
-        'num_ctx' in adjusted or 
-        'num_ctx_tokens' in adjusted
-    )
-    
-    if user_specified:
-        # User specified a value - respect it and don't change
-        return adjusted
-    
-    # Estimate input token count (rough approximation - 4 chars per token)
-    # This is just an approximation, real tokenization varies by model
-    estimated_tokens = len(prompt) // 4
-    
-    # Get the optimal context length for this input
-    recommended_ctx = cluster.model_manager.estimate_optimal_context_length(
-        model_name, estimated_tokens
-    )
-    
-    # Set context length in all the formats Ollama might use
-    adjusted['context_length'] = recommended_ctx
-    adjusted['num_ctx'] = recommended_ctx
-    
-    logger.debug(f"Adjusted context length for {model_name}: {recommended_ctx} (est. tokens: {estimated_tokens})")
-    
-    return adjusted
-
-
 @app.route('/api/embeddings', methods=['POST'])
 def embeddings():
     """Handle embedding requests in a simplified manner that guarantees response."""
@@ -1129,103 +611,73 @@ def get_model_context(model_name):
 
 @app.route('/api/servers', methods=['GET'])
 def list_servers():
-    """Return a list of all servers in the cluster."""
+    """Return a list of all servers in the cluster without blocking."""
     if cluster is None:
         return jsonify({"error": "Cluster not initialized"}), 500
     
-    server_info = {}
-    
-    # Fonction pour vérifier directement la santé d'un serveur
-    def check_server_health(server_address):
-        try:
-            if server_address.count(':') == 1:
-                host, port_str = server_address.split(':')
-                port = int(port_str)
-                client = OllamaClient(host=host, port=port)
-                try:
-                    is_healthy = client.check_health()
-                    return is_healthy
-                except Exception:
-                    return False
-                finally:
-                    client.close()
-            return False
-        except Exception:
-            return False
-    
-    # Fonction pour obtenir la liste des modèles d'un serveur
-    def get_server_models(server_address):
-        try:
-            if server_address.count(':') == 1:
-                host, port_str = server_address.split(':')
-                port = int(port_str)
-                client = OllamaClient(host=host, port=port)
-                try:
-                    models_response = client.list_models()
-                    if hasattr(models_response, 'models'):
-                        return [model.name for model in models_response.models]
-                    return []
-                except Exception:
-                    return []
-                finally:
-                    client.close()
-            return []
-        except Exception:
-            return []
+    response = {
+        "servers": {},
+        "count": 0
+    }
     
     try:
-        # Obtenir la liste des serveurs
-        with cluster.server_lock:
-            server_addresses = list(cluster.server_addresses)
+        # Récupérer la liste des serveurs sans verrou
+        server_addresses = []
+        try:
+            # Copier rapidement la liste pour éviter les verrous trop longs
+            with cluster.server_lock:
+                server_addresses = list(cluster.server_addresses)
+        except:
+            # En cas d'erreur, continuer avec une liste vide
+            pass
         
-        # Collecter des informations sur chaque serveur
+        # Obtenir les informations de base sur chaque serveur
+        # SANS appeler les serveurs directement - utiliser uniquement les données en cache
+        server_info = {}
         for server in server_addresses:
-            # Vérifier directement la santé du serveur
-            is_healthy = check_server_health(server)
+            # Valeurs par défaut
+            is_healthy = False
+            server_load = 0
+            server_models = []
             
-            # Mettre à jour le statut de santé dans le cluster
-            with cluster.health_lock:
-                cluster.mark_server_health(server, is_healthy)
-            
-            # Obtenir les modèles du serveur seulement s'il est en bonne santé
-            models = []
-            if is_healthy:
-                models = get_server_models(server)
+            try:
+                # Récupérer l'état de santé en cache (très rapide)
+                with cluster.health_lock:
+                    is_healthy = cluster.server_health.get(server, False)
                 
-                # Mettre à jour la liste des modèles dans le cluster
-                if models:
-                    with cluster.model_lock:
-                        for model_name in models:
-                            if model_name not in cluster.model_server_map:
-                                cluster.model_server_map[model_name] = []
-                            
-                            if server not in cluster.model_server_map[model_name]:
-                                cluster.model_server_map[model_name].append(server)
+                # Récupérer la charge en cache
+                with cluster.server_lock:
+                    server_load = cluster.server_loads.get(server, 0)
+                
+                # Récupérer les modèles en cache
+                with cluster.model_lock:
+                    # Parcourir la liste des modèles et trouver ceux sur ce serveur
+                    for model, servers in cluster.model_server_map.items():
+                        if server in servers:
+                            server_models.append(model)
+            except:
+                # Ignorer les erreurs et continuer avec les valeurs par défaut
+                pass
             
-            # Construire l'objet d'information du serveur
-            info = {
+            # Construire l'information du serveur
+            server_info[server] = {
                 "address": server,
                 "healthy": is_healthy,
-                "load": cluster.server_loads.get(server, 0),
-                "models": models
+                "load": server_load,
+                "models": server_models
             }
-            
-            # Ajouter à la liste de serveurs
-            server_info[server] = info
-    except Exception as e:
-        logger.error(f"Error collecting server information: {e}")
         
-        # Renvoyer une réponse même en cas d'erreur
-        return jsonify({
-            "servers": {},
-            "count": 0,
-            "error": str(e)
-        })
+        response["servers"] = server_info
+        response["count"] = len(server_info)
+        
+    except Exception as e:
+        # Ajouter l'erreur à la réponse mais continuer à renvoyer les données
+        response["error"] = str(e)
     
-    return jsonify({
-        "servers": server_info,
-        "count": len(server_info)
-    })
+    # Ajouter un timestamp à la réponse
+    response["timestamp"] = time.time()
+    
+    return jsonify(response)
 
 @app.route('/api/transfer', methods=['POST'])
 def transfer_model():
@@ -1304,11 +756,6 @@ def transfer_model():
                 target_client.close()
         
         # Implémenter la logique de transfert
-        # Plusieurs approches possibles :
-        # 1. Demander au serveur cible de télécharger depuis le serveur source
-        # 2. Utiliser un mécanisme de pull via l'API Ollama
-        
-        # Pour l'instant, utiliser l'API Pull pour télécharger le modèle
         target_client = None
         try:
             # Format host:port simple
@@ -1543,6 +990,7 @@ def run_proxy(host: str = "0.0.0.0", port: int = 8000,
     else:
         # If discovery is disabled, start health checker immediately
         health_thread.start()
+    
     # Start the console UI if enabled
     if enable_ui:
         # Set up parameters to control UI verbosity
@@ -1581,8 +1029,3 @@ def run_proxy(host: str = "0.0.0.0", port: int = 8000,
         # Stop the discovery service if it's running
         if discovery_service:
             discovery_service.stop()
-
-
-if __name__ == "__main__":
-    # Default configuration
-    run_proxy()
