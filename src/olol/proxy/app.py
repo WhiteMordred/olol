@@ -547,8 +547,14 @@ def run_proxy(host: str = "0.0.0.0", port: int = 8000,
     
     # Register API routes and Swagger if web interface is enabled
     if enable_web:
-        # Register API routes
-        register_api_routes(app)
+        # Import the OllamaProxyService
+        from .api.services import OllamaProxyService
+        
+        # Create an instance of OllamaProxyService
+        api_service = OllamaProxyService(cluster_manager)
+        
+        # Register API routes with the api_service
+        register_api_routes(app, api_service)
         
         # Register Swagger blueprint
         swagger_bp = init_swagger()
