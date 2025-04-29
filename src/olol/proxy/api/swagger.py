@@ -11,6 +11,7 @@ from flask_restx import Api, Resource, fields, Namespace
 from typing import Dict, Any, Optional, List
 
 from olol.proxy.api.services import OllamaProxyService
+from olol.proxy.cluster.manager import ClusterManager
 from olol.proxy.cluster.health import get_health_monitor
 
 # Configuration du logging
@@ -36,7 +37,8 @@ ollama_ns = api.namespace('api', description='Opérations de l\'API Ollama')
 cluster_ns = api.namespace('cluster', description='Opérations de gestion du cluster')
 
 # Service API Ollama
-ollama_service = OllamaProxyService()
+cluster_manager = ClusterManager()
+ollama_service = OllamaProxyService(cluster_manager=cluster_manager)
 
 # Modèles pour la documentation
 # Modèle pour la requête de génération
