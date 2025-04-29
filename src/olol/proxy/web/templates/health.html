@@ -174,7 +174,13 @@
                                     <small class="text-muted">{{ "%.0f"|format(server.load * 100) }}%</small>
                                 </td>
                                 <td>{{ "%.1f"|format(server.latency_ms) }} ms</td>
-                                <td>{{ "%.1f"|format(server.avg_response_time) }} ms</td>
+                                <td>
+                                    {% if server.avg_response_time is defined %}
+                                        {{ "%.1f"|format(server.avg_response_time) }} ms
+                                    {% else %}
+                                        <span class="text-muted">N/A</span>
+                                    {% endif %}
+                                </td>
                                 <td>
                                     <div class="progress" style="height: 6px;">
                                         <div class="progress-bar 
