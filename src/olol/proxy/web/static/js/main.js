@@ -1,312 +1,335 @@
 /**
  * OLOL Proxy - Main JavaScript
- * Fonctions principales pour l'interface web du proxy OLOL
+ * Dark Theme Version
  */
 
-// Fonctions d'utilitaires
-function showToast(title, message, type = 'info') {
-    const toast = document.getElementById('notificationToast');
-    const toastTitle = document.getElementById('toastTitle');
-    const toastMessage = document.getElementById('toastMessage');
-    const toastTime = document.getElementById('toastTime');
+// Fonctions utilitaires
+const OLOL = {
+    // Couleurs du thème sombre pour les graphiques
+    chartColors: {
+        primary: '#0d6efd',
+        secondary: '#6c757d',
+        success: '#198754',
+        danger: '#dc3545',
+        warning: '#ffc107',
+        info: '#0dcaf0',
+        background: '#121212',
+        surface: '#1e1e1e',
+        border: '#333333',
+        text: '#f1f1f1',
+        textSecondary: '#a0a0a0'
+    },
     
-    // Définir le contenu
-    toastTitle.textContent = title;
-    toastMessage.textContent = message;
-    toastTime.textContent = 'À l\'instant';
-    
-    // Définir le type (couleur)
-    toast.classList.remove('bg-success', 'bg-danger', 'bg-warning', 'bg-info');
-    switch(type) {
-        case 'success':
-            toast.classList.add('bg-success', 'text-white');
-            break;
-        case 'error':
-            toast.classList.add('bg-danger', 'text-white');
-            break;
-        case 'warning':
-            toast.classList.add('bg-warning');
-            break;
-        default:
-            toast.classList.add('bg-info', 'text-white');
-    }
-    
-    // Initialiser et afficher le toast
-    const bsToast = new bootstrap.Toast(toast);
-    bsToast.show();
-}
-
-// Format d'affichage pour les dates
-function formatDate(date) {
-    const now = new Date();
-    const diff = Math.floor((now - date) / 1000); // différence en secondes
-    
-    if (diff < 60) {
-        return 'À l\'instant';
-    } else if (diff < 3600) {
-        const minutes = Math.floor(diff / 60);
-        return `Il y a ${minutes} minute${minutes > 1 ? 's' : ''}`;
-    } else if (diff < 86400) {
-        const hours = Math.floor(diff / 3600);
-        return `Il y a ${hours} heure${hours > 1 ? 's' : ''}`;
-    } else {
-        const days = Math.floor(diff / 86400);
-        return `Il y a ${days} jour${days > 1 ? 's' : ''}`;
-    }
-}
-
-// Fonction pour formater les nombres
-function formatNumber(num) {
-    return new Intl.NumberFormat('fr-FR').format(num);
-}
-
-// Fonction pour formater la taille des fichiers
-function formatBytes(bytes, decimals = 2) {
-    if (bytes === 0) return '0 Bytes';
-    
-    const k = 1024;
-    const dm = decimals < 0 ? 0 : decimals;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
-    
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
-}
-
-// Classe pour gérer les actualisations automatiques
-class AutoRefresh {
-    constructor(elementId, refreshFunction, interval = 30000) {
-        this.elementId = elementId;
-        this.refreshFunction = refreshFunction;
-        this.interval = interval;
-        this.timerId = null;
-        this.isActive = false;
-    }
-    
-    start() {
-        if (!this.isActive) {
-            this.refreshFunction();
-            this.timerId = setInterval(() => {
-                this.refreshFunction();
-            }, this.interval);
-            this.isActive = true;
-            
-            // Mettre à jour l'UI
-            const element = document.getElementById(this.elementId);
-            if (element) {
-                element.classList.add('active');
-                const statusText = element.querySelector('.status-text');
-                if (statusText) {
-                    statusText.textContent = 'Actif';
+    // Configuration commune pour les graphiques en thème sombre
+    commonChartOptions: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                labels: {
+                    color: '#f1f1f1'
                 }
+            },
+            tooltip: {
+                backgroundColor: 'rgba(30, 30, 30, 0.9)',
+                titleColor: '#f1f1f1',
+                bodyColor: '#f1f1f1',
+                borderColor: '#333333',
+                borderWidth: 1
             }
-        }
-    }
-    
-    stop() {
-        if (this.isActive) {
-            clearInterval(this.timerId);
-            this.isActive = false;
-            
-            // Mettre à jour l'UI
-            const element = document.getElementById(this.elementId);
-            if (element) {
-                element.classList.remove('active');
-                const statusText = element.querySelector('.status-text');
-                if (statusText) {
-                    statusText.textContent = 'Actualisation auto';
-                }
-            }
-        }
-    }
-    
-    toggle() {
-        if (this.isActive) {
-            this.stop();
-        } else {
-            this.start();
-        }
-    }
-}
-
-// Classe pour gérer les appels API
-class ApiClient {
-    constructor(baseUrl = '') {
-        this.baseUrl = baseUrl;
-    }
-    
-    async get(endpoint) {
-        try {
-            const response = await fetch(`${this.baseUrl}${endpoint}`);
-            if (!response.ok) {
-                throw new Error(`Erreur HTTP: ${response.status}`);
-            }
-            return await response.json();
-        } catch (error) {
-            console.error(`Erreur API GET ${endpoint}:`, error);
-            throw error;
-        }
-    }
-    
-    async post(endpoint, data) {
-        try {
-            const response = await fetch(`${this.baseUrl}${endpoint}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
+        },
+        scales: {
+            x: {
+                grid: {
+                    color: 'rgba(255, 255, 255, 0.1)',
+                    borderColor: 'rgba(255, 255, 255, 0.2)'
                 },
-                body: JSON.stringify(data)
-            });
-            if (!response.ok) {
-                throw new Error(`Erreur HTTP: ${response.status}`);
+                ticks: {
+                    color: '#a0a0a0'
+                }
+            },
+            y: {
+                grid: {
+                    color: 'rgba(255, 255, 255, 0.1)',
+                    borderColor: 'rgba(255, 255, 255, 0.2)'
+                },
+                ticks: {
+                    color: '#a0a0a0'
+                }
             }
-            return await response.json();
-        } catch (error) {
-            console.error(`Erreur API POST ${endpoint}:`, error);
-            throw error;
         }
-    }
-}
-
-// Classe pour le Playground
-class Playground {
-    constructor(containerId, messageContainerId, inputId, sendButtonId, modelSelectId) {
-        this.container = document.getElementById(containerId);
-        this.messageContainer = document.getElementById(messageContainerId);
-        this.input = document.getElementById(inputId);
-        this.sendButton = document.getElementById(sendButtonId);
-        this.modelSelect = document.getElementById(modelSelectId);
-        this.apiClient = new ApiClient();
-        this.conversationId = null;
-        
-        this.init();
-    }
+    },
     
-    init() {
-        // Générer un ID de conversation unique
-        this.conversationId = Date.now().toString(36) + Math.random().toString(36).substring(2);
+    // Gestionnaire de notifications Toast
+    showToast: function(title, message, type = 'info') {
+        const toast = document.getElementById('notificationToast');
+        const toastTitle = document.getElementById('toastTitle');
+        const toastMessage = document.getElementById('toastMessage');
+        const toastTime = document.getElementById('toastTime');
         
-        // Configurer les écouteurs d'événements
-        this.sendButton.addEventListener('click', () => this.sendMessage());
-        this.input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                this.sendMessage();
+        if (toast && toastTitle && toastMessage && toastTime) {
+            // Définir l'icône en fonction du type
+            let icon = 'info-circle';
+            let colorClass = 'text-info';
+            
+            switch (type) {
+                case 'success':
+                    icon = 'check-circle';
+                    colorClass = 'text-success';
+                    break;
+                case 'warning':
+                    icon = 'exclamation-circle';
+                    colorClass = 'text-warning';
+                    break;
+                case 'error':
+                    icon = 'times-circle';
+                    colorClass = 'text-danger';
+                    break;
+            }
+            
+            toastTitle.innerHTML = `<i class="fas fa-${icon} me-1 ${colorClass}"></i> ${title}`;
+            toastMessage.textContent = message;
+            toastTime.textContent = 'À l\'instant';
+            
+            // Initialiser et afficher le toast
+            const toastInstance = new bootstrap.Toast(toast);
+            toastInstance.show();
+        }
+    },
+    
+    // Formatage des nombres
+    formatNumber: function(num) {
+        return new Intl.NumberFormat().format(num);
+    },
+    
+    // Formatage de la mémoire
+    formatMemory: function(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    },
+    
+    // Formatage du temps
+    formatTime: function(seconds) {
+        if (seconds < 60) {
+            return `${seconds.toFixed(2)} s`;
+        } else if (seconds < 3600) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            return `${minutes} min ${remainingSeconds.toFixed(0)} s`;
+        } else {
+            const hours = Math.floor(seconds / 3600);
+            const remainingMinutes = Math.floor((seconds % 3600) / 60);
+            return `${hours} h ${remainingMinutes} min`;
+        }
+    },
+    
+    // Actualiser automatiquement les données
+    setupAutoRefresh: function(callback, interval = 30000) {
+        const autoRefreshBtn = document.getElementById('autoRefreshToggle');
+        if (!autoRefreshBtn) return;
+        
+        let refreshInterval;
+        
+        autoRefreshBtn.addEventListener('click', function() {
+            this.classList.toggle('active');
+            
+            if (this.classList.contains('active')) {
+                // Activer l'actualisation automatique
+                this.innerHTML = '<i class="fas fa-sync-alt fa-spin me-2"></i>Auto (ON)';
+                callback(); // Actualiser immédiatement
+                refreshInterval = setInterval(callback, interval);
+                OLOL.showToast('Actualisation automatique', 'L\'actualisation automatique est activée', 'info');
+            } else {
+                // Désactiver l'actualisation automatique
+                this.innerHTML = '<i class="fas fa-sync-alt me-2"></i>Auto (OFF)';
+                clearInterval(refreshInterval);
             }
         });
-        
-        // Ajuster la hauteur du textarea automatiquement
-        this.input.addEventListener('input', function() {
-            this.style.height = 'auto';
-            this.style.height = (this.scrollHeight) + 'px';
-        });
-        
-        // Afficher le message de bienvenue
-        this.addMessage({
-            role: 'ai',
-            content: `Bienvenue dans le Playground OLOL ! Je suis prêt à vous aider. Que voulez-vous savoir ?`,
-            timestamp: new Date()
-        });
-    }
+    },
     
-    async sendMessage() {
-        const message = this.input.value.trim();
-        if (!message) return;
+    // Animer les compteurs
+    animateCounter: function(element, targetValue, duration = 1000) {
+        if (!element) return;
         
-        // Obtenir le modèle sélectionné
-        const selectedModel = this.modelSelect.value;
+        const startValue = parseInt(element.textContent) || 0;
+        const increment = (targetValue - startValue) / (duration / 16);
+        let currentValue = startValue;
         
-        // Ajouter le message de l'utilisateur à l'interface
-        this.addMessage({
-            role: 'user',
-            content: message,
-            timestamp: new Date()
-        });
-        
-        // Réinitialiser l'input
-        this.input.value = '';
-        this.input.style.height = 'auto';
-        this.input.focus();
-        
-        // Désactiver le bouton d'envoi pendant le traitement
-        this.sendButton.disabled = true;
-        this.sendButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Envoi...';
-        
-        try {
-            // Appeler l'API de complétion
-            const response = await this.apiClient.post('/api/v1/chat/completions', {
-                model: selectedModel,
-                messages: [{ role: 'user', content: message }],
-                conversation_id: this.conversationId
-            });
+        const animate = () => {
+            currentValue += increment;
             
-            // Ajouter la réponse à l'interface
-            this.addMessage({
-                role: 'ai',
-                content: response.choices[0].message.content,
-                timestamp: new Date()
-            });
-        } catch (error) {
-            console.error('Erreur lors de l\'envoi du message:', error);
-            
-            // Afficher une erreur à l'utilisateur
-            this.addMessage({
-                role: 'ai',
-                content: `Désolé, une erreur s'est produite : ${error.message}`,
-                timestamp: new Date(),
-                isError: true
-            });
-            
-            // Afficher un toast d'erreur
-            showToast('Erreur', 'Impossible de communiquer avec le modèle', 'error');
-        } finally {
-            // Réactiver le bouton d'envoi
-            this.sendButton.disabled = false;
-            this.sendButton.innerHTML = '<i class="fas fa-paper-plane"></i>';
-        }
-    }
+            if ((increment >= 0 && currentValue >= targetValue) || 
+                (increment < 0 && currentValue <= targetValue)) {
+                element.textContent = OLOL.formatNumber(targetValue);
+            } else {
+                element.textContent = OLOL.formatNumber(Math.floor(currentValue));
+                requestAnimationFrame(animate);
+            }
+        };
+        
+        animate();
+    },
     
-    addMessage(message) {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `message ${message.role} ${message.isError ? 'error' : ''}`;
+    // Créer un graphique en ligne avec thème sombre
+    createLineChart: function(ctx, labels, datasets, options = {}) {
+        if (!ctx) return null;
         
-        // Formatter le contenu avec Markdown si nécessaire
-        let formattedContent = message.content;
+        // Fusionner les options par défaut et personnalisées
+        const chartOptions = {...OLOL.commonChartOptions, ...options};
         
-        // Ajouter le contenu et le timestamp
-        messageDiv.innerHTML = `
-            <div class="message-content">${formattedContent}</div>
-            <span class="timestamp">${formatDate(message.timestamp)}</span>
-        `;
+        return new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: datasets.map(dataset => ({
+                    ...dataset,
+                    borderColor: dataset.borderColor || OLOL.chartColors.primary,
+                    backgroundColor: dataset.backgroundColor || 'rgba(13, 110, 253, 0.1)',
+                    borderWidth: dataset.borderWidth || 2,
+                    pointRadius: dataset.pointRadius || 3,
+                    pointHoverRadius: dataset.pointHoverRadius || 5,
+                    tension: dataset.tension || 0.3
+                }))
+            },
+            options: chartOptions
+        });
+    },
+    
+    // Créer un graphique en barres avec thème sombre
+    createBarChart: function(ctx, labels, datasets, options = {}) {
+        if (!ctx) return null;
         
-        // Ajouter au conteneur et faire défiler vers le bas
-        this.messageContainer.appendChild(messageDiv);
-        this.messageContainer.scrollTop = this.messageContainer.scrollHeight;
+        // Fusionner les options par défaut et personnalisées
+        const chartOptions = {...OLOL.commonChartOptions, ...options};
+        
+        return new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: datasets.map(dataset => ({
+                    ...dataset,
+                    borderColor: dataset.borderColor || OLOL.chartColors.primary,
+                    backgroundColor: dataset.backgroundColor || 'rgba(13, 110, 253, 0.7)',
+                    borderWidth: dataset.borderWidth || 1,
+                    borderRadius: dataset.borderRadius || 4
+                }))
+            },
+            options: chartOptions
+        });
+    },
+    
+    // Créer un graphique en donut avec thème sombre
+    createDoughnutChart: function(ctx, labels, data, colors = [], options = {}) {
+        if (!ctx) return null;
+        
+        // Couleurs par défaut du thème sombre si non spécifiées
+        const defaultColors = [
+            OLOL.chartColors.primary,
+            OLOL.chartColors.success,
+            OLOL.chartColors.warning,
+            OLOL.chartColors.danger,
+            OLOL.chartColors.info,
+            OLOL.chartColors.secondary
+        ];
+        
+        // Utiliser les couleurs spécifiées ou les couleurs par défaut
+        const chartColors = colors.length > 0 ? colors : defaultColors;
+        
+        // Options de base pour les graphiques en donut
+        const baseOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: {
+                        color: OLOL.chartColors.text,
+                        padding: 15,
+                        font: {
+                            size: 12
+                        }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(30, 30, 30, 0.9)',
+                    titleColor: OLOL.chartColors.text,
+                    bodyColor: OLOL.chartColors.text,
+                    borderColor: OLOL.chartColors.border,
+                    borderWidth: 1
+                }
+            },
+            cutout: '70%'
+        };
+        
+        // Fusionner les options par défaut et personnalisées
+        const chartOptions = {...baseOptions, ...options};
+        
+        return new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: chartColors,
+                    borderColor: OLOL.chartColors.background,
+                    borderWidth: 2,
+                    hoverOffset: 10
+                }]
+            },
+            options: chartOptions
+        });
+    },
+    
+    // Initialiser les datatables avec style sombre
+    initDatatable: function(tableId, options = {}) {
+        const tableElement = document.getElementById(tableId);
+        if (!tableElement) return null;
+        
+        // Options par défaut pour le thème sombre
+        const defaultOptions = {
+            language: {
+                url: '//cdn.datatables.net/plug-ins/1.11.5/i18n/fr-FR.json'
+            },
+            pageLength: 10,
+            lengthMenu: [5, 10, 25, 50],
+            responsive: true,
+            initComplete: function() {
+                // Appliquer des styles personnalisés après l'initialisation
+                document.querySelectorAll(`#${tableId}_wrapper .dataTables_paginate .page-link`).forEach(el => {
+                    el.classList.add('bg-dark', 'text-light', 'border-dark');
+                });
+                
+                document.querySelectorAll(`#${tableId}_wrapper select, #${tableId}_wrapper input`).forEach(el => {
+                    el.classList.add('bg-dark', 'text-light', 'border-secondary');
+                });
+                
+                document.querySelectorAll(`#${tableId}_wrapper label`).forEach(el => {
+                    el.classList.add('text-light');
+                });
+            }
+        };
+        
+        // Fusionner les options par défaut avec les options personnalisées
+        const finalOptions = {...defaultOptions, ...options};
+        
+        // Initialiser DataTable avec les options fusionnées
+        return new DataTable(`#${tableId}`, finalOptions);
     }
-}
+};
 
-// Initialiser les tooltips et popovers de Bootstrap
+// Initialisation au chargement du document
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialiser les tooltips
-    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    tooltipTriggerList.map(function(tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl);
+    // Appliquer des styles spécifiques au thème sombre aux éléments interactifs
+    document.querySelectorAll('input, select, textarea').forEach(element => {
+        element.classList.add('bg-dark', 'text-light', 'border-secondary');
     });
     
-    // Initialiser les popovers
-    const popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
-    popoverTriggerList.map(function(popoverTriggerEl) {
-        return new bootstrap.Popover(popoverTriggerEl);
+    // Initialiser les tooltips Bootstrap
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
     });
-    
-    // Initialiser le Playground si on est sur la page correspondante
-    if (document.getElementById('playgroundContainer')) {
-        window.playground = new Playground(
-            'playgroundContainer',
-            'messageContainer',
-            'userInput',
-            'sendButton',
-            'modelSelect'
-        );
-    }
 });
