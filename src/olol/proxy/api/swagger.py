@@ -33,7 +33,7 @@ api = Api(
 )
 
 # Namespace pour les endpoints principaux
-api_ns = api.namespace('api/v1', description='Opérations de l\'API Ollama')
+api_ns = api.namespace('', description='Opérations de l\'API Ollama')
 
 # Service API Ollama
 cluster_manager = ClusterManager()
