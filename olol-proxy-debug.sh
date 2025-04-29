@@ -74,6 +74,79 @@ run_tests() {
     -d '{"model": "mistral", "prompt": "Hello, how are you?", "stream": false}'
 }
 
+# Exécuter un test complet de tous les endpoints API
+test_all_endpoints() {
+  echo "==================================================================="
+  echo "                   TEST COMPLET DES ENDPOINTS API                   "
+  echo "==================================================================="
+  
+  # 1. GET /api/status - État du serveur
+  echo -e "\n[TEST 1/8] GET /api/status - État du serveur"
+  curl -s -m 5 http://$HOST:$PORT/api/status | jq . || echo "Erreur: /api/status ne répond pas"
+  
+  # 2. GET /api/models - Liste des modèles disponibles
+  echo -e "\n[TEST 2/8] GET /api/models - Liste des modèles disponibles"
+  curl -s -m 5 http://$HOST:$PORT/api/models | jq . || echo "Erreur: /api/models ne répond pas"
+  
+  # 3. GET /api/servers - Liste des serveurs du cluster
+  echo -e "\n[TEST 3/8] GET /api/servers - Liste des serveurs du cluster"
+  curl -s -m 5 http://$HOST:$PORT/api/servers | jq . || echo "Erreur: /api/servers ne répond pas"
+  
+  # 4. POST /api/generate - Génération de texte
+  echo -e "\n[TEST 4/8] POST /api/generate - Génération de texte"
+  curl -s -m 10 -X POST http://$HOST:$PORT/api/generate \
+    -H "Content-Type: application/json" \
+    -d '{"model": "mistral", "prompt": "Expliquez brièvement ce quest un LLM.", "stream": false}' | jq . || echo "Erreur: /api/generate ne répond pas"
+    
+  # 5. POST /api/chat - Chat avec modèle
+  echo -e "\n[TEST 5/8] POST /api/chat - Chat avec modèle"
+  curl -s -m 10 -X POST http://$HOST:$PORT/api/chat \
+    -H "Content-Type: application/json" \
+    -d '{"model": "mistral", "messages": [{"role": "user", "content": "Bonjour, comment ça va?"}], "stream": false}' | jq . || echo "Erreur: /api/chat ne répond pas"
+    
+  # 6. POST /api/embeddings - Obtention d'embeddings
+  echo -e "\n[TEST 6/8] POST /api/embeddings - Obtention d'embeddings"
+  curl -s -m 10 -X POST http://$HOST:$PORT/api/embeddings \
+    -H "Content-Type: application/json" \
+    -d '{"model": "mistral", "prompt": "Ceci est un test d'\''embedding"}' | jq . || echo "Erreur: /api/embeddings ne répond pas"
+    
+  # 7. GET /api/models/:model/context - Informations sur le contexte d'un modèle
+  echo -e "\n[TEST 7/8] GET /api/models/:model/context - Informations sur le contexte"
+  curl -s -m 5 http://$HOST:$PORT/api/models/mistral/context | jq . || echo "Erreur: /api/models/:model/context ne répond pas"
+    
+  # 8. POST /api/transfer - Test de transfert de modèle
+  echo -e "\n[TEST 8/8] POST /api/transfer - Test de transfert de modèle"
+  # Récupérer d'abord la liste des serveurs
+  SERVERS_JSON=$(curl -s -m 5 http://$HOST:$PORT/api/servers)
+  
+  # Extraire les deux premiers serveurs s'ils existent
+  if [ ! -z "$SERVERS_JSON" ]; then
+    # Utiliser jq pour extraire les clés du dictionnaire 'servers' (ce sont les adresses des serveurs)
+    SERVER_ADDRESSES=$(echo $SERVERS_JSON | jq -r '.servers | keys | .[0:2][]' 2>/dev/null)
+    
+    # Convertir en tableau
+    readarray -t SERVER_ARRAY <<< "$SERVER_ADDRESSES"
+    
+    if [ ${#SERVER_ARRAY[@]} -ge 2 ]; then
+      SOURCE_SERVER="${SERVER_ARRAY[0]}"
+      TARGET_SERVER="${SERVER_ARRAY[1]}"
+      
+      echo "  Tentative de transfert du modèle 'mistral' de $SOURCE_SERVER vers $TARGET_SERVER"
+      curl -s -m 10 -X POST http://$HOST:$PORT/api/transfer \
+        -H "Content-Type: application/json" \
+        -d "{\"model\": \"mistral\", \"source\": \"$SOURCE_SERVER\", \"target\": \"$TARGET_SERVER\"}" | jq . || echo "Erreur: /api/transfer ne répond pas"
+    else
+      echo "  Pas assez de serveurs disponibles pour tester le transfert"
+    fi
+  else
+    echo "  Impossible de récupérer la liste des serveurs"
+  fi
+  
+  echo -e "\n==================================================================="
+  echo "                      TEST DES ENDPOINTS TERMINÉ                     "
+  echo "==================================================================="
+}
+
 case "$1" in
   update)
     update_code
@@ -93,8 +166,11 @@ case "$1" in
   test-api)
     run_tests
     ;;
+  test-all)
+    test_all_endpoints
+    ;;
   *)
-    echo "Usage: $0 {update|direct|debug|logged|test-nodes|test-api}"
+    echo "Usage: $0 {update|direct|debug|logged|test-nodes|test-api|test-all}"
     echo ""
     echo "  update      - Met à jour le code depuis git et réinstalle"
     echo "  direct      - Lance le proxy directement avec Python pour voir les erreurs en direct"
@@ -102,5 +178,6 @@ case "$1" in
     echo "  logged      - Lance le proxy avec logs détaillés dans logs/proxy-debug.log"
     echo "  test-nodes  - Teste la connectivité avec chaque nœud"
     echo "  test-api    - Exécute des tests basiques d'API"
+    echo "  test-all    - Teste tous les endpoints API de façon exhaustive"
     ;;
 esac
