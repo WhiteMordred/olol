@@ -1,9 +1,9 @@
 """Utility functions for Ollama proxy server."""
 
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Tuple
 
-from ..sync.client import OllamaClient
+from olol.sync.client import OllamaClient
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -63,7 +63,8 @@ def adjust_context_length(model_name: str, prompt: str, options: Dict[str, Any])
         Adjusted options with optimized context length
     """
     # Import here to avoid circular imports
-    from proxy import cluster
+    import olol.proxy.app as proxy_app
+    cluster = proxy_app.cluster
     
     # Make a copy of options to avoid modifying the original
     adjusted = options.copy() if options else {}
@@ -84,7 +85,7 @@ def adjust_context_length(model_name: str, prompt: str, options: Dict[str, Any])
     estimated_tokens = len(prompt) // 4
     
     # Get the optimal context length for this input
-    if cluster and cluster.model_manager:
+    if cluster and cluster.model_manager and hasattr(cluster.model_manager, 'estimate_optimal_context_length'):
         recommended_ctx = cluster.model_manager.estimate_optimal_context_length(
             model_name, estimated_tokens
         )
@@ -115,7 +116,7 @@ def format_server_address(ip: str, port: int) -> str:
         return f"{ip}:{port}"
 
 
-def parse_server_address(server_address: str) -> tuple:
+def parse_server_address(server_address: str) -> Tuple[str, int]:
     """Parse server address into host and port.
     
     Args:

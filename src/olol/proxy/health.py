@@ -4,7 +4,7 @@ import logging
 import time
 from typing import Dict, List, Optional
 
-from ..sync.client import OllamaClient
+from olol.sync.client import OllamaClient
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -16,7 +16,8 @@ health_check_interval = 30  # seconds
 def health_checker() -> None:
     """Background thread to check server health periodically."""
     # Import here to avoid circular imports
-    from ..proxy import cluster
+    import olol.proxy.app as proxy_app
+    cluster = proxy_app.cluster
     
     if cluster is None:
         logger.error("Cluster not initialized for health checker")
@@ -99,8 +100,7 @@ def health_checker() -> None:
                                             logger.debug(f"Error getting details for model {model_name}: {e}")
                                     
                                     # Mise à jour de la disponibilité des modèles
-                                    if hasattr(cluster, 'model_manager') and cluster.model_manager is not None:
-                                        cluster.model_manager.update_server_models(server, models)
+                                    cluster.model_manager.update_server_models(server, models)
                                 else:
                                     logger.warning(f"Server {short_server} returned invalid model list")
                             except Exception as model_err:
