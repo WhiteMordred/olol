@@ -1339,43 +1339,59 @@ def list_servers():
     
     server_info = {}
     
-    # Get server information without nested locks
+    # Version simplifiée ne bloquant pas les verrous trop longtemps
     try:
-        # Faire une copie des adresses pour éviter de bloquer trop longtemps sur les verrous
-        with cluster.server_lock:
-            server_addresses = list(cluster.server_addresses)
-            
-        # Récupérer les informations pour chaque serveur individuellement
+        # Faire une copie rapide des adresses sans bloquer
+        server_addresses = []
+        try:
+            # Utiliser un timeout court pour le verrou
+            if cluster.server_lock.acquire(timeout=0.1):
+                try:
+                    server_addresses = list(cluster.server_addresses)
+                finally:
+                    cluster.server_lock.release()
+            else:
+                # Si on ne peut pas acquérir le verrou, utiliser une liste vide
+                logger.warning("Couldn't acquire server lock in time, returning empty server list")
+        except Exception as e:
+            logger.error(f"Error accessing server addresses: {e}")
+        
+        # Si nous n'avons pas pu obtenir les adresses, renvoyer une réponse rapide
+        if not server_addresses:
+            return jsonify({
+                "servers": {},
+                "count": 0,
+                "status": "Partial data - servers currently unavailable"
+            })
+        
+        # Collecter des informations minimales sur chaque serveur
         for server in server_addresses:
-            info = {}
+            info = {
+                "address": server,
+                "healthy": False,  # Par défaut
+                "load": 0,         # Par défaut
+                "models": []       # Par défaut
+            }
             
-            # Récupérer la charge du serveur
-            with cluster.server_lock:
-                info["load"] = cluster.server_loads.get(server, 0)
-                
-            # Récupérer le statut de santé du serveur
-            with cluster.health_lock:
-                info["healthy"] = cluster.server_health.get(server, False)
-                
-            # Récupérer les capacités du serveur si disponibles
-            with cluster.capabilities_lock:
-                info["capabilities"] = cluster.server_capabilities.get(server, {})
-                
-            # Récupérer les modèles chargés sur ce serveur
-            with cluster.model_lock:
-                info["models"] = []
-                for model, servers in cluster.model_server_map.items():
-                    if server in servers:
-                        info["models"].append(model)
-                        
+            # Essayer d'obtenir le statut de santé rapidement
+            try:
+                if cluster.health_lock.acquire(timeout=0.05):
+                    try:
+                        info["healthy"] = cluster.server_health.get(server, False)
+                    finally:
+                        cluster.health_lock.release()
+            except Exception:
+                pass
+            
+            # Ajouter à la liste de serveurs
             server_info[server] = info
     except Exception as e:
         logger.error(f"Error collecting server information: {e}")
-        # Fournir au moins une réponse basique même en cas d'erreur
+        
+        # Renvoyer une réponse même en cas d'erreur
         return jsonify({
-            "servers": {server: {"healthy": False, "error": "Failed to collect information"} 
-                      for server in server_addresses},
-            "count": len(server_addresses),
+            "servers": {},
+            "count": 0,
             "error": str(e)
         })
     
