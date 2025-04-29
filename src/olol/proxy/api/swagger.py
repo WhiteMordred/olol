@@ -28,7 +28,7 @@ api = Api(
     version='1.0',
     title='OLOL - Proxy API pour Ollama',
     description='API de proxy pour interagir avec un cluster de serveurs Ollama',
-    doc='/swagger/docs',
+    doc='/docs',
     validate=True
 )
 
