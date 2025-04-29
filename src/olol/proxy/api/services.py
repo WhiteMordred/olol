@@ -688,3 +688,423 @@ class OllamaProxyService:
                 "success": False,
                 "error": str(e)
             }
+    
+    def get_server_details(self, address: str) -> Dict[str, Any]:
+        """
+        Obtient les détails d'un serveur spécifique.
+        
+        Args:
+            address: L'adresse du serveur au format host:port
+            
+        Returns:
+            Un dictionnaire contenant les détails du serveur
+        """
+        try:
+            # Vérifier si le serveur existe
+            if not self.cluster_manager.has_server(address):
+                return {
+                    "success": False,
+                    "error": "Serveur non trouvé"
+                }
+                
+            # Récupérer l'état de santé
+            is_healthy = self.cluster_manager.get_server_health(address)
+            
+            # Récupérer la charge
+            server_load = self.cluster_manager.get_server_load(address)
+            
+            # Récupérer les modèles disponibles sur ce serveur
+            server_models = []
+            all_models = self.cluster_manager.get_all_models()
+            for model, servers in all_models.items():
+                if address in servers:
+                    server_models.append(model)
+            
+            # Obtenir le timestamp de la dernière vérification de santé
+            last_health_check = self.cluster_manager.get_last_health_check_time(address)
+            
+            # Obtenir les informations de système
+            system_info = {}
+            try:
+                host, port_str = address.split(':')
+                port = int(port_str)
+                client = OllamaClient(host=host, port=port)
+                try:
+                    # Essayer d'obtenir les informations système si disponibles
+                    system_info = client.get_system_info()
+                finally:
+                    client.close()
+            except Exception as e:
+                logger.warning(f"Impossible d'obtenir les infos système pour {address}: {e}")
+            
+            return {
+                "success": True,
+                "address": address,
+                "healthy": is_healthy,
+                "load": server_load,
+                "models": server_models,
+                "last_health_check": last_health_check,
+                "system_info": system_info
+            }
+            
+        except Exception as e:
+            logger.error(f"Erreur lors de l'obtention des détails du serveur {address}: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+    
+    def check_server_health(self, address: str) -> Dict[str, Any]:
+        """
+        Vérifie la santé d'un serveur spécifique.
+        
+        Args:
+            address: L'adresse du serveur à vérifier
+            
+        Returns:
+            Un dictionnaire contenant le résultat de la vérification
+        """
+        try:
+            # Vérifier si le serveur existe
+            if not self.cluster_manager.has_server(address):
+                return {
+                    "success": False,
+                    "error": "Serveur non trouvé"
+                }
+            
+            # Créer un client pour ce serveur
+            client = self.cluster_manager.get_client_for_server(address)
+            if not client:
+                return {
+                    "success": False,
+                    "error": "Impossible de créer un client pour ce serveur"
+                }
+            
+            # Vérifier la santé
+            is_healthy = False
+            try:
+                is_healthy = client.check_health()
+            finally:
+                client.close()
+            
+            # Mettre à jour l'état de santé dans le cluster
+            self.cluster_manager.update_server_health(address, is_healthy)
+            
+            return {
+                "success": True,
+                "address": address,
+                "healthy": is_healthy,
+                "timestamp": time.time()
+            }
+            
+        except Exception as e:
+            logger.error(f"Erreur lors de la vérification de santé du serveur {address}: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+    
+    def get_health_report(self) -> Dict[str, Any]:
+        """
+        Obtient un rapport de santé global du cluster.
+        
+        Returns:
+            Un dictionnaire contenant le rapport de santé
+        """
+        try:
+            servers = {}
+            total_servers = 0
+            healthy_servers = 0
+            
+            # Récupérer les informations de santé pour chaque serveur
+            for address in self.cluster_manager.get_server_addresses():
+                total_servers += 1
+                
+                # Récupérer l'état de santé
+                is_healthy = self.cluster_manager.get_server_health(address)
+                if is_healthy:
+                    healthy_servers += 1
+                
+                # Récupérer la charge
+                server_load = self.cluster_manager.get_server_load(address)
+                
+                # Ajouter ce serveur au rapport
+                servers[address] = {
+                    "healthy": is_healthy,
+                    "load": server_load
+                }
+            
+            # Calculer le pourcentage de santé global
+            if total_servers > 0:
+                health_percent = (healthy_servers / total_servers) * 100
+            else:
+                health_percent = 0
+            
+            return {
+                "success": True,
+                "timestamp": time.time(),
+                "total_servers": total_servers,
+                "healthy_servers": healthy_servers,
+                "health_percent": health_percent,
+                "servers": servers
+            }
+            
+        except Exception as e:
+            logger.error(f"Erreur lors de la génération du rapport de santé: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+    
+    def get_health_stats(self, hours: int = 24) -> Dict[str, Any]:
+        """
+        Obtient des statistiques de santé sur une période donnée.
+        
+        Args:
+            hours: Le nombre d'heures pour lesquelles récupérer les données
+            
+        Returns:
+            Un dictionnaire contenant les statistiques de santé
+        """
+        try:
+            # Vérifier si la fonctionnalité est supportée
+            if not hasattr(self.cluster_manager, 'get_health_history'):
+                return {
+                    "success": False,
+                    "error": "Les statistiques de santé ne sont pas disponibles"
+                }
+                
+            # Récupérer l'historique de santé
+            history = self.cluster_manager.get_health_history(hours)
+            if not history:
+                return {
+                    "success": True,
+                    "message": "Pas de données de santé disponibles",
+                    "stats": {}
+                }
+            
+            # Calculer les statistiques à partir de l'historique
+            stats = {}
+            for address in self.cluster_manager.get_server_addresses():
+                server_stats = {
+                    "total_checks": 0,
+                    "healthy_checks": 0,
+                    "health_ratio": 0,
+                    "avg_response_time": 0
+                }
+                
+                # Extraire les données pour ce serveur
+                server_history = [entry for entry in history if entry.get("server") == address]
+                
+                if server_history:
+                    server_stats["total_checks"] = len(server_history)
+                    server_stats["healthy_checks"] = sum(1 for entry in server_history if entry.get("healthy", False))
+                    
+                    if server_stats["total_checks"] > 0:
+                        server_stats["health_ratio"] = server_stats["healthy_checks"] / server_stats["total_checks"]
+                        
+                    # Calculer le temps de réponse moyen si disponible
+                    response_times = [entry.get("response_time") for entry in server_history if "response_time" in entry]
+                    if response_times:
+                        server_stats["avg_response_time"] = sum(response_times) / len(response_times)
+                
+                stats[address] = server_stats
+            
+            return {
+                "success": True,
+                "period_hours": hours,
+                "stats": stats
+            }
+            
+        except Exception as e:
+            logger.error(f"Erreur lors de la récupération des statistiques de santé: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+    
+    def get_server_health_history(self, server: str, hours: int = 24) -> Dict[str, Any]:
+        """
+        Obtient l'historique de santé d'un serveur spécifique.
+        
+        Args:
+            server: L'adresse du serveur
+            hours: Le nombre d'heures pour lesquelles récupérer l'historique
+            
+        Returns:
+            Un dictionnaire contenant l'historique de santé
+        """
+        try:
+            # Vérifier si le serveur existe
+            if not self.cluster_manager.has_server(server):
+                return {
+                    "success": False,
+                    "error": "Serveur non trouvé"
+                }
+                
+            # Vérifier si la fonctionnalité est supportée
+            if not hasattr(self.cluster_manager, 'get_server_health_history'):
+                return {
+                    "success": False,
+                    "error": "L'historique de santé n'est pas disponible"
+                }
+                
+            # Récupérer l'historique de santé pour ce serveur
+            history = self.cluster_manager.get_server_health_history(server, hours)
+            
+            return {
+                "success": True,
+                "server": server,
+                "period_hours": hours,
+                "history": history
+            }
+            
+        except Exception as e:
+            logger.error(f"Erreur lors de la récupération de l'historique du serveur {server}: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+    
+    def get_load_chart_data(self, hours: int = 1) -> Dict[str, Any]:
+        """
+        Obtient les données de graphique pour la charge des serveurs.
+        
+        Args:
+            hours: Le nombre d'heures pour lesquelles récupérer les données
+            
+        Returns:
+            Un dictionnaire contenant les données du graphique
+        """
+        try:
+            # Vérifier si la fonctionnalité est supportée
+            if not hasattr(self.cluster_manager, 'get_load_history'):
+                return {
+                    "success": False,
+                    "error": "Les données de charge ne sont pas disponibles"
+                }
+                
+            # Récupérer l'historique de charge
+            load_history = self.cluster_manager.get_load_history(hours)
+            
+            # Organiser les données pour le graphique
+            servers = set()
+            timestamps = set()
+            
+            # Collecter tous les serveurs et timestamps
+            for entry in load_history:
+                if "server" in entry and "timestamp" in entry:
+                    servers.add(entry["server"])
+                    timestamps.add(entry["timestamp"])
+            
+            # Trier les timestamps
+            sorted_timestamps = sorted(timestamps)
+            
+            # Créer des séries pour chaque serveur
+            series = {}
+            for server in servers:
+                series[server] = []
+                
+                # Pour chaque timestamp, trouver la valeur pour ce serveur
+                for ts in sorted_timestamps:
+                    # Trouver l'entrée correspondante dans l'historique
+                    matching_entries = [e for e in load_history 
+                                        if e.get("server") == server and e.get("timestamp") == ts]
+                    
+                    if matching_entries:
+                        # Prendre la première entrée correspondante
+                        value = matching_entries[0].get("load", 0)
+                    else:
+                        # Pas de données pour ce point
+                        value = None
+                        
+                    series[server].append({
+                        "timestamp": ts,
+                        "value": value
+                    })
+            
+            return {
+                "success": True,
+                "period_hours": hours,
+                "timestamps": sorted_timestamps,
+                "series": series
+            }
+            
+        except Exception as e:
+            logger.error(f"Erreur lors de la récupération des données de graphique de charge: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+    
+    def get_health_chart_data(self, hours: int = 1) -> Dict[str, Any]:
+        """
+        Obtient les données de graphique pour la santé des serveurs.
+        
+        Args:
+            hours: Le nombre d'heures pour lesquelles récupérer les données
+            
+        Returns:
+            Un dictionnaire contenant les données du graphique
+        """
+        try:
+            # Vérifier si la fonctionnalité est supportée
+            if not hasattr(self.cluster_manager, 'get_health_history'):
+                return {
+                    "success": False,
+                    "error": "Les données de santé ne sont pas disponibles"
+                }
+                
+            # Récupérer l'historique de santé
+            health_history = self.cluster_manager.get_health_history(hours)
+            
+            # Organiser les données pour le graphique
+            servers = set()
+            timestamps = set()
+            
+            # Collecter tous les serveurs et timestamps
+            for entry in health_history:
+                if "server" in entry and "timestamp" in entry:
+                    servers.add(entry["server"])
+                    timestamps.add(entry["timestamp"])
+            
+            # Trier les timestamps
+            sorted_timestamps = sorted(timestamps)
+            
+            # Créer des séries pour chaque serveur
+            series = {}
+            for server in servers:
+                series[server] = []
+                
+                # Pour chaque timestamp, trouver la valeur pour ce serveur
+                for ts in sorted_timestamps:
+                    # Trouver l'entrée correspondante dans l'historique
+                    matching_entries = [e for e in health_history 
+                                        if e.get("server") == server and e.get("timestamp") == ts]
+                    
+                    if matching_entries:
+                        # Prendre la première entrée correspondante
+                        # Convertir booléen en valeur numérique
+                        value = 1 if matching_entries[0].get("healthy", False) else 0
+                    else:
+                        # Pas de données pour ce point
+                        value = None
+                        
+                    series[server].append({
+                        "timestamp": ts,
+                        "value": value
+                    })
+            
+            return {
+                "success": True,
+                "period_hours": hours,
+                "timestamps": sorted_timestamps,
+                "series": series
+            }
+            
+        except Exception as e:
+            logger.error(f"Erreur lors de la récupération des données de graphique de santé: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
