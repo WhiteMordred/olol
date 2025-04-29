@@ -531,8 +531,19 @@ class OllamaCluster:
         with self.server_lock:
             servers = list(self.server_addresses)
         
+        # Ajouter un message de log pour le débogage
+        logger.info(f"Découverte des modèles sur {len(servers)} serveurs")
+        
         for server in servers:
+            # Exécuter immédiatement pour le premier serveur, puis un par un
             self._discover_server_models(server)
+            # Ajouter un petit délai pour éviter de surcharger les serveurs
+            time.sleep(0.5)
+            
+        # Ajouter un log pour indiquer la fin de la découverte
+        with self.model_lock:
+            model_count = len(self.model_server_map)
+            logger.info(f"Découverte terminée: {model_count} modèles trouvés")
     
     def _discover_server_models(self, server_address: str):
         """Discover models available on a server."""

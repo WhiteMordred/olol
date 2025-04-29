@@ -108,12 +108,13 @@ class RichUI:
         minutes, seconds = divmod(remainder, 60)
         uptime_str = f"{hours:02}:{minutes:02}:{seconds:02}"
         
-        spinner = Spinner("dots", text="OLOL Proxy Server")
+        spinner = Spinner("dots")
+        spinner_text = spinner.render()
         grid = Table.grid(expand=True)
         grid.add_column(justify="left", ratio=1)
         grid.add_column(justify="right")
         grid.add_row(
-            f"[bold green]{spinner} OLOL Proxy Server Status[/bold green]",
+            f"[bold green]{spinner_text} OLOL Proxy Server Status[/bold green]",
             f"[yellow]Uptime: {uptime_str}[/yellow]"
         )
         
@@ -258,9 +259,10 @@ class RichUI:
             model_context_lengths = {}
             
             # Utiliser des verrous appropriés pour éviter les problèmes de concurrence
-            with cluster.model_lock:
-                # Faire une copie profonde pour éviter les problèmes de référence
-                model_server_map = {k: list(v) for k, v in cluster.model_server_map.items() if v}
+            if hasattr(cluster, 'model_lock') and hasattr(cluster, 'model_server_map'):
+                with cluster.model_lock:
+                    # Faire une copie profonde pour éviter les problèmes de référence
+                    model_server_map = {k: list(v) for k, v in cluster.model_server_map.items() if v}
             
             # Vérifier si nous avons des modèles
             if not model_server_map:
