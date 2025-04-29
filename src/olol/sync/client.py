@@ -50,11 +50,72 @@ class OllamaClient:
                 stream=stream,
                 options=options or {}
             )
-            responses = self.stub.Generate(request)
-            return responses
-        except grpc.RpcError as e:
-            logger.error(f"gRPC error: {e.code()}: {e.details()}")
+            try:
+                responses = self.stub.Generate(request)
+                return responses
+            except grpc.RpcError as e:
+                # Si la commande "generate" n'est pas reconnue, essayer avec "run"
+                if "unknown command" in e.details() and "generate" in e.details():
+                    logger.warning("Generate command not supported, falling back to RunModel")
+                    return self._generate_fallback(model, prompt, stream, options)
+                else:
+                    # Autre erreur gRPC, la propager
+                    logger.error(f"gRPC error: {e.code()}: {e.details()}")
+                    raise
+        except Exception as e:
+            logger.error(f"Generate error: {str(e)}")
             raise
+            
+    def _generate_fallback(self, model: str, prompt: str, 
+                         stream: bool = True, 
+                         options: Optional[Dict[str, str]] = None) -> Iterator[ollama_pb2.GenerateResponse]:
+        """Fallback implementation for generate using RunModel.
+        
+        Cette méthode est utilisée quand la commande 'generate' n'est pas supportée.
+        Elle convertit la réponse de RunModel en format GenerateResponse compatible.
+        """
+        try:
+            # Créer une requête pour RunModel
+            request = ollama_pb2.ModelRequest(
+                model_name=model,
+                prompt=prompt
+            )
+            
+            # Exécuter RunModel
+            response = self.stub.RunModel(request)
+            
+            # Créer et retourner un iterator avec une seule réponse compatible
+            class SingleResponseIterator:
+                def __iter__(self):
+                    return self
+                
+                def __next__(self):
+                    raise StopIteration
+                
+            iterator = SingleResponseIterator()
+            
+            # Ajouter la réponse complète comme seul élément
+            setattr(iterator, "__next__", lambda: self._convert_response(response))
+            setattr(iterator, "__iter__", lambda: iterator)
+            
+            return iterator
+        except Exception as e:
+            logger.error(f"Generate fallback error: {str(e)}")
+            raise
+            
+    def _convert_response(self, response):
+        """Convertit une réponse de RunModel en format GenerateResponse."""
+        if hasattr(response, 'output'):
+            generate_response = ollama_pb2.GenerateResponse(
+                model="",  # Le modèle n'est pas inclus dans la réponse RunModel
+                response=response.output,
+                done=True
+            )
+            # Ne retourner qu'une seule réponse, puis StopIteration
+            self._convert_response = lambda x: StopIteration()  
+            return generate_response
+        else:
+            raise StopIteration()
     
     def chat(self, model: str, messages: List[Dict[str, str]], 
             stream: bool = True,
