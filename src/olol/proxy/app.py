@@ -48,6 +48,15 @@ use_distributed_inference = False  # Set to True to enable distributed inference
 ui_active = False
 ui_thread = None
 
+# Ajout d'un filtre personnalisé yesno (similaire à celui de Django)
+@app.template_filter('yesno')
+def yesno_filter(value, choices="oui,non"):
+    choices_list = choices.split(",")
+    if len(choices_list) < 2:
+        choices_list = ["oui", "non"]
+    
+    return choices_list[0] if value else choices_list[1]
+
 # Web routes
 @app.route('/')
 def index():
