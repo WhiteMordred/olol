@@ -10,6 +10,14 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 
+class ValidationError(Exception):
+    """Exception levée lorsqu'une validation des données échoue."""
+    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
+        super().__init__(message)
+        self.message = message
+        self.details = details or {}
+
+
 @dataclass
 class GenerateRequest:
     """Requête pour l'endpoint /api/generate."""
