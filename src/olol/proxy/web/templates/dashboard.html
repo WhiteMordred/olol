@@ -218,7 +218,7 @@
                                 <h5 class="model-name">{{ model.name }}</h5>
                                 <div class="model-info mb-2">
                                     <span class="badge bg-{% if model.available %}success{% else %}danger{% endif %}">
-                                        {{ model.available|yesno("Disponible,Non disponible") }}
+                                        {% if model.available %}Disponible{% else %}Non disponible{% endif %}
                                     </span>
                                     <span class="badge bg-secondary">{{ model.servers|length }} serveur(s)</span>
                                 </div>
