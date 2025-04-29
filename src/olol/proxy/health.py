@@ -16,7 +16,7 @@ health_check_interval = 30  # seconds
 def health_checker() -> None:
     """Background thread to check server health periodically."""
     # Import here to avoid circular imports
-    from proxy import cluster
+    from ..proxy import cluster
     
     if cluster is None:
         logger.error("Cluster not initialized for health checker")
@@ -99,7 +99,8 @@ def health_checker() -> None:
                                             logger.debug(f"Error getting details for model {model_name}: {e}")
                                     
                                     # Mise à jour de la disponibilité des modèles
-                                    cluster.model_manager.update_server_models(server, models)
+                                    if hasattr(cluster, 'model_manager') and cluster.model_manager is not None:
+                                        cluster.model_manager.update_server_models(server, models)
                                 else:
                                     logger.warning(f"Server {short_server} returned invalid model list")
                             except Exception as model_err:
