@@ -561,39 +561,73 @@ class OllamaCluster:
                 port = int(port_str)
                 
                 from olol.sync.client import OllamaClient
-                client = OllamaClient(host=host, port=port)
+                client = OllamaClient(host=host, port=port, timeout=2.0)  # Timeout réduit pour éviter les blocages
                 
                 try:
-                    # Vérifier la santé du serveur
-                    is_healthy = client.check_health()
+                    # Vérifier la santé du serveur avec un timeout court
+                    is_healthy = client.check_health(timeout=1.0)
                     
-                    # Mettre à jour l'état de santé
-                    with self.health_lock:
+                    # Mettre à jour l'état de santé sans bloquer trop longtemps
+                    try:
+                        # Utiliser un timeout plus court pour l'acquisition du verrou
+                        self.health_lock.acquire(timeout=0.5)
                         self.server_health[server_address] = is_healthy
+                    except Exception:
+                        # Si on ne peut pas acquérir le verrou, continuer quand même
+                        pass
+                    finally:
+                        # S'assurer de toujours relâcher le verrou s'il a été acquis
+                        if self.health_lock._is_owned():
+                            self.health_lock.release()
                     
                     # Si sain, récupérer les modèles
                     if is_healthy:
                         models_response = client.list_models()
                         
                         if hasattr(models_response, 'models'):
-                            # Mise à jour de la carte des modèles
-                            with self.model_lock:
-                                for model_info in models_response.models:
-                                    model_name = model_info.name
-                                    
-                                    if model_name not in self.model_server_map:
-                                        self.model_server_map[model_name] = []
+                            # Mise à jour de la carte des modèles de façon atomique
+                            try:
+                                # Essayer d'acquérir le verrou avec un timeout
+                                acquired = self.model_lock.acquire(timeout=0.5)
+                                if acquired:
+                                    for model_info in models_response.models:
+                                        model_name = model_info.name
                                         
-                                    if server_address not in self.model_server_map[model_name]:
-                                        self.model_server_map[model_name].append(server_address)
-                except Exception:
+                                        if model_name not in self.model_server_map:
+                                            self.model_server_map[model_name] = []
+                                            
+                                        if server_address not in self.model_server_map[model_name]:
+                                            self.model_server_map[model_name].append(server_address)
+                                else:
+                                    # Si on ne peut pas acquérir le verrou, on garde l'information pour plus tard
+                                    logger.warning(f"Impossible d'acquérir le verrou model_lock pour {server_address}")
+                            finally:
+                                # S'assurer de relâcher le verrou s'il a été acquis
+                                if self.model_lock._is_owned():
+                                    self.model_lock.release()
+                except Exception as e:
                     # Si une erreur se produit, marquer le serveur comme non sain
-                    with self.health_lock:
-                        self.server_health[server_address] = False
+                    logger.warning(f"Erreur lors de la découverte du serveur {server_address}: {str(e)}")
+                    try:
+                        # Acquérir le verrou avec un timeout
+                        if self.health_lock.acquire(timeout=0.5):
+                            self.server_health[server_address] = False
+                    except Exception:
+                        pass
+                    finally:
+                        if self.health_lock._is_owned():
+                            self.health_lock.release()
                 finally:
                     # Fermer le client pour libérer les ressources
                     client.close()
-        except Exception:
+        except Exception as e:
             # En cas d'erreur de connexion, marquer le serveur comme non sain
-            with self.health_lock:
-                self.server_health[server_address] = False
+            logger.warning(f"Erreur de connexion au serveur {server_address}: {str(e)}")
+            try:
+                if self.health_lock.acquire(timeout=0.5):
+                    self.server_health[server_address] = False
+            except Exception:
+                pass
+            finally:
+                if self.health_lock._is_owned():
+                    self.health_lock.release()
