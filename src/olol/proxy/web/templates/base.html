@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" class="dark-mode">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -20,8 +20,8 @@
 <body>
     <div class="d-flex" id="wrapper">
         <!-- Sidebar -->
-        <div class="bg-light border-end" id="sidebar-wrapper">
-            <div class="sidebar-heading text-center py-3 border-bottom">
+        <div id="sidebar-wrapper">
+            <div class="sidebar-heading text-center py-3">
                 <img src="{{ url_for('static', filename='img/olol-logo.png') }}" alt="OLOL" 
                      class="img-fluid" style="max-height: 40px;">
                 <span class="sidebar-brand d-none d-sm-inline">OLOL Proxy</span>
@@ -59,13 +59,13 @@
             </div>
             <!-- Sidebar Footer with Status -->
             <div class="sidebar-footer">
-                <div class="d-flex justify-content-between px-3 py-2 bg-light border-top align-items-center">
+                <div class="d-flex justify-content-between px-3 py-2 align-items-center">
                     <div class="server-status">
                         <span class="status-indicator online"></span>
                         <span class="d-none d-sm-inline small">Proxy actif</span>
                     </div>
                     <div class="dropdown">
-                        <button class="btn btn-sm btn-link dropdown-toggle" type="button" id="dropdownMenuButton1"
+                        <button class="btn btn-sm btn-link text-light dropdown-toggle" type="button" id="dropdownMenuButton1"
                             data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="fas fa-ellipsis-v"></i>
                         </button>
@@ -89,9 +89,9 @@
         <!-- Page Content -->
         <div id="page-content-wrapper">
             <!-- Top navigation -->
-            <nav class="navbar navbar-expand-lg navbar-light border-bottom bg-white">
+            <nav class="navbar navbar-expand-lg navbar-dark">
                 <div class="container-fluid">
-                    <button class="btn btn-link" id="sidebarToggle">
+                    <button class="btn btn-link text-light" id="sidebarToggle">
                         <i class="fas fa-bars"></i>
                     </button>
                     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" 
@@ -164,7 +164,7 @@
                                         <span class="status-indicator online me-2"></span>
                                         192.168.1.10:50051
                                     </a></li>
-                                    <li><a class="dropdown-item text-muted" href="/servers">
+                                    <li><a class="dropdown-item" href="/servers">
                                         <span class="status-indicator offline me-2"></span>
                                         192.168.1.5:50051
                                     </a></li>
@@ -211,7 +211,7 @@
             </div>
             
             <!-- Footer -->
-            <footer class="py-3 mt-auto border-top">
+            <footer class="py-3 mt-auto">
                 <div class="container-fluid px-4">
                     <div class="d-flex align-items-center justify-content-between small">
                         <div>
@@ -237,6 +237,11 @@
     <!-- Scripts and page-specific JS -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // Configurer les options de Chart.js pour le thème sombre
+            Chart.defaults.color = '#f1f1f1';
+            Chart.defaults.scale.grid.color = 'rgba(255, 255, 255, 0.1)';
+            Chart.defaults.scale.grid.borderColor = 'rgba(255, 255, 255, 0.1)';
+            
             // Toggle sidebar
             const sidebarToggle = document.getElementById('sidebarToggle');
             const toggleSidebarBtn = document.getElementById('toggleSidebarBtn');
