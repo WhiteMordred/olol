@@ -174,34 +174,63 @@ class RichUI:
         server_data = []
         
         try:
-            with cluster.health_lock:
-                server_count = len(cluster.server_addresses)
-                healthy_count = sum(1 for v in cluster.server_health.values() if v)
+            # Utiliser des copies locales pour éviter de maintenir les verrous trop longtemps
+            server_addresses = []
+            server_loads = {}
+            server_health = {}
+            model_server_map = {}
+            
+            # Récupérer les adresses des serveurs
+            if hasattr(cluster, 'server_addresses'):
+                with cluster.server_lock:
+                    server_addresses = list(cluster.server_addresses)
+                    server_loads = dict(cluster.server_loads)
+
+            # Récupérer les statuts de santé des serveurs
+            if hasattr(cluster, 'server_health'):
+                with cluster.health_lock:
+                    server_health = dict(cluster.server_health)
+            
+            # Récupérer la carte des modèles aux serveurs
+            if hasattr(cluster, 'model_server_map'):
+                with cluster.model_lock:
+                    model_server_map = {k: list(v) for k, v in cluster.model_server_map.items()}
+            
+            server_count = len(server_addresses)
+            healthy_count = sum(1 for v in server_health.values() if v)
                 
-                # Get data for each server
-                for server in cluster.server_addresses:
-                    healthy = cluster.server_health.get(server, False)
-                    with cluster.server_lock:
-                        load = cluster.server_loads.get(server, 0)
-                    
-                    # Get model count
-                    model_count = 0
-                    with cluster.model_lock:
-                        for models in cluster.model_server_map.values():
-                            if server in models:
-                                model_count += 1
-                                
-                    server_data.append({
-                        "address": server,
-                        "healthy": healthy,
-                        "load": load,
-                        "model_count": model_count
-                    })
+            # Obtenir les données pour chaque serveur
+            for server in server_addresses:
+                healthy = server_health.get(server, False)
+                load = server_loads.get(server, 0)
+                
+                # Obtenir le nombre de modèles
+                model_count = 0
+                for models in model_server_map.values():
+                    if server in models:
+                        model_count += 1
+                            
+                server_data.append({
+                    "address": server,
+                    "healthy": healthy,
+                    "load": load,
+                    "model_count": model_count
+                })
+                
+            # Ajouter un message d'état en mode verbose
+            if self.verbose or self.debug:
+                self.add_status_message(f"Found {server_count} servers, {healthy_count} healthy")
+                
         except Exception as e:
             if self.debug:
                 self.add_status_message(f"Error getting server data: {str(e)}")
+            return Panel(f"Error accessing server data: {str(e)}", title="Servers", border_style="red")
         
-        # Create server table
+        # Si aucun serveur n'est trouvé, afficher un message
+        if not server_data:
+            return Panel("No servers found in cluster", title="Servers", border_style="yellow")
+        
+        # Créer le tableau des serveurs
         table = Table(box=box.SIMPLE, expand=True)
         table.add_column("Server", style="dim")
         table.add_column("Health", justify="center")
@@ -217,50 +246,53 @@ class RichUI:
                 str(server["model_count"])
             )
         
-        title = f"[bold]Servers[/bold] [green]{healthy_count}[/green]/[blue]{server_count}[/blue] healthy"
-        return Panel(table, title=title, border_style="blue", box=box.ROUNDED)
+        return Panel(table, title=f"[bold]Servers[/bold] ({healthy_count}/{server_count} healthy)", border_style="blue", box=box.ROUNDED)
     
     def _create_models_panel(self, cluster=None) -> Panel:
-        """Create models panel with model info."""
-        if not cluster or not hasattr(cluster, 'model_manager'):
-            return Panel("No model data available", title="Models", border_style="yellow")
-        
-        # Create models table
-        table = Table(box=box.SIMPLE, expand=True)
-        table.add_column("Model", style="cyan")
-        table.add_column("Context", justify="right")
-        table.add_column("Servers", justify="right")
-        
+        """Create models panel with model availability info."""
+        if not cluster:
+            return Panel("No cluster data available", title="Models", border_style="yellow")
+            
         try:
+            model_server_map = {}
+            model_context_lengths = {}
+            
+            # Utiliser des verrous appropriés pour éviter les problèmes de concurrence
             with cluster.model_lock:
-                # Try to get models with details
-                if hasattr(cluster.model_manager, 'get_all_models_with_details'):
-                    model_details = cluster.model_manager.get_all_models_with_details()
-                else:
-                    model_details = cluster.model_manager.get_all_models()
+                # Faire une copie profonde pour éviter les problèmes de référence
+                model_server_map = {k: list(v) for k, v in cluster.model_server_map.items() if v}
+            
+            # Vérifier si nous avons des modèles
+            if not model_server_map:
+                return Panel("No model data available", title="Models", border_style="yellow")
+            
+            # Créer un tableau pour les modèles
+            table = Table(box=box.SIMPLE, expand=True)
+            table.add_column("Model", style="cyan")
+            table.add_column("Context", justify="right")
+            table.add_column("Servers", justify="right")
                 
-                # Show models (limit to 10 to avoid crowding)
-                for model_name, details in list(model_details.items())[:10]:
-                    # Try to get context length
-                    ctx_info = None
-                    if hasattr(cluster.model_manager, 'get_model_context_length'):
-                        ctx_info = cluster.model_manager.get_model_context_length(model_name)
-                    ctx_size = ctx_info.get("current", "?") if ctx_info else "?"
-                    
-                    # Get servers count
-                    if isinstance(details, dict) and "servers" in details:
-                        servers_count = len(details.get("servers", []))
-                    else:
-                        # If details is a list, it's the server list itself
-                        servers_count = len(details) if isinstance(details, list) else 0
-                    
-                    table.add_row(model_name, str(ctx_size), str(servers_count))
+            # Afficher les modèles (limité à 10 pour éviter l'encombrement)
+            for model_name, servers in list(model_server_map.items())[:10]:
+                # Contexte par défaut
+                ctx_size = "4096"
+                
+                # Nombre de serveurs actifs pour ce modèle
+                servers_count = len(servers) if isinstance(servers, list) else (1 if servers else 0)
+                
+                table.add_row(model_name, str(ctx_size), str(servers_count))
+            
+            # En mode verbeux, ajouter un message d'état
+            if self.verbose or self.debug:
+                model_count = len(model_server_map)
+                self.add_status_message(f"Found {model_count} models")
+                
+            return Panel(table, title="[bold]Available Models[/bold]", border_style="cyan", box=box.ROUNDED)
+            
         except Exception as e:
             if self.debug:
                 self.add_status_message(f"Error getting model data: {str(e)}")
-            table.add_row("[red]Error loading models[/red]", "", "")
-        
-        return Panel(table, title="[bold]Available Models[/bold]", border_style="cyan", box=box.ROUNDED)
+            return Panel(f"Error loading models: {str(e)}", title="Models", border_style="red")
     
     def _create_status_panel(self) -> Panel:
         """Create status messages panel."""

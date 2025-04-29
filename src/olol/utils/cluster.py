@@ -485,402 +485,97 @@ class ModelManager:
 
 
 class OllamaCluster:
-    """Manager for a cluster of Ollama instances.
+    """Manage a cluster of Ollama servers for load balancing and failover."""
     
-    Provides load balancing, server health tracking, and model availability
-    across a cluster of Ollama servers.
-    """
-    
-    def __init__(self, server_addresses: List[str]) -> None:
-        """Initialize the cluster manager.
-        
-        Args:
-            server_addresses: List of server addresses in "host:port" format
-        """
+    def __init__(self, server_addresses: List[str]):
+        """Initialize the cluster with a list of server addresses."""
+        # Fix hint errors for missing imports
+        from typing import Dict, Any, Set, List
+
+        # Server list and load information
         self.server_addresses = server_addresses
-        self.server_loads = {server: 0 for server in server_addresses}
-        self.server_lock = threading.Lock()
+        self.server_loads: Dict[str, int] = {}
+        self.server_status: Dict[str, bool] = {}
+        self.server_health: Dict[str, bool] = {}
+        self.server_connection_details: Dict[str, Dict[str, Any]] = {}
         
-        # Enhanced model management
-        self.model_manager = ModelManager()
+        # Mapping models to servers
+        self.model_server_map: Dict[str, List[str]] = {}
         
-        # For backward compatibility, keep this reference
-        self.model_server_map: Dict[str, List[str]] = self.model_manager.model_server_map
-        self.model_lock = self.model_manager.lock
+        # Discovery callbacks
+        self.discovery_callbacks = []
         
-        # Maps session IDs to their assigned server
-        self.session_server_map: Dict[str, str] = {}
-        self.session_lock = threading.Lock()
+        # Thread locks to avoid racing conditions
+        self.server_lock = threading.RLock()
+        self.health_lock = threading.RLock()
+        self.model_lock = threading.RLock()
+
+        # Initialize server loads
+        with self.server_lock:
+            for server in server_addresses:
+                self.server_loads[server] = 0
+                
+        # Initialize server health status
+        with self.health_lock:
+            for server in server_addresses:
+                self.server_health[server] = False
+                
+        # Initialize model-server mappings
+        # This sera rempli plus tard lorsque les serveurs seront découverts
         
-        # Server health status
-        self.server_health: Dict[str, bool] = {server: True for server in server_addresses}
-        self.health_lock = threading.Lock()
+        # Start model discovery for each server
+        threading.Thread(target=self._discover_all_servers, daemon=True).start()
         
-        # Extended server information for complex networks
-        # Maps server_id -> connection details
-        self.server_connections: Dict[str, Dict[str, Any]] = {}
-        self.connections_lock = threading.Lock()
+    def _discover_all_servers(self):
+        """Discover models on all servers."""
+        with self.server_lock:
+            servers = list(self.server_addresses)
         
-        # Server capabilities
-        self.server_capabilities: Dict[str, Dict[str, Any]] = {}
-        self.capabilities_lock = threading.Lock()
+        for server in servers:
+            self._discover_server_models(server)
     
-    def select_server(self, model_name: Optional[str] = None, session_id: Optional[str] = None) -> str:
-        """Select the best server for a request.
-        
-        Args:
-            model_name: Optional model name to filter servers
-            session_id: Optional session ID to maintain server affinity
-            
-        Returns:
-            Selected server address
-        """
-        # If session already exists, use the same server
-        if session_id:
-            with self.session_lock:
-                if session_id in self.session_server_map:
-                    server = self.session_server_map[session_id]
-                    logger.debug(f"Using existing server {server} for session {session_id}")
-                    return server
-        
-        # If model specified, find servers with this model
-        if model_name:
-            with self.model_lock:
-                if model_name in self.model_server_map:
-                    available_servers = [
-                        s for s in self.model_server_map[model_name] 
-                        if self.server_health.get(s, False)
-                    ]
-                    if available_servers:
-                        # Get the least loaded server among those with the model
-                        with self.server_lock:
-                            server_options = [(s, self.server_loads[s]) for s in available_servers]
-                            selected_server = min(server_options, key=lambda x: x[1])[0]
-                            self.server_loads[selected_server] += 1
-                            
-                            # Record session mapping if provided
-                            if session_id:
-                                with self.session_lock:
-                                    self.session_server_map[session_id] = selected_server
+    def _discover_server_models(self, server_address: str):
+        """Discover models available on a server."""
+        try:
+            # Format host:port simple
+            if server_address.count(':') == 1:
+                host, port_str = server_address.split(':')
+                port = int(port_str)
+                
+                from olol.sync.client import OllamaClient
+                client = OllamaClient(host=host, port=port)
+                
+                try:
+                    # Vérifier la santé du serveur
+                    is_healthy = client.check_health()
+                    
+                    # Mettre à jour l'état de santé
+                    with self.health_lock:
+                        self.server_health[server_address] = is_healthy
+                    
+                    # Si sain, récupérer les modèles
+                    if is_healthy:
+                        models_response = client.list_models()
+                        
+                        if hasattr(models_response, 'models'):
+                            # Mise à jour de la carte des modèles
+                            with self.model_lock:
+                                for model_info in models_response.models:
+                                    model_name = model_info.name
                                     
-                            logger.debug(f"Selected server {selected_server} for model {model_name}")
-                            return selected_server
-        
-        # Otherwise, use least loaded healthy server
-        with self.server_lock, self.health_lock:
-            healthy_servers = [s for s in self.server_addresses if self.server_health.get(s, False)]
-            if not healthy_servers:
-                # If no healthy servers, try any server
-                logger.warning("No healthy servers available, trying any server")
-                healthy_servers = self.server_addresses
-                
-            server_options = [(s, self.server_loads[s]) for s in healthy_servers]
-            selected_server = min(server_options, key=lambda x: x[1])[0]
-            self.server_loads[selected_server] += 1
-            
-            # Record selected server for new session
-            if session_id:
-                with self.session_lock:
-                    self.session_server_map[session_id] = selected_server
-            
-            # Record model availability if specified
-            if model_name:
-                with self.model_lock:
-                    if model_name not in self.model_server_map:
-                        self.model_server_map[model_name] = []
-                    if selected_server not in self.model_server_map[model_name]:
-                        self.model_server_map[model_name].append(selected_server)
-                        
-            logger.debug(f"Selected least loaded server {selected_server}")
-            return selected_server
-    
-    def release_server(self, server: str) -> None:
-        """Release load counter for a server after request completes.
-        
-        Args:
-            server: Server address to release
-        """
-        with self.server_lock:
-            if server in self.server_loads:
-                self.server_loads[server] = max(0, self.server_loads[server] - 1)
-    
-    def mark_server_health(self, server: str, healthy: bool, force: bool = False) -> None:
-        """Update health status for a server.
-        
-        Args:
-            server: Server address to update
-            healthy: Whether the server is healthy
-            force: Whether to force the health state even if it would downgrade a connection
-        """
-        with self.health_lock:
-            # Critical: Never mark a previously healthy server as unhealthy
-            # once it has successfully connected, unless force=True
-            if not healthy and server in self.server_health and self.server_health[server] and not force:
-                logger.warning(f"Ignoring temporary health check failure for previously healthy server: {server}")
-                return
-                
-            # Only log changes in health status
-            if server not in self.server_health or self.server_health[server] != healthy:
-                self.server_health[server] = healthy
-                logger.info(f"Server {server} health status: {'healthy' if healthy else 'unhealthy'}")
-            else:
-                # Still update, but don't log
-                self.server_health[server] = healthy
-    
-    def update_model_availability(self, server_address: str, models: List[str], 
-                              model_details: Dict[str, Any] = None) -> None:
-        """Update the availability of models on a server.
-        
-        Args:
-            server_address: Address of the server in "host:port" format
-            models: List of model names available on the server
-            model_details: Optional dictionary of model details
-        """
-        with self.model_lock:
-            # Mettre à jour la carte modèle -> serveurs
-            for model in models:
-                if model not in self.model_server_map:
-                    self.model_server_map[model] = []
-                    
-                # Ajouter ce serveur s'il n'est pas déjà dans la liste
-                if server_address not in self.model_server_map[model]:
-                    self.model_server_map[model].append(server_address)
-                
-                # Si nous avons des détails sur ce modèle, mettons à jour le gestionnaire de modèles
-                if model_details and model in model_details and hasattr(self, 'model_manager'):
-                    try:
-                        params = model_details[model]
-                        if isinstance(params, dict):
-                            # Mettre à jour les infos du modèle avec les détails
-                            self.model_manager.update_model_info(model, params)
-                    except Exception as e:
-                        # Ignorer les erreurs pour éviter de bloquer la mise à jour
-                        pass
-                        
-            # Mettre à jour la carte serveur -> modèles également
-            self.server_model_map[server_address] = list(models)
-    
-    def remove_session(self, session_id: str) -> None:
-        """Remove a session from the tracking map.
-        
-        Args:
-            session_id: Session ID to remove
-        """
-        with self.session_lock:
-            if session_id in self.session_server_map:
-                del self.session_server_map[session_id]
-                
-    def get_cluster_status(self) -> Dict:
-        """Get a summary of the cluster status.
-        
-        Returns:
-            Dict with cluster status information
-        """
-        # Collect data under individual locks instead of nesting locks
-        # This avoids potential deadlocks
-        
-        # Get server health information
-        with self.health_lock:
-            server_health = {server: health for server, health in self.server_health.items()}
-            
-        # Get server loads
-        with self.server_lock:
-            server_loads = {server: load for server, load in self.server_loads.items()}
-            server_addresses = list(self.server_addresses)
-            
-        # Get model information
-        with self.model_lock:
-            model_map = {model: list(servers) for model, servers in self.model_server_map.items()}
-            
-        # Get session information
-        with self.session_lock:
-            session_count = len(self.session_server_map)
-            
-        # Get capabilities information
-        with self.capabilities_lock:
-            capabilities = {server: caps.copy() for server, caps in self.server_capabilities.items()}
-            
-        # Build server info dict
-        server_info = {}
-        for server in server_addresses:
-            server_info[server] = {
-                "load": server_loads.get(server, 0),
-                "healthy": server_health.get(server, False),
-            }
-            
-            # Add capability information where available
-            if server in capabilities:
-                caps = capabilities[server]
-                server_info[server]["device_type"] = caps.get("device_type", "unknown")
-                
-                # Include device info if available
-                if "device_info" in caps:
-                    server_info[server]["device_info"] = caps["device_info"]
-                    
-                # Include model count
-                if "models" in caps:
-                    server_info["model_count"] = len(caps["models"])
-                    
-        # Get enhanced model information
-        model_info = {}
-        for model_name, servers in model_map.items():
-            # Get model details if available - this uses its own lock internally
-            details = self.model_manager.get_model_details(model_name) or {}
-            
-            # Create entry with both servers and available details
-            model_info[model_name] = {
-                "servers": servers,
-                "details": details
-            }
-        
-        # Build the complete status response
-        return {
-            "servers": server_info,
-            "models": model_info,
-            "model_count": len(model_info),
-            "server_count": len(server_info),
-            "healthy_server_count": sum(1 for s in server_info.values() if s.get("healthy", False)),
-            "sessions": session_count
-        }
-            
-    def add_server(self, server_address: str, connection_details: Optional[Dict[str, Any]] = None) -> None:
-        """Add a new server to the cluster.
-        
-        Args:
-            server_address: Server address in "host:port" format
-            connection_details: Optional additional connection information for complex networks
-        """
-        with self.server_lock, self.health_lock:
-            if server_address not in self.server_addresses:
-                logger.info(f"Adding new server to cluster: {server_address}")
-                self.server_addresses.append(server_address)
-                self.server_loads[server_address] = 0
-                self.server_health[server_address] = True
-                
-                # Register connection details if provided
-                if connection_details:
-                    with self.connections_lock:
-                        self.server_connections[server_address] = connection_details
-                        
-                        # Log all endpoints for debugging
-                        if "connection_endpoints" in connection_details:
-                            endpoints = connection_details["connection_endpoints"]
-                            logger.debug(f"Server {server_address} has {len(endpoints)} connection endpoints")
-                            
-    def register_connection_details(self, server_address: str, connection_details: Dict[str, Any]) -> None:
-        """Register detailed connection information for a server.
-        
-        Args:
-            server_address: Server address in "host:port" format
-            connection_details: Dict containing connection information like:
-                - connection_endpoints: List of possible endpoints
-                - reachable_ips: List of reachable IP addresses
-                - best_ip: Best IP address to use
-                - source_port: Source port for NAT traversal
-        """
-        with self.connections_lock:
-            self.server_connections[server_address] = connection_details
-            logger.debug(f"Registered connection details for {server_address}")
-            
-        # Extract capabilities if present
-        capabilities = connection_details.get("capabilities", {})
-        if capabilities:
-            with self.capabilities_lock:
-                self.server_capabilities[server_address] = capabilities
-                
-    def register_server_capabilities(self, server_address: str, capabilities: Dict[str, Any]) -> None:
-        """Register capabilities of a server.
-        
-        Args:
-            server_address: Server address in "host:port" format
-            capabilities: Dict with server capabilities (CPU, GPU, memory, etc.)
-        """
-        with self.capabilities_lock:
-            self.server_capabilities[server_address] = capabilities
-            logger.info(f"Registered capabilities for {server_address}: {capabilities.get('device_type', 'unknown')}")
-            
-    def request_model_transfer(self, model_name: str, source_server: str, target_server: str) -> bool:
-        """Request a model transfer from source to target server.
-        
-        Args:
-            model_name: Name of the model to transfer
-            source_server: Source server that has the model
-            target_server: Target server that needs the model
-            
-        Returns:
-            True if transfer was initiated, False otherwise
-        """
-        # Check if source server has the model
-        available_servers = self.model_manager.get_servers_for_model(model_name)
-        if source_server not in available_servers:
-            logger.warning(f"Source server {source_server} does not have model {model_name}")
-            return False
-            
-        # Check if target server already has the model
-        if target_server in available_servers:
-            logger.info(f"Target server {target_server} already has model {model_name}")
-            return True
-            
-        # Get connection details for the target server
-        target_endpoint = self.get_best_connection_endpoint(target_server)
-        
-        # Mark the transfer as requested in capabilities
-        with self.capabilities_lock:
-            if target_server in self.server_capabilities:
-                if "pending_transfers" not in self.server_capabilities[target_server]:
-                    self.server_capabilities[target_server]["pending_transfers"] = {}
-                    
-                # Record source and timestamp
-                self.server_capabilities[target_server]["pending_transfers"][model_name] = {
-                    "source": source_server,
-                    "requested_at": time.time()
-                }
-        
-        logger.info(f"Requested transfer of model {model_name} from {source_server} to {target_server}")
-        return True
-        
-    def get_server_capabilities(self, server_address: str) -> Dict[str, Any]:
-        """Get capabilities of a server.
-        
-        Args:
-            server_address: Server address in "host:port" format
-            
-        Returns:
-            Dict with server capabilities or empty dict if not found
-        """
-        with self.capabilities_lock:
-            return self.server_capabilities.get(server_address, {}).copy()
-            
-    def get_best_connection_endpoint(self, server_address: str) -> str:
-        """Get the best connection endpoint for a server.
-        
-        This handles complex network environments where direct addressing
-        might not work due to tunnels, NAT, etc.
-        
-        Args:
-            server_address: Server address in "host:port" format
-            
-        Returns:
-            The optimal connection endpoint or the original address if no details
-        """
-        with self.connections_lock:
-            if server_address in self.server_connections:
-                details = self.server_connections[server_address]
-                
-                # First try a best_ip if available
-                if "best_ip" in details:
-                    best_ip = details["best_ip"]
-                    port = server_address.split(":")[-1]
-                    
-                    # Format differently for IPv6
-                    if ':' in best_ip and not best_ip.startswith('localhost'):
-                        return f"[{best_ip}]:{port}"
-                    else:
-                        return f"{best_ip}:{port}"
-                
-                # Next try any connection endpoints
-                if "connection_endpoints" in details and details["connection_endpoints"]:
-                    return details["connection_endpoints"][0]  # Return first endpoint
-                
-            # Fall back to original address
-            return server_address
+                                    if model_name not in self.model_server_map:
+                                        self.model_server_map[model_name] = []
+                                        
+                                    if server_address not in self.model_server_map[model_name]:
+                                        self.model_server_map[model_name].append(server_address)
+                except Exception:
+                    # Si une erreur se produit, marquer le serveur comme non sain
+                    with self.health_lock:
+                        self.server_health[server_address] = False
+                finally:
+                    # Fermer le client pour libérer les ressources
+                    client.close()
+        except Exception:
+            # En cas d'erreur de connexion, marquer le serveur comme non sain
+            with self.health_lock:
+                self.server_health[server_address] = False

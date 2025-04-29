@@ -12,7 +12,7 @@ from olol.utils.cluster import OllamaCluster
 
 # Import local modules
 from .stats import update_request_stats, request_stats, stats_lock
-from .console_ui import RichUI, run_console_ui, ui_exit_event
+from .console_ui import RichUI as ConsoleUI, run_console_ui, ui_exit_event
 from .utils import create_grpc_client, adjust_context_length
 from .health import health_checker
 
