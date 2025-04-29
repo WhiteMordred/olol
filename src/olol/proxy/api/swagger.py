@@ -9,6 +9,7 @@ import logging
 from flask import Blueprint, request, jsonify
 from flask_restx import Api, Resource, fields, Namespace
 from typing import Dict, Any, Optional, List
+from dataclasses import asdict
 
 from olol.proxy.api.services import OllamaProxyService
 from olol.proxy.cluster.manager import ClusterManager
@@ -31,10 +32,10 @@ api = Api(
 )
 
 # Namespace pour les endpoints principaux
-ollama_ns = api.namespace('api', description='Opérations de l\'API Ollama')
+ollama_ns = api.namespace('api/v1', description='Opérations de l\'API Ollama')
 
 # Namespace pour les endpoints du cluster
-cluster_ns = api.namespace('cluster', description='Opérations de gestion du cluster')
+cluster_ns = api.namespace('cluster/v1', description='Opérations de gestion du cluster')
 
 # Service API Ollama
 cluster_manager = ClusterManager()
@@ -246,7 +247,11 @@ class Models(Resource):
     def get(self):
         """Lister tous les modèles disponibles sur le cluster"""
         try:
-            return ollama_service.list_models()
+            models_resp = ollama_service.list_models()
+            # Convertir l'objet ModelsResponse en dictionnaire pour permettre la sérialisation JSON
+            if hasattr(models_resp, '__dict__') and not isinstance(models_resp, dict):
+                return asdict(models_resp)
+            return models_resp
         except Exception as e:
             logger.error(f"Erreur lors de la récupération des modèles: {str(e)}")
             return {'error': f"Erreur de récupération des modèles: {str(e)}"}, 500
@@ -260,7 +265,11 @@ class Servers(Resource):
     def get(self):
         """Lister tous les serveurs du cluster avec leurs détails"""
         try:
-            return ollama_service.list_servers()
+            servers_resp = ollama_service.list_servers()
+            # Convertir l'objet ServersResponse en dictionnaire pour permettre la sérialisation JSON
+            if hasattr(servers_resp, '__dict__') and not isinstance(servers_resp, dict):
+                return asdict(servers_resp)
+            return servers_resp
         except Exception as e:
             logger.error(f"Erreur lors de la récupération des serveurs: {str(e)}")
             return {'error': f"Erreur de récupération des serveurs: {str(e)}"}, 500
@@ -325,7 +334,11 @@ class Status(Resource):
     def get(self):
         """Obtenir le statut actuel du proxy"""
         try:
-            return ollama_service.get_status()
+            status_resp = ollama_service.get_status()
+            # Convertir l'objet StatusResponse en dictionnaire pour permettre la sérialisation JSON
+            if hasattr(status_resp, '__dict__') and not isinstance(status_resp, dict):
+                return asdict(status_resp)
+            return status_resp
         except Exception as e:
             logger.error(f"Erreur lors de la récupération du statut: {str(e)}")
             return {'error': f"Erreur de statut: {str(e)}"}, 500
