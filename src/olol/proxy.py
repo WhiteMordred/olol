@@ -735,18 +735,34 @@ def generate():
             # Pour le non-streaming, on fait une requête simple
             if not stream:
                 try:
-                    # Utiliser run_model au lieu de generate qui n'existe plus dans les nouvelles versions d'Ollama
+                    # Utiliser la méthode generate() qui existe bien dans OllamaClient
                     client = OllamaClient(host=host, port=port)
-                    response = client.run_model(model, prompt)
+                    
+                    # Définir un timeout court pour éviter le blocage
+                    import time
+                    start_time = time.time()
+                    max_time = 7  # 7 secondes maximum
+                    
+                    response_text = ""
+                    final_response = None
+                    
+                    # Appel à generate avec un timeout
+                    for resp in client.generate(model, prompt, False, options):
+                        final_response = resp
+                        if hasattr(resp, 'response'):
+                            response_text += resp.response
+                        # Vérifier si on a dépassé le temps maximal
+                        if time.time() - start_time > max_time:
+                            break
                     
                     # Formater la réponse au format attendu par l'API generate
                     return jsonify({
                         "model": model,
-                        "response": response.output if hasattr(response, 'output') else str(response),
-                        "done": True
+                        "response": response_text,
+                        "done": True if final_response and hasattr(final_response, 'done') and final_response.done else True
                     })
                 except Exception as e:
-                    logger.error(f"Error in generate API (run_model): {str(e)}")
+                    logger.error(f"Error in generate API: {str(e)}")
                     return jsonify({
                         "model": model,
                         "response": f"Error: {str(e)}",
@@ -758,30 +774,46 @@ def generate():
             # En mode streaming
             else:
                 def generate_stream():
-                    # Réponse immédiate pour éviter le timeout
-                    yield json.dumps({
-                        "model": model,
-                        "response": "Starting generation...",
-                        "done": False
-                    }) + '\n'
-                    
-                    # Simuler une génération de texte en plusieurs étapes
-                    responses = [
-                        "Processing your request for model " + model,
-                        "Please note that streaming is currently in maintenance mode",
-                        "For full responses, please use stream: false in your request",
-                        "Thank you for your patience"
-                    ]
-                    
-                    for i, text in enumerate(responses):
-                        # Attendre un peu entre les réponses
-                        time.sleep(0.5)
+                    try:
+                        client = OllamaClient(host=host, port=port)
+                        
+                        # Réponse immédiate pour éviter le timeout
                         yield json.dumps({
                             "model": model,
-                            "response": text,
-                            "done": i == len(responses) - 1
+                            "response": "Starting generation...",
+                            "done": False
                         }) + '\n'
-                
+                        
+                        # Appel à generate avec streaming
+                        for resp in client.generate(model, prompt, True, options):
+                            if hasattr(resp, 'response'):
+                                yield json.dumps({
+                                    "model": model,
+                                    "response": resp.response,
+                                    "done": resp.done if hasattr(resp, 'done') else False
+                                }) + '\n'
+                            
+                            if hasattr(resp, 'done') and resp.done:
+                                break
+                        
+                        # Message de fin si nécessaire
+                        yield json.dumps({
+                            "model": model,
+                            "response": "",
+                            "done": True
+                        }) + '\n'
+                        
+                    except Exception as e:
+                        # En cas d'erreur, renvoyer un message d'erreur
+                        yield json.dumps({
+                            "model": model,
+                            "response": f"Error: {str(e)}",
+                            "done": True
+                        }) + '\n'
+                    finally:
+                        if client:
+                            client.close()
+                    
                 return Response(stream_with_context(generate_stream()), 
                               mimetype='application/json')
                 
