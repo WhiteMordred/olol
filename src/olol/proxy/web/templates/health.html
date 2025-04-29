@@ -182,6 +182,7 @@
                                     {% endif %}
                                 </td>
                                 <td>
+                                    {% if server.memory_usage is defined %}
                                     <div class="progress" style="height: 6px;">
                                         <div class="progress-bar 
                                         {% if server.memory_usage < 0.5 %}bg-success
@@ -189,7 +190,15 @@
                                         {% else %}bg-danger{% endif %}" 
                                         style="width: {{ server.memory_usage * 100 }}%"></div>
                                     </div>
-                                    <small class="text-muted">{{ "%.0f"|format(server.memory_usage * 100) }}% ({{ server.memory_used | filesizeformat }}/{{ server.memory_total | filesizeformat }})</small>
+                                    <small class="text-muted">
+                                        {{ "%.0f"|format(server.memory_usage * 100) }}%
+                                        {% if server.memory_used is defined and server.memory_total is defined %}
+                                        ({{ server.memory_used | filesizeformat }}/{{ server.memory_total | filesizeformat }})
+                                        {% endif %}
+                                    </small>
+                                    {% else %}
+                                    <span class="text-muted">N/A</span>
+                                    {% endif %}
                                 </td>
                                 <td>
                                     <button class="btn btn-sm btn-info view-history-btn" data-server="{{ server_name }}">
