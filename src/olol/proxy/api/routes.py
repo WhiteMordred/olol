@@ -72,10 +72,13 @@ def register_api_routes(app, api_service):
             # Convertir les données JSON en objet ChatRequest
             chat_request = dict_to_chat_request(data)
             response = api_service.chat(chat_request)
-            return response
+            # Convertir l'objet ChatResponse en dictionnaire si nécessaire
+            if hasattr(response, '__dict__') and not isinstance(response, dict):
+                return jsonify(asdict(response))
+            return jsonify(response)
         except Exception as e:
             logger.error(f"Erreur lors du chat: {str(e)}")
-            return {'error': f"Erreur de chat: {str(e)}"}, 500
+            return jsonify({'error': f"Erreur de chat: {str(e)}"}), 500
     
     # Route API d'embeddings
     @app.route('/api/v1/embeddings', methods=['POST'])

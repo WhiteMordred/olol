@@ -26,7 +26,7 @@ api = Api(
     version='1.0',
     title='OLOL - Proxy API pour Ollama',
     description='API de proxy pour interagir avec un cluster de serveurs Ollama',
-    doc='/',  # Modifié de '/docs' à '/' pour éviter la duplication dans l'URL
+    doc='/docs',  # Modifié de '/docs' à '/' pour éviter la duplication dans l'URL
     validate=True
 )
 
