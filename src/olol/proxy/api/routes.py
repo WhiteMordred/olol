@@ -89,20 +89,27 @@ def register_api_routes(app, api_service):
             # Convertir les données JSON en objet EmbeddingsRequest
             embeddings_request = dict_to_embeddings_request(data)
             response = api_service.embeddings(embeddings_request)
-            return response
+            # Convertir l'objet EmbeddingsResponse en dictionnaire si nécessaire
+            if hasattr(response, '__dict__') and not isinstance(response, dict):
+                return jsonify(asdict(response))
+            return jsonify(response)
         except Exception as e:
             logger.error(f"Erreur lors de la génération d'embeddings: {str(e)}")
-            return {'error': f"Erreur d'embeddings: {str(e)}"}, 500
+            return jsonify({'error': f"Erreur d'embeddings: {str(e)}"}), 500
     
     # Route API pour lister les modèles
     @app.route('/api/v1/models', methods=['GET'])
     def list_models():
         """Lister tous les modèles disponibles"""
         try:
-            return api_service.list_models()
+            models_response = api_service.list_models()
+            # Convertir l'objet ModelsResponse en dictionnaire
+            if hasattr(models_response, '__dict__') and not isinstance(models_response, dict):
+                return jsonify(asdict(models_response))
+            return jsonify(models_response)
         except Exception as e:
             logger.error(f"Erreur lors de la récupération des modèles: {str(e)}")
-            return {'error': f"Erreur de récupération des modèles: {str(e)}"}, 500
+            return jsonify({'error': f"Erreur de récupération des modèles: {str(e)}"}), 500
     
     # Route API pour obtenir le status du proxy
     @app.route('/api/v1/status', methods=['GET'])
@@ -121,10 +128,14 @@ def register_api_routes(app, api_service):
     def list_servers():
         """Lister tous les serveurs du cluster"""
         try:
-            return api_service.list_servers()
+            servers_response = api_service.list_servers()
+            # Convertir l'objet ServersResponse en dictionnaire
+            if hasattr(servers_response, '__dict__') and not isinstance(servers_response, dict):
+                return jsonify(asdict(servers_response))
+            return jsonify(servers_response)
         except Exception as e:
             logger.error(f"Erreur lors de la récupération des serveurs: {str(e)}")
-            return {'error': f"Erreur de récupération des serveurs: {str(e)}"}, 500
+            return jsonify({'error': f"Erreur de récupération des serveurs: {str(e)}"}), 500
     
     # Route API pour ajouter un serveur
     @app.route('/api/v1/servers', methods=['POST'])
@@ -132,53 +143,73 @@ def register_api_routes(app, api_service):
         """Ajouter un nouveau serveur au cluster"""
         try:
             data = request.json
-            return api_service.add_server(
+            response = api_service.add_server(
                 address=data.get('address'),
                 verify_health=data.get('verify_health', True)
             )
+            # Convertir la réponse en dictionnaire si nécessaire
+            if hasattr(response, '__dict__') and not isinstance(response, dict):
+                return jsonify(asdict(response))
+            return jsonify(response)
         except Exception as e:
             logger.error(f"Erreur lors de l'ajout du serveur: {str(e)}")
-            return {'error': f"Erreur d'ajout de serveur: {str(e)}"}, 500
+            return jsonify({'error': f"Erreur d'ajout de serveur: {str(e)}"}), 500
     
     # Route API pour supprimer un serveur
     @app.route('/api/v1/servers/<server>', methods=['DELETE'])
     def remove_server(server):
         """Supprimer un serveur du cluster"""
         try:
-            return api_service.remove_server(server)
+            response = api_service.remove_server(server)
+            # Convertir la réponse en dictionnaire si nécessaire
+            if hasattr(response, '__dict__') and not isinstance(response, dict):
+                return jsonify(asdict(response))
+            return jsonify(response)
         except Exception as e:
             logger.error(f"Erreur lors de la suppression du serveur: {str(e)}")
-            return {'error': f"Erreur de suppression de serveur: {str(e)}"}, 500
+            return jsonify({'error': f"Erreur de suppression de serveur: {str(e)}"}), 500
     
     # Route API pour obtenir les détails d'un serveur
     @app.route('/api/v1/servers/<server>', methods=['GET'])
     def get_server(server):
         """Obtenir les détails d'un serveur"""
         try:
-            return api_service.get_server_details(server)
+            response = api_service.get_server_details(server)
+            # Convertir la réponse en dictionnaire si nécessaire
+            if hasattr(response, '__dict__') and not isinstance(response, dict):
+                return jsonify(asdict(response))
+            return jsonify(response)
         except Exception as e:
             logger.error(f"Erreur lors de la récupération des détails du serveur: {str(e)}")
-            return {'error': f"Erreur de récupération des détails: {str(e)}"}, 500
+            return jsonify({'error': f"Erreur de récupération des détails: {str(e)}"}), 500
     
     # Route API pour vérifier la santé d'un serveur
     @app.route('/api/v1/servers/<server>/check_health', methods=['POST'])
     def check_server_health(server):
         """Vérifier la santé d'un serveur"""
         try:
-            return api_service.check_server_health(server)
+            response = api_service.check_server_health(server)
+            # Convertir la réponse en dictionnaire si nécessaire
+            if hasattr(response, '__dict__') and not isinstance(response, dict):
+                return jsonify(asdict(response))
+            return jsonify(response)
         except Exception as e:
             logger.error(f"Erreur lors de la vérification de santé du serveur: {str(e)}")
-            return {'error': f"Erreur de vérification de santé: {str(e)}"}, 500
+            return jsonify({'error': f"Erreur de vérification de santé: {str(e)}"}), 500
     
     # Route API pour obtenir le rapport de santé global
     @app.route('/api/v1/health', methods=['GET'])
     def get_health():
         """Obtenir le rapport de santé du cluster"""
         try:
-            return api_service.get_health_report()
+            response = api_service.get_health_report()
+            # Convertir la réponse en dictionnaire si nécessaire
+            if hasattr(response, '__dict__') and not isinstance(response, dict):
+                return jsonify(asdict(response))
+            return jsonify(response)
         except Exception as e:
             logger.error(f"Erreur lors de la récupération du rapport de santé: {str(e)}")
-            return {'error': f"Erreur de rapport de santé: {str(e)}"}, 500
+            return jsonify({'error': f"Erreur de rapport de santé: {str(e)}"}), 500
     
     # Route API pour obtenir les statistiques de santé
     @app.route('/api/v1/health/stats', methods=['GET'])
@@ -186,10 +217,14 @@ def register_api_routes(app, api_service):
         """Obtenir des statistiques sur la santé du cluster"""
         try:
             hours = request.args.get('hours', 24, type=int)
-            return api_service.get_health_stats(hours=hours)
+            response = api_service.get_health_stats(hours=hours)
+            # Convertir la réponse en dictionnaire si nécessaire
+            if hasattr(response, '__dict__') and not isinstance(response, dict):
+                return jsonify(asdict(response))
+            return jsonify(response)
         except Exception as e:
             logger.error(f"Erreur lors de la récupération des statistiques de santé: {str(e)}")
-            return {'error': f"Erreur de statistiques de santé: {str(e)}"}, 500
+            return jsonify({'error': f"Erreur de statistiques de santé: {str(e)}"}), 500
     
     # Route API pour obtenir l'historique de santé d'un serveur
     @app.route('/api/v1/health/server/<server>', methods=['GET'])
@@ -197,10 +232,14 @@ def register_api_routes(app, api_service):
         """Obtenir l'historique de santé d'un serveur"""
         try:
             hours = request.args.get('hours', 24, type=int)
-            return api_service.get_server_health_history(server=server, hours=hours)
+            response = api_service.get_server_health_history(server=server, hours=hours)
+            # Convertir la réponse en dictionnaire si nécessaire
+            if hasattr(response, '__dict__') and not isinstance(response, dict):
+                return jsonify(asdict(response))
+            return jsonify(response)
         except Exception as e:
             logger.error(f"Erreur lors de la récupération de l'historique de santé: {str(e)}")
-            return {'error': f"Erreur d'historique de santé: {str(e)}"}, 500
+            return jsonify({'error': f"Erreur d'historique de santé: {str(e)}"}), 500
     
     # Routes API pour les graphiques
     @app.route('/api/v1/chart/load', methods=['GET'])
@@ -208,20 +247,28 @@ def register_api_routes(app, api_service):
         """Obtenir les données pour le graphique de charge des serveurs"""
         try:
             hours = request.args.get('hours', 1, type=int)
-            return api_service.get_load_chart_data(hours=hours)
+            response = api_service.get_load_chart_data(hours=hours)
+            # Convertir la réponse en dictionnaire si nécessaire
+            if hasattr(response, '__dict__') and not isinstance(response, dict):
+                return jsonify(asdict(response))
+            return jsonify(response)
         except Exception as e:
             logger.error(f"Erreur lors de la récupération des données du graphique: {str(e)}")
-            return {'error': f"Erreur de données de graphique: {str(e)}"}, 500
+            return jsonify({'error': f"Erreur de données de graphique: {str(e)}"}), 500
     
     @app.route('/api/v1/chart/health', methods=['GET'])
     def get_health_chart_data():
         """Obtenir les données pour le graphique de santé des serveurs"""
         try:
             hours = request.args.get('hours', 1, type=int)
-            return api_service.get_health_chart_data(hours=hours)
+            response = api_service.get_health_chart_data(hours=hours)
+            # Convertir la réponse en dictionnaire si nécessaire
+            if hasattr(response, '__dict__') and not isinstance(response, dict):
+                return jsonify(asdict(response))
+            return jsonify(response)
         except Exception as e:
             logger.error(f"Erreur lors de la récupération des données du graphique: {str(e)}")
-            return {'error': f"Erreur de données de graphique: {str(e)}"}, 500
+            return jsonify({'error': f"Erreur de données de graphique: {str(e)}"}), 500
     
     logger.info("Routes API enregistrées avec succès")
     return app
