@@ -567,7 +567,7 @@ def run_proxy(host: str = "0.0.0.0", port: int = 8000,
         
         # Register Swagger blueprint
         swagger_bp = init_swagger()
-        app.register_blueprint(swagger_bp, url_prefix='/api/v1/docs')
+        app.register_blueprint(swagger_bp, url_prefix='/api/v1/swagger')
         
         logger.info("Web interface and API enabled")
     
