@@ -1135,49 +1135,80 @@ def list_servers():
     
     server_info = {}
     
-    # Version simplifiée ne bloquant pas les verrous trop longtemps
-    try:
-        # Faire une copie rapide des adresses sans bloquer
-        server_addresses = []
+    # Fonction pour vérifier directement la santé d'un serveur
+    def check_server_health(server_address):
         try:
-            # Utiliser un timeout court pour le verrou
-            if cluster.server_lock.acquire(timeout=0.1):
+            if server_address.count(':') == 1:
+                host, port_str = server_address.split(':')
+                port = int(port_str)
+                client = OllamaClient(host=host, port=port)
                 try:
-                    server_addresses = list(cluster.server_addresses)
+                    is_healthy = client.check_health()
+                    return is_healthy
+                except Exception:
+                    return False
                 finally:
-                    cluster.server_lock.release()
-            else:
-                # Si on ne peut pas acquérir le verrou, utiliser une liste vide
-                logger.warning("Couldn't acquire server lock in time, returning empty server list")
-        except Exception as e:
-            logger.error(f"Error accessing server addresses: {e}")
+                    client.close()
+            return False
+        except Exception:
+            return False
+    
+    # Fonction pour obtenir la liste des modèles d'un serveur
+    def get_server_models(server_address):
+        try:
+            if server_address.count(':') == 1:
+                host, port_str = server_address.split(':')
+                port = int(port_str)
+                client = OllamaClient(host=host, port=port)
+                try:
+                    models_response = client.list_models()
+                    if hasattr(models_response, 'models'):
+                        return [model.name for model in models_response.models]
+                    return []
+                except Exception:
+                    return []
+                finally:
+                    client.close()
+            return []
+        except Exception:
+            return []
+    
+    try:
+        # Obtenir la liste des serveurs
+        with cluster.server_lock:
+            server_addresses = list(cluster.server_addresses)
         
-        # Si nous n'avons pas pu obtenir les adresses, renvoyer une réponse rapide
-        if not server_addresses:
-            return jsonify({
-                "servers": {},
-                "count": 0,
-                "status": "Partial data - servers currently unavailable"
-            })
-        
-        # Collecter des informations minimales sur chaque serveur
+        # Collecter des informations sur chaque serveur
         for server in server_addresses:
+            # Vérifier directement la santé du serveur
+            is_healthy = check_server_health(server)
+            
+            # Mettre à jour le statut de santé dans le cluster
+            with cluster.health_lock:
+                cluster.mark_server_health(server, is_healthy)
+            
+            # Obtenir les modèles du serveur seulement s'il est en bonne santé
+            models = []
+            if is_healthy:
+                models = get_server_models(server)
+                
+                # Mettre à jour la liste des modèles dans le cluster
+                if models:
+                    with cluster.model_lock:
+                        for model_name in models:
+                            if model_name not in cluster.model_server_map:
+                                cluster.model_server_map[model_name] = []
+                            
+                            if server not in cluster.model_server_map[model_name]:
+                                cluster.model_server_map[model_name].append(server)
+            
+            # Construire l'objet d'information du serveur
             info = {
                 "address": server,
-                "healthy": False,  # Par défaut
-                "load": 0,         # Par défaut
-                "models": []       # Par défaut
+                "healthy": is_healthy,
+                "load": cluster.server_loads.get(server, 0),
+                "models": models
             }
-            
-            # Essayer d'obtenir le statut de santé rapidement
-            try:
-                if cluster.health_lock.acquire(timeout=0.05):
-                    try:
-                        info["healthy"] = cluster.server_health.get(server, False)
-                    finally:
-                        cluster.health_lock.release()
-            except Exception:
-                pass
             
             # Ajouter à la liste de serveurs
             server_info[server] = info
