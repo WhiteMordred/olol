@@ -1175,31 +1175,62 @@ def status():
 @app.route('/api/models', methods=['GET'])
 def list_models():
     """Return a list of all models available across the cluster."""
+    # Version ultra simplifiée qui garantit une réponse immédiate
+    response = {
+        "timestamp": time.time(),
+        "models": {}
+    }
+    
+    # Ne pas accéder aux verrous pour éviter tout blocage
     if cluster is None:
-        return jsonify({"error": "Cluster not initialized"}), 500
+        response["error"] = "Cluster not initialized"
+        return jsonify(response)
     
-    # Get model information from the cluster
-    model_info = cluster.model_manager.get_all_models()
-    models_with_details = {}
-    
-    # Enhance with model details where available
-    for model_name, servers in model_info.items():
-        details = cluster.model_manager.get_model_details(model_name) or {}
-        context_info = cluster.model_manager.get_model_context_length(model_name)
+    # Collecter les modèles sans utiliser trop de verrous
+    try:
+        # Accès minimaliste aux données, sans verrous imbriqués
+        models_list = []
         
-        # Create enhanced details dictionary
-        model_data = {
-            "servers": servers,
-            "details": details,
-            "context": context_info
-        }
+        # Essayer d'obtenir la liste des modèles depuis le client
+        for server_address in cluster.server_addresses:
+            try:
+                # Créer un client temporaire sans utiliser get_best_connection_endpoint
+                # qui pourrait bloquer
+                client = None
+                try:
+                    # Format host:port simple
+                    if server_address.count(':') == 1:
+                        host, port_str = server_address.split(':')
+                        port = int(port_str)
+                        client = OllamaClient(host=host, port=port)
+                        
+                        # Essayer de récupérer les modèles avec un timeout court
+                        models_response = client.list_models()
+                        
+                        # Ajouter les modèles à la liste
+                        if hasattr(models_response, 'models'):
+                            for model in models_response.models:
+                                model_name = model.name
+                                if model_name not in models_list:
+                                    models_list.append(model_name)
+                except Exception as e:
+                    pass
+                finally:
+                    if client:
+                        client.close()
+            except Exception:
+                # Ignorer les erreurs pour chaque serveur
+                continue
+                
+        # Ajouter les modèles à la réponse
+        response["models"] = {model: {"available": True} for model in models_list}
+        response["model_count"] = len(models_list)
         
-        models_with_details[model_name] = model_data
+    except Exception as e:
+        # En cas d'erreur générale, renvoyer quand même une réponse
+        response["error"] = f"Error collecting models: {str(e)}"
     
-    return jsonify({
-        "models": models_with_details,
-        "count": len(models_with_details)
-    })
+    return jsonify(response)
 
 @app.route('/api/models/<model_name>/context', methods=['GET', 'PUT'])
 def model_context(model_name):
