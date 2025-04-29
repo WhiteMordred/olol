@@ -348,17 +348,27 @@ class RichUI:
     def start(self):
         """Start the Rich UI."""
         try:
-            # Run the UI with live updates
-            with Live(self._generate_layout(), refresh_per_second=4, screen=True) as live:
+            # Ajouter un délai initial pour permettre au cluster de s'initialiser
+            time.sleep(1.0)
+            
+            # Run the UI with live updates - réduction du taux de rafraîchissement pour éviter les effets de glitch
+            with Live(self._generate_layout(), refresh_per_second=2, screen=True) as live:
                 while not ui_exit_event.is_set():
-                    # Update at specified interval
-                    current_time = time.time()
-                    if current_time - self.last_update >= self.update_interval:
-                        self.last_update = current_time
-                        live.update(self._generate_layout())
+                    try:
+                        # Update at specified interval
+                        current_time = time.time()
+                        if current_time - self.last_update >= self.update_interval:
+                            self.last_update = current_time
+                            # Utiliser un délai entre chaque mise à jour du layout
+                            layout = self._generate_layout()
+                            live.update(layout)
+                    except Exception as e:
+                        # Isoler les erreurs de mise à jour pour éviter que l'interface ne se bloque
+                        logger.error(f"Error updating UI: {str(e)}")
+                        self.add_status_message(f"UI update error: {str(e)}")
                     
-                    # Avoid high CPU usage
-                    time.sleep(0.1)
+                    # Augmenter le délai pour réduire l'utilisation du CPU et les glitches
+                    time.sleep(0.25)
         except KeyboardInterrupt:
             # Handle Ctrl+C gracefully
             ui_exit_event.set()
