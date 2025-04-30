@@ -918,3 +918,448 @@ pre {
         font-size: 1.5rem;
     }
 }
+
+/* CSS pour le tableau de bord Cyberpunk */
+
+/* Titre principal du tableau de bord */
+.cyber-heading {
+    color: var(--primary-color);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 600;
+    position: relative;
+    display: inline-block;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.5rem;
+}
+
+.cyber-heading::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 60px;
+    height: 2px;
+    background-color: var(--primary-color);
+    box-shadow: 0 0 5px var(--primary-glow);
+}
+
+/* Carte cyberpunk (remplace stat-card) */
+.cyber-card {
+    background-color: var(--cyber-surface);
+    border: 1px solid var(--cyber-border);
+    border-radius: 3px;
+    overflow: hidden;
+    transition: all 0.25s;
+    position: relative;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.cyber-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+.cyber-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 3px;
+    height: 100%;
+    background-color: var(--primary-color);
+    box-shadow: 0 0 5px var(--primary-glow);
+}
+
+.cyber-card.server-card::before {
+    background-color: var(--primary-color);
+    box-shadow: 0 0 5px var(--primary-glow);
+}
+
+.cyber-card.model-card::before {
+    background-color: var(--success-color);
+    box-shadow: 0 0 5px var(--success-glow);
+}
+
+.cyber-card.load-card::before {
+    background-color: var(--warning-color);
+    box-shadow: 0 0 5px var(--warning-glow);
+}
+
+.cyber-card.uptime-card::before {
+    background-color: var(--info-color);
+    box-shadow: 0 0 5px var(--info-glow);
+}
+
+.cyber-card-header {
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+    color: var(--cyber-text-secondary);
+    background-color: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid var(--cyber-border);
+}
+
+.cyber-card-body {
+    padding: 1.25rem 1rem;
+    display: flex;
+    flex-direction: column;
+}
+
+.cyber-value {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+}
+
+.server-card .cyber-value {
+    color: var(--primary-color);
+}
+
+.model-card .cyber-value {
+    color: var(--success-color);
+}
+
+.load-card .cyber-value {
+    color: var(--warning-color);
+}
+
+.uptime-card .cyber-value {
+    color: var(--info-color);
+}
+
+.cyber-stats {
+    margin-bottom: 0.5rem;
+}
+
+.cyber-stat {
+    display: inline-block;
+    font-size: 0.85rem;
+    margin-right: 0.75rem;
+    color: var(--cyber-text-secondary);
+}
+
+.cyber-stat.online {
+    color: var(--success-color);
+}
+
+.cyber-stat.offline {
+    color: var(--danger-color);
+}
+
+.cyber-card-footer {
+    padding: 0.75rem 1rem;
+    background-color: rgba(0, 0, 0, 0.15);
+    border-top: 1px solid var(--cyber-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.cyber-card-footer a {
+    color: var(--cyber-text-primary);
+    text-decoration: none;
+    font-size: 0.85rem;
+    transition: all 0.25s;
+}
+
+.cyber-card-footer a:hover {
+    color: var(--primary-color);
+}
+
+.server-card .cyber-card-footer a:hover {
+    color: var(--primary-color);
+}
+
+.model-card .cyber-card-footer a:hover {
+    color: var(--success-color);
+}
+
+.load-card .cyber-card-footer a:hover {
+    color: var(--warning-color);
+}
+
+.uptime-card .cyber-card-footer a:hover {
+    color: var(--info-color);
+}
+
+/* Panneau cyberpunk (remplace card) */
+.cyber-panel {
+    background-color: var(--cyber-surface);
+    border: 1px solid var(--cyber-border);
+    border-radius: 3px;
+    overflow: hidden;
+    transition: all 0.25s;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.cyber-panel:hover {
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+.cyber-panel-header {
+    padding: 0.75rem 1rem;
+    background-color: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid var(--cyber-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 600;
+}
+
+.cyber-panel-header i {
+    margin-right: 0.5rem;
+    color: var(--primary-color);
+}
+
+.cyber-panel-body {
+    padding: 1.25rem;
+}
+
+/* Tableau cyberpunk (remplace table) */
+.cyber-table {
+    width: 100%;
+    margin-bottom: 1rem;
+    color: var(--cyber-text-primary);
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.cyber-table thead th {
+    padding: 0.75rem;
+    vertical-align: top;
+    border-bottom: 1px solid var(--cyber-border);
+    background-color: var(--cyber-dark);
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+    color: var(--cyber-text-secondary);
+}
+
+.cyber-table td {
+    padding: 0.75rem;
+    vertical-align: middle;
+    border-bottom: 1px solid var(--cyber-border);
+    transition: all 0.25s;
+}
+
+.cyber-table tr:hover td {
+    background-color: var(--cyber-surface-elevated);
+}
+
+.cyber-table tr:last-child td {
+    border-bottom: none;
+}
+
+/* Badge cyberpunk (remplace status-indicator) */
+.cyber-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.8rem;
+    border-radius: 3px;
+    padding: 0.2rem 0.5rem;
+    background-color: var(--cyber-surface-elevated);
+    margin-right: 0.5rem;
+}
+
+.cyber-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 5px;
+}
+
+.cyber-badge.online .cyber-dot {
+    background-color: var(--success-color);
+    box-shadow: 0 0 5px var(--success-glow);
+}
+
+.cyber-badge.offline .cyber-dot {
+    background-color: var(--danger-color);
+    box-shadow: 0 0 5px var(--danger-glow);
+}
+
+.cyber-badge.servers {
+    background-color: var(--cyber-dark);
+    color: var(--cyber-text-secondary);
+}
+
+/* Barre de progression cyberpunk */
+.cyber-progress {
+    height: 6px;
+    background-color: var(--cyber-dark);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 0.25rem;
+}
+
+.cyber-progress-bar {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.cyber-progress-bar.good {
+    background-color: var(--success-color);
+    box-shadow: 0 0 5px var(--success-glow);
+}
+
+.cyber-progress-bar.warning {
+    background-color: var(--warning-color);
+    box-shadow: 0 0 5px var(--warning-glow);
+}
+
+.cyber-progress-bar.danger {
+    background-color: var(--danger-color);
+    box-shadow: 0 0 5px var(--danger-glow);
+}
+
+/* Bouton cyberpunk (remplace btn) */
+.cyber-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--primary-color);
+    background-color: var(--cyber-surface-elevated);
+    border: 1px solid var(--primary-color);
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.25s;
+    text-decoration: none;
+}
+
+.cyber-btn i {
+    margin-right: 0.5rem;
+}
+
+.cyber-btn:hover {
+    background-color: var(--primary-color);
+    color: var(--cyber-black);
+    box-shadow: 0 0 10px var(--primary-glow);
+}
+
+.cyber-btn.active {
+    background-color: var(--primary-color);
+    color: var(--cyber-black);
+    box-shadow: 0 0 10px var(--primary-glow);
+}
+
+.cyber-btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+}
+
+.cyber-btn-success {
+    color: var(--success-color);
+    border-color: var(--success-color);
+}
+
+.cyber-btn-success:hover {
+    background-color: var(--success-color);
+    color: var(--cyber-black);
+    box-shadow: 0 0 10px var(--success-glow);
+}
+
+/* Modèle cyberpunk */
+.cyber-model {
+    padding: 1rem;
+    background-color: var(--cyber-surface-elevated);
+    border: 1px solid var(--cyber-border);
+    border-radius: 3px;
+    height: 100%;
+    transition: all 0.25s;
+    position: relative;
+    overflow: hidden;
+}
+
+.cyber-model:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+.cyber-model::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 3px;
+    height: 100%;
+    background-color: var(--primary-color);
+    box-shadow: 0 0 5px var(--primary-glow);
+}
+
+.cyber-model-name {
+    font-weight: 600;
+    font-size: 1.1rem;
+    margin-bottom: 0.75rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--primary-color);
+}
+
+.cyber-model-info {
+    margin-bottom: 1rem;
+}
+
+.cyber-model-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+/* Alerte cyberpunk */
+.cyber-alert {
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border: 1px solid var(--cyber-border);
+    border-radius: 3px;
+    background-color: var(--cyber-surface-elevated);
+    position: relative;
+    overflow: hidden;
+}
+
+.cyber-alert::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 3px;
+    height: 100%;
+    background-color: var(--info-color);
+    box-shadow: 0 0 5px var(--info-glow);
+}
+
+/* Info cyberpunk */
+.cyber-info {
+    display: flex;
+    gap: 1rem;
+}
+
+.cyber-info-icon {
+    font-size: 1.5rem;
+    color: var(--info-color);
+}
+
+.cyber-info-content {
+    flex: 1;
+}
+
+/* Animation pour les auto-refresh-toggle */
+.auto-refresh-toggle.active i {
+    animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
