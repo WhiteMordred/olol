@@ -3,94 +3,197 @@
 {% block title %}Journaux - Ollama Sync{% endblock %}
 
 {% block content %}
+<div class="row">
+    <div class="col-lg-12">
+        <h2 class="mb-4 cyber-heading">Journaux Système</h2>
+    </div>
+</div>
+
+<!-- Actions principales -->
 <div class="row mb-4">
-    <div class="col">
-        <h2 class="mb-4">
-            <i class="fas fa-clipboard-list me-2"></i> Journaux système
-        </h2>
-        
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span>Logs du système</span>
-                <div class="btn-group">
-                    <button class="btn btn-sm btn-primary" id="refresh-logs">
+    <div class="col-lg-12">
+        <div class="cyber-panel">
+            <div class="cyber-panel-body">
+                <div class="d-flex gap-2">
+                    <button type="button" class="cyber-btn cyber-btn-success" id="refresh-logs">
                         <i class="fas fa-sync-alt"></i> Rafraîchir
                     </button>
-                    <button class="btn btn-sm btn-secondary dropdown-toggle" id="log-level-dropdown" 
-                            data-bs-toggle="dropdown" aria-expanded="false">
-                        Niveau: INFO
-                    </button>
-                    <ul class="dropdown-menu" aria-labelledby="log-level-dropdown">
-                        <li><a class="dropdown-item" href="#" data-level="DEBUG">DEBUG</a></li>
-                        <li><a class="dropdown-item" href="#" data-level="INFO">INFO</a></li>
-                        <li><a class="dropdown-item" href="#" data-level="WARNING">WARNING</a></li>
-                        <li><a class="dropdown-item" href="#" data-level="ERROR">ERROR</a></li>
-                        <li><a class="dropdown-item" href="#" data-level="CRITICAL">CRITICAL</a></li>
-                    </ul>
-                    <button class="btn btn-sm btn-outline-secondary" id="toggle-autoscroll">
+                    <button type="button" class="cyber-btn" id="toggle-autoscroll">
                         <i class="fas fa-scroll"></i> Auto-défil
                     </button>
-                </div>
-            </div>
-            <div class="card-body p-0">
-                <div class="log-container" id="log-container">
-                    <div class="log-filters mb-2 p-2">
-                        <div class="row g-2">
-                            <div class="col-md-4">
-                                <div class="input-group input-group-sm">
-                                    <span class="input-group-text"><i class="fas fa-search"></i></span>
-                                    <input type="text" class="form-control" id="log-search" placeholder="Filtrer les logs...">
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="input-group input-group-sm">
-                                    <span class="input-group-text"><i class="fas fa-tag"></i></span>
-                                    <select class="form-select" id="log-component">
-                                        <option value="">Tous les composants</option>
-                                        <option value="osync.proxy.app">Proxy</option>
-                                        <option value="osync.utils.cluster">Cluster</option>
-                                        <option value="osync.sync.client">Client</option>
-                                        <option value="osync.rpc.client">RPC</option>
-                                        <option value="osync.proxy.cluster.health">Santé</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="input-group input-group-sm">
-                                    <span class="input-group-text"><i class="fas fa-calendar"></i></span>
-                                    <input type="datetime-local" class="form-control" id="log-date">
-                                </div>
-                            </div>
-                            <div class="col-md-2">
-                                <button class="btn btn-sm btn-secondary w-100" id="clear-filters">
-                                    <i class="fas fa-eraser"></i> Effacer
-                                </button>
-                            </div>
+                    <div class="dropdown">
+                        <button class="cyber-btn dropdown-toggle" type="button" id="log-level-dropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                            Niveau: <span id="current-level">INFO</span>
+                        </button>
+                        <ul class="dropdown-menu" aria-labelledby="log-level-dropdown">
+                            <li><a class="dropdown-item" href="#" data-level="DEBUG">DEBUG</a></li>
+                            <li><a class="dropdown-item" href="#" data-level="INFO">INFO</a></li>
+                            <li><a class="dropdown-item" href="#" data-level="WARNING">WARNING</a></li>
+                            <li><a class="dropdown-item" href="#" data-level="ERROR">ERROR</a></li>
+                            <li><a class="dropdown-item" href="#" data-level="CRITICAL">CRITICAL</a></li>
+                        </ul>
+                    </div>
+                    <div class="ms-auto">
+                        <div class="cyber-search">
+                            <input type="text" class="cyber-input" id="log-search" placeholder="Filtrer les logs...">
+                            <button class="cyber-btn cyber-btn-sm" type="button" id="searchBtn">
+                                <i class="fas fa-search"></i>
+                            </button>
                         </div>
                     </div>
-                    
-                    <div class="log-entries" id="log-entries">
-                        <pre class="log-content" id="log-content">
-<!-- Les logs seront chargés dynamiquement ici -->
-<div class="text-center p-3 loading-indicator">
-    <div class="spinner-border text-primary" role="status">
-        <span class="visually-hidden">Chargement...</span>
+                </div>
+            </div>
+        </div>
     </div>
-    <p class="mt-2">Chargement des journaux...</p>
 </div>
-                        </pre>
+
+<!-- Vue d'ensemble des logs -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6">
+        <div class="cyber-card mb-4">
+            <div class="cyber-card-header">
+                <i class="fas fa-clipboard-list"></i> Total
+            </div>
+            <div class="cyber-card-body">
+                <div class="cyber-value" id="total-logs">{{ logs|length }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="cyber-card mb-4" style="border-left-color: var(--warning-color);">
+            <div class="cyber-card-header">
+                <i class="fas fa-exclamation-triangle"></i> Avertissements
+            </div>
+            <div class="cyber-card-body">
+                <div class="cyber-value" style="color: var(--warning-color);" id="warning-logs">{{ logs|selectattr('level', 'eq', 'WARNING')|list|length }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="cyber-card mb-4" style="border-left-color: var(--danger-color);">
+            <div class="cyber-card-header">
+                <i class="fas fa-times-circle"></i> Erreurs
+            </div>
+            <div class="cyber-card-body">
+                <div class="cyber-value" style="color: var(--danger-color);" id="error-logs">{{ logs|selectattr('level', 'in', ['ERROR', 'CRITICAL'])|list|length }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="cyber-card mb-4" style="border-left-color: var(--info-color);">
+            <div class="cyber-card-header">
+                <i class="fas fa-filter"></i> Filtrage
+            </div>
+            <div class="cyber-card-body">
+                <div class="dropdown">
+                    <button class="cyber-btn cyber-btn-sm dropdown-toggle w-100" type="button" id="componentFilterBtn" data-bs-toggle="dropdown" aria-expanded="false">
+                        Filtrer par composant
+                    </button>
+                    <ul class="dropdown-menu" id="componentFilterMenu" aria-labelledby="componentFilterBtn">
+                        <li><a class="dropdown-item" href="#" data-component="">Tous les composants</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        {% set components = [] %}
+                        {% for log in logs %}
+                            {% if log.component not in components %}
+                                {% set _ = components.append(log.component) %}
+                            {% endif %}
+                        {% endfor %}
+                        {% for component in components %}
+                            <li><a class="dropdown-item" href="#" data-component="{{ component }}">{{ component }}</a></li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filtres avancés -->
+<div class="row mb-4">
+    <div class="col-lg-12">
+        <div class="cyber-panel">
+            <div class="cyber-panel-header">
+                <i class="fas fa-sliders-h"></i> Filtres avancés
+                <button class="cyber-btn cyber-btn-sm float-end" id="toggle-filters">
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+            </div>
+            <div class="cyber-panel-body" id="advanced-filters" style="display: none;">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label for="log-date" class="form-label">Date</label>
+                        <input type="datetime-local" class="cyber-input form-control" id="log-date">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="log-component" class="form-label">Composant</label>
+                        <select class="cyber-input form-select" id="log-component">
+                            <option value="">Tous les composants</option>
+                            {% for component in components %}
+                                <option value="{{ component }}">{{ component }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button type="button" class="cyber-btn mb-3 w-100" id="clear-filters">
+                            <i class="fas fa-eraser"></i> Effacer les filtres
+                        </button>
                     </div>
                 </div>
             </div>
-            <div class="card-footer d-flex justify-content-between">
+        </div>
+    </div>
+</div>
+
+<!-- Journaux -->
+<div class="row">
+    <div class="col-lg-12">
+        <div class="cyber-panel">
+            <div class="cyber-panel-header">
+                <i class="fas fa-clipboard-list"></i> Journaux
+                <div class="float-end">
+                    <span class="me-2">Page {{ current_page }}/{{ pages_total }}</span>
+                    <div class="btn-group btn-group-sm">
+                        <a href="{{ url_for('logs', page=current_page-1, limit=limit, level=selected_level) if current_page > 1 else '#' }}" class="cyber-btn cyber-btn-sm {{ 'disabled' if current_page <= 1 }}">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                        <a href="{{ url_for('logs', page=current_page+1, limit=limit, level=selected_level) if current_page < pages_total else '#' }}" class="cyber-btn cyber-btn-sm {{ 'disabled' if current_page >= pages_total }}">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="cyber-panel-body p-0">
+                <div id="log-container" class="log-container">
+                    <div id="log-entries" class="log-entries">
+                        {% if logs %}
+                        <div class="log-content" id="log-content">
+                            {% for log in logs %}
+                            <div class="log-entry {{ log.level|lower }}" data-component="{{ log.component }}">
+                                <span class="log-timestamp">{{ log.formatted_time }}</span>
+                                <span class="log-level {{ log.level|lower }}">{{ log.level }}</span>
+                                <span class="log-component">[{{ log.component }}]</span>
+                                <span class="log-message">{{ log.message }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="text-center p-5">
+                            <i class="fas fa-info-circle fa-2x mb-3" style="color: var(--info-color);"></i>
+                            <p>Aucun journal disponible pour le moment.</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="cyber-panel-footer d-flex justify-content-between">
                 <div>
                     <small>Taille du fichier: <span id="log-size">-</span></small>
                 </div>
                 <div>
-                    <button class="btn btn-sm btn-outline-danger" id="clear-logs">
+                    <button class="cyber-btn cyber-btn-sm cyber-btn-danger" id="clear-logs">
                         <i class="fas fa-trash"></i> Effacer les logs
                     </button>
-                    <button class="btn btn-sm btn-outline-primary" id="download-logs">
+                    <button class="cyber-btn cyber-btn-sm" id="download-logs">
                         <i class="fas fa-download"></i> Télécharger
                     </button>
                 </div>
@@ -99,24 +202,48 @@
     </div>
 </div>
 
-<div class="row">
+<!-- Graphiques des journaux -->
+<div class="row mt-4">
     <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <i class="fas fa-chart-pie me-2"></i> Distribution des niveaux de log
+        <div class="cyber-panel">
+            <div class="cyber-panel-header">
+                <i class="fas fa-chart-pie"></i> Distribution des niveaux de log
             </div>
-            <div class="card-body">
-                <canvas id="log-level-chart" height="200"></canvas>
+            <div class="cyber-panel-body">
+                <canvas id="log-level-chart" height="240"></canvas>
             </div>
         </div>
     </div>
     <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <i class="fas fa-chart-bar me-2"></i> Activité par composant
+        <div class="cyber-panel">
+            <div class="cyber-panel-header">
+                <i class="fas fa-chart-bar"></i> Activité par composant
             </div>
-            <div class="card-body">
-                <canvas id="log-component-chart" height="200"></canvas>
+            <div class="cyber-panel-body">
+                <canvas id="log-component-chart" height="240"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de confirmation pour effacer les logs -->
+<div class="modal fade" id="clearLogsModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content cyber-modal">
+            <div class="cyber-modal-header">
+                <h5 class="modal-title">Confirmer l'effacement</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="cyber-modal-body">
+                <p>Êtes-vous sûr de vouloir effacer tous les journaux système ?</p>
+                <div class="cyber-alert">
+                    <i class="fas fa-exclamation-triangle"></i> 
+                    Cette action est irréversible et supprimera définitivement tous les journaux.
+                </div>
+            </div>
+            <div class="cyber-modal-footer">
+                <button type="button" class="cyber-btn cyber-btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="cyber-btn cyber-btn-danger" id="confirmClearBtn">Effacer</button>
             </div>
         </div>
     </div>
@@ -126,6 +253,10 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Configuration graphique pour correspondre au style cyberpunk
+    Chart.defaults.color = '#808080';
+    Chart.defaults.borderColor = '#2A2A2A';
+    
     // Variables globales
     const refreshBtn = document.getElementById('refresh-logs');
     const logSearch = document.getElementById('log-search');
@@ -137,28 +268,38 @@ document.addEventListener('DOMContentLoaded', function() {
     const clearFiltersBtn = document.getElementById('clear-filters');
     const downloadBtn = document.getElementById('download-logs');
     const clearLogsBtn = document.getElementById('clear-logs');
-    const levelDropdown = document.querySelectorAll('[data-level]');
+    const levelDropdowns = document.querySelectorAll('[data-level]');
     const logSizeSpan = document.getElementById('log-size');
+    const componentFilterItems = document.querySelectorAll('[data-component]');
+    const toggleFiltersBtn = document.getElementById('toggle-filters');
     
     // Configuration
-    let currentLogLevel = 'INFO';
+    let currentLogLevel = '{{ selected_level or "INFO" }}';
     let autoScroll = true;
-    let logData = [];
-    let filteredLogData = [];
-    
-    // Configuration des graphiques
-    let levelChart, componentChart;
+    let currentComponent = '';
     
     // Initialisation des graphiques
+    initCharts();
+    
+    // Initialiser les événements
+    initEvents();
+    
+    // Fonction pour initialiser les graphiques
     function initCharts() {
         // Graphique de distribution des niveaux de log
         const levelCtx = document.getElementById('log-level-chart').getContext('2d');
-        levelChart = new Chart(levelCtx, {
+        const levelChart = new Chart(levelCtx, {
             type: 'doughnut',
             data: {
                 labels: ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
                 datasets: [{
-                    data: [0, 0, 0, 0, 0],
+                    data: [
+                        {{ logs|selectattr('level', 'eq', 'DEBUG')|list|length }},
+                        {{ logs|selectattr('level', 'eq', 'INFO')|list|length }},
+                        {{ logs|selectattr('level', 'eq', 'WARNING')|list|length }},
+                        {{ logs|selectattr('level', 'eq', 'ERROR')|list|length }},
+                        {{ logs|selectattr('level', 'eq', 'CRITICAL')|list|length }}
+                    ],
                     backgroundColor: [
                         '#0dcaf0',  // DEBUG - info-light
                         '#20c997',  // INFO - success
@@ -182,13 +323,27 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Graphique d'activité par composant
         const componentCtx = document.getElementById('log-component-chart').getContext('2d');
-        componentChart = new Chart(componentCtx, {
+        
+        // Compter les logs par composant
+        const components = {};
+        {% for log in logs %}
+            if (!components['{{ log.component }}']) {
+                components['{{ log.component }}'] = 0;
+            }
+            components['{{ log.component }}']++;
+        {% endfor %}
+        
+        // Convertir en tableaux pour Chart.js
+        const componentNames = Object.keys(components);
+        const componentCounts = Object.values(components);
+        
+        const componentChart = new Chart(componentCtx, {
             type: 'bar',
             data: {
-                labels: [],
+                labels: componentNames,
                 datasets: [{
                     label: 'Entrées de log',
-                    data: [],
+                    data: componentCounts,
                     backgroundColor: '#6f42c1',
                     borderWidth: 1
                 }]
@@ -198,326 +353,296 @@ document.addEventListener('DOMContentLoaded', function() {
                 maintainAspectRatio: false,
                 scales: {
                     y: {
-                        beginAtZero: true
+                        beginAtZero: true,
+                        grid: {
+                            color: 'rgba(42, 42, 42, 0.4)'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            color: 'rgba(42, 42, 42, 0.4)'
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        backgroundColor: 'rgba(10, 10, 10, 0.8)',
+                        bodyColor: '#F0F0F0',
+                        borderColor: '#2A2A2A'
                     }
                 }
             }
         });
     }
     
-    // Chargement des données de log depuis le serveur
-    function loadLogs() {
-        // Afficher l'indicateur de chargement
-        logContent.innerHTML = `
-            <div class="text-center p-3 loading-indicator">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Chargement...</span>
-                </div>
-                <p class="mt-2">Chargement des journaux...</p>
-            </div>
-        `;
-        
-        // Faire une requête AJAX pour récupérer les logs
-        fetch('/api/logs?level=' + currentLogLevel)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Erreur lors de la récupération des logs');
-                }
-                return response.json();
-            })
-            .then(data => {
-                logData = data.logs || [];
-                logSizeSpan.textContent = data.file_size || '-';
-                
-                // Appliquer les filtres
-                applyFilters();
-                
-                // Mettre à jour les graphiques
-                updateCharts(data);
-                
-                // Afficher un toast de succès
-                showToast('Logs actualisés', 'Les journaux ont été mis à jour avec succès');
-            })
-            .catch(error => {
-                console.error('Erreur:', error);
-                
-                // Afficher un message d'erreur
-                logContent.innerHTML = `
-                    <div class="text-center p-3 text-danger">
-                        <i class="fas fa-exclamation-triangle fa-2x mb-3"></i>
-                        <p>Impossible de charger les journaux.<br>
-                        Erreur: ${error.message}</p>
-                        <button class="btn btn-sm btn-primary" onclick="location.reload()">
-                            Réessayer
-                        </button>
-                    </div>
-                `;
-                
-                // Afficher un toast d'erreur
-                showToast('Erreur', 'Impossible de charger les journaux: ' + error.message, 'error');
-            });
-    }
-    
-    // Appliquer les filtres sur les logs
-    function applyFilters() {
-        const searchTerm = logSearch.value.toLowerCase();
-        const componentFilter = logComponentSelect.value;
-        const dateFilter = logDateInput.value ? new Date(logDateInput.value) : null;
-        
-        // Filtrer les données
-        filteredLogData = logData.filter(log => {
-            // Filtre de recherche textuelle
-            if (searchTerm && !log.message.toLowerCase().includes(searchTerm) && 
-                !log.component.toLowerCase().includes(searchTerm)) {
-                return false;
-            }
-            
-            // Filtre par composant
-            if (componentFilter && log.component !== componentFilter) {
-                return false;
-            }
-            
-            // Filtre par date
-            if (dateFilter) {
-                const logDate = new Date(log.timestamp);
-                if (logDate.getDate() !== dateFilter.getDate() || 
-                    logDate.getMonth() !== dateFilter.getMonth() || 
-                    logDate.getFullYear() !== dateFilter.getFullYear()) {
-                    return false;
-                }
-            }
-            
-            return true;
-        });
-        
-        // Afficher les logs filtrés
-        renderLogs();
-    }
-    
-    // Afficher les logs dans l'interface
-    function renderLogs() {
-        if (filteredLogData.length === 0) {
-            logContent.innerHTML = `
-                <div class="text-center p-3 text-muted">
-                    <i class="fas fa-search fa-2x mb-3"></i>
-                    <p>Aucun journal correspondant aux critères de filtrage.</p>
-                </div>
-            `;
-            return;
-        }
-        
-        let logHtml = '';
-        
-        filteredLogData.forEach(log => {
-            let levelClass = '';
-            switch (log.level) {
-                case 'DEBUG': levelClass = 'text-info'; break;
-                case 'INFO': levelClass = 'text-success'; break;
-                case 'WARNING': levelClass = 'text-warning'; break;
-                case 'ERROR': levelClass = 'text-danger'; break;
-                case 'CRITICAL': levelClass = 'text-purple'; break;
-            }
-            
-            const date = new Date(log.timestamp);
-            const timeStr = date.toLocaleTimeString();
-            
-            logHtml += `<span class="${levelClass}">${log.level}:</span><span class="text-muted">[${timeStr}]</span> ${log.component}: ${log.message}\n`;
-        });
-        
-        logContent.innerHTML = logHtml;
-        
-        // Défiler vers le bas si activé
-        if (autoScroll) {
-            logEntries.scrollTop = logEntries.scrollHeight;
-        }
-        
-        // Coloriser les niveaux de log
-        colorizeLogLevels();
-    }
-    
-    // Mettre à jour les graphiques avec les données
-    function updateCharts(data) {
-        if (!data || !data.stats) return;
-        
-        // Mettre à jour le graphique des niveaux de log
-        if (data.stats.levels) {
-            levelChart.data.datasets[0].data = [
-                data.stats.levels.DEBUG || 0,
-                data.stats.levels.INFO || 0,
-                data.stats.levels.WARNING || 0,
-                data.stats.levels.ERROR || 0,
-                data.stats.levels.CRITICAL || 0
-            ];
-            levelChart.update();
-        }
-        
-        // Mettre à jour le graphique des composants
-        if (data.stats.components) {
-            const components = Object.keys(data.stats.components);
-            const counts = components.map(c => data.stats.components[c]);
-            
-            componentChart.data.labels = components;
-            componentChart.data.datasets[0].data = counts;
-            componentChart.update();
-        }
-    }
-    
-    // Initialiser les événements
+    // Initialisation des événements
     function initEvents() {
         // Actualiser les logs
-        refreshBtn.addEventListener('click', loadLogs);
+        refreshBtn.addEventListener('click', function() {
+            this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Actualisation...';
+            this.disabled = true;
+            window.location.reload();
+        });
         
         // Filtrage par recherche textuelle
-        logSearch.addEventListener('input', applyFilters);
+        logSearch.addEventListener('input', function() {
+            filterLogs();
+        });
         
-        // Filtrage par composant
-        logComponentSelect.addEventListener('change', applyFilters);
+        // Filtrage par composant via le dropdown
+        componentFilterItems.forEach(item => {
+            item.addEventListener('click', function(e) {
+                e.preventDefault();
+                const component = this.getAttribute('data-component');
+                document.getElementById('componentFilterBtn').textContent = component ? component : 'Filtrer par composant';
+                currentComponent = component;
+                filterLogs();
+            });
+        });
+        
+        // Filtrage par composant via le select
+        if (logComponentSelect) {
+            logComponentSelect.addEventListener('change', function() {
+                currentComponent = this.value;
+                filterLogs();
+            });
+        }
         
         // Filtrage par date
-        logDateInput.addEventListener('change', applyFilters);
+        if (logDateInput) {
+            logDateInput.addEventListener('change', function() {
+                filterLogs();
+            });
+        }
         
         // Effacer les filtres
-        clearFiltersBtn.addEventListener('click', function() {
-            logSearch.value = '';
-            logComponentSelect.value = '';
-            logDateInput.value = '';
-            applyFilters();
-        });
+        if (clearFiltersBtn) {
+            clearFiltersBtn.addEventListener('click', function() {
+                logSearch.value = '';
+                if (logComponentSelect) logComponentSelect.value = '';
+                if (logDateInput) logDateInput.value = '';
+                document.getElementById('componentFilterBtn').textContent = 'Filtrer par composant';
+                currentComponent = '';
+                filterLogs();
+            });
+        }
         
         // Télécharger les logs
         downloadBtn.addEventListener('click', function() {
             // Dans une implémentation réelle, rediriger vers un endpoint qui génère un fichier de logs
-            location.href = '/api/logs/download';
+            window.location.href = '/api/logs/download';
         });
         
-        // Effacer les logs
+        // Afficher le modal de confirmation pour l'effacement des logs
         clearLogsBtn.addEventListener('click', function() {
-            if (confirm('Voulez-vous vraiment effacer tous les journaux? Cette action ne peut pas être annulée.')) {
-                fetch('/api/logs/clear', { method: 'POST' })
-                    .then(response => {
-                        if (!response.ok) throw new Error('Échec de la suppression');
-                        showToast('Logs effacés', 'Les journaux ont été effacés avec succès');
-                        loadLogs();
-                    })
-                    .catch(error => {
-                        showToast('Erreur', 'Impossible d\'effacer les journaux: ' + error.message, 'error');
-                    });
-            }
+            const modal = new bootstrap.Modal(document.getElementById('clearLogsModal'));
+            modal.show();
+        });
+        
+        // Confirmer l'effacement des logs
+        document.getElementById('confirmClearBtn').addEventListener('click', function() {
+            this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Effacement...';
+            this.disabled = true;
+            
+            fetch('/api/logs/clear', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Fermer le modal et rafraîchir la page
+                bootstrap.Modal.getInstance(document.getElementById('clearLogsModal')).hide();
+                window.location.reload();
+            })
+            .catch(error => {
+                this.innerHTML = 'Effacer';
+                this.disabled = false;
+                console.error('Erreur lors de l\'effacement des logs:', error);
+                alert('Erreur lors de l\'effacement des logs.');
+            });
         });
         
         // Changer de niveau de log
-        levelDropdown.forEach(item => {
+        levelDropdowns.forEach(item => {
             item.addEventListener('click', function(e) {
                 e.preventDefault();
                 const level = this.getAttribute('data-level');
-                currentLogLevel = level;
-                document.getElementById('log-level-dropdown').textContent = 'Niveau: ' + level;
-                loadLogs();
+                document.getElementById('current-level').textContent = level;
+                window.location.href = `{{ url_for('logs') }}?level=${level}`;
             });
         });
         
         // Toggle autoscroll
         toggleAutoscroll.addEventListener('click', function() {
             autoScroll = !autoScroll;
-            this.classList.toggle('btn-outline-secondary');
-            this.classList.toggle('btn-secondary');
+            this.classList.toggle('cyber-btn-active');
             
-            if (autoScroll) {
+            if (autoScroll && logEntries) {
                 logEntries.scrollTop = logEntries.scrollHeight;
             }
         });
-    }
-    
-    // Fonction pour afficher un toast
-    function showToast(title, message, type = 'info') {
-        const toast = document.getElementById('notificationToast');
-        const toastTitle = document.getElementById('toastTitle');
-        const toastMessage = document.getElementById('toastMessage');
-        const toastTime = document.getElementById('toastTime');
         
-        if (!toast) return;
+        // Toggle filtres avancés
+        toggleFiltersBtn.addEventListener('click', function() {
+            const filtersPanel = document.getElementById('advanced-filters');
+            const isVisible = filtersPanel.style.display !== 'none';
+            
+            filtersPanel.style.display = isVisible ? 'none' : 'block';
+            this.innerHTML = isVisible ? 
+                '<i class="fas fa-chevron-down"></i>' : 
+                '<i class="fas fa-chevron-up"></i>';
+        });
         
-        toastTitle.textContent = title;
-        toastMessage.textContent = message;
-        toastTime.textContent = 'À l\'instant';
-        
-        // Ajouter la classe correspondant au type
-        toast.classList.remove('bg-success', 'bg-danger', 'bg-warning', 'bg-info');
-        switch (type) {
-            case 'success': toast.classList.add('bg-success'); break;
-            case 'error': toast.classList.add('bg-danger'); break;
-            case 'warning': toast.classList.add('bg-warning'); break;
-            default: toast.classList.add('bg-info');
+        // Défiler vers le bas si auto-scroll activé
+        if (autoScroll && logEntries) {
+            logEntries.scrollTop = logEntries.scrollHeight;
         }
-        
-        const bsToast = new bootstrap.Toast(toast);
-        bsToast.show();
-        
-        return bsToast;
     }
     
-    // Colorisation des niveaux de log
-    function colorizeLogLevels() {
-        const pre = logContent;
-        let content = pre.innerHTML;
+    // Fonction pour filtrer les logs selon les critères
+    function filterLogs() {
+        const searchTerm = logSearch.value.toLowerCase();
+        const dateFilter = logDateInput && logDateInput.value ? new Date(logDateInput.value) : null;
+        const logEntries = document.querySelectorAll('.log-entry');
+        let visibleCount = 0;
         
-        // Colorer les différents niveaux de log
-        content = content.replace(/DEBUG:/g, '<span class="text-info">DEBUG:</span>');
-        content = content.replace(/INFO:/g, '<span class="text-success">INFO:</span>');
-        content = content.replace(/WARNING:/g, '<span class="text-warning">WARNING:</span>');
-        content = content.replace(/ERROR:/g, '<span class="text-danger">ERROR:</span>');
-        content = content.replace(/CRITICAL:/g, '<span class="text-purple">CRITICAL:</span>');
+        logEntries.forEach(entry => {
+            // Vérifier la correspondance avec le texte de recherche
+            const text = entry.textContent.toLowerCase();
+            let matchesSearch = !searchTerm || text.includes(searchTerm);
+            
+            // Vérifier la correspondance avec le composant
+            let matchesComponent = true;
+            if (currentComponent) {
+                matchesComponent = entry.getAttribute('data-component') === currentComponent;
+            }
+            
+            // Vérifier la correspondance avec la date (à implémenter si nécessaire)
+            let matchesDate = true;
+            if (dateFilter) {
+                // Cette partie nécessiterait que chaque entrée ait un timestamp machine lisible
+                // Pour l'instant, on conserve tous les logs
+            }
+            
+            // Afficher ou masquer l'entrée
+            if (matchesSearch && matchesComponent && matchesDate) {
+                entry.style.display = '';
+                visibleCount++;
+            } else {
+                entry.style.display = 'none';
+            }
+        });
         
-        pre.innerHTML = content;
+        // Mettre à jour le compteur de logs visibles
+        document.getElementById('total-logs').textContent = visibleCount;
+        
+        // Défilement si activé
+        if (autoScroll && logEntries.length > 0) {
+            document.getElementById('log-entries').scrollTop = document.getElementById('log-entries').scrollHeight;
+        }
     }
-    
-    // Initialiser l'interface
-    initCharts();
-    initEvents();
-    loadLogs();
 });
 </script>
 
 <style>
 .log-container {
-    border: 1px solid rgba(0,0,0,.125);
-    border-radius: 0.25rem;
+    height: 400px;
     overflow: hidden;
 }
 
-.log-filters {
-    background-color: #f8f9fa;
-    border-bottom: 1px solid rgba(0,0,0,.125);
-}
-
 .log-entries {
-    height: 350px;
+    height: 100%;
     overflow-y: auto;
-    background-color: #f8f9fa;
+    background-color: rgba(10, 10, 10, 0.9);
 }
 
-.log-entries pre {
-    padding: 0.75rem;
-    margin-bottom: 0;
-    font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+.log-content {
+    font-family: 'Courier New', monospace;
     font-size: 0.875rem;
     line-height: 1.5;
-    color: #212529;
     white-space: pre-wrap;
     word-wrap: break-word;
 }
 
-.text-purple {
+.log-entry {
+    padding: 4px 8px;
+    border-bottom: 1px solid rgba(50, 50, 50, 0.5);
+}
+
+.log-entry:hover {
+    background-color: rgba(50, 50, 50, 0.3);
+}
+
+.log-timestamp {
+    color: #6c757d;
+    margin-right: 8px;
+}
+
+.log-level {
+    font-weight: bold;
+    padding: 2px 5px;
+    border-radius: 3px;
+    margin-right: 8px;
+}
+
+.log-level.debug {
+    background-color: rgba(13, 202, 240, 0.2);
+    color: #0dcaf0;
+}
+
+.log-level.info {
+    background-color: rgba(32, 201, 151, 0.2);
+    color: #20c997;
+}
+
+.log-level.warning {
+    background-color: rgba(255, 193, 7, 0.2);
+    color: #ffc107;
+}
+
+.log-level.error {
+    background-color: rgba(220, 53, 69, 0.2);
+    color: #dc3545;
+}
+
+.log-level.critical {
+    background-color: rgba(102, 16, 242, 0.2);
     color: #6610f2;
 }
 
-.loading-indicator {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    min-height: 200px;
+.log-component {
+    color: #6f42c1;
+    margin-right: 8px;
+}
+
+.log-message {
+    color: #e0e0e0;
+}
+
+/* Styles pour les logs filtrés par niveau */
+.log-entry.debug .log-message {
+    color: #0dcaf0;
+}
+
+.log-entry.info .log-message {
+    color: #e0e0e0;
+}
+
+.log-entry.warning .log-message {
+    color: #ffc107;
+}
+
+.log-entry.error .log-message {
+    color: #dc3545;
+}
+
+.log-entry.critical .log-message {
+    color: #6610f2;
+    font-weight: bold;
+}
+
+.cyber-btn-active {
+    background-color: var(--primary-color);
+    color: #fff;
 }
 </style>
 {% endblock %}
