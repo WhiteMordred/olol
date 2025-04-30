@@ -59,9 +59,30 @@ class ClusterManager:
         try:
             # Créer ou mettre à jour le cluster Ollama
             if cluster_config:
+                # S'assurer que server_addresses est présent dans la configuration
+                if 'server_addresses' not in cluster_config:
+                    # Essayer de récupérer les serveurs depuis la base de données
+                    db = get_db()
+                    servers = db.get_all("servers")
+                    if servers:
+                        server_addresses = [server["address"] for server in servers]
+                        cluster_config['server_addresses'] = server_addresses
+                    else:
+                        # Si pas de serveurs trouvés, utiliser une liste vide
+                        cluster_config['server_addresses'] = []
+                        logger.warning("Aucun serveur trouvé dans la base de données. Le cluster sera initialisé avec une liste vide.")
+                
+                # Initialiser le cluster avec la configuration
                 self._cluster = OllamaCluster(**cluster_config)
             else:
-                self._cluster = OllamaCluster()
+                # Sans configuration, initialiser avec les serveurs de la base de données
+                db = get_db()
+                servers = db.get_all("servers")
+                server_addresses = [server["address"] for server in servers] if servers else []
+                
+                # Initialiser le cluster avec les adresses de serveurs
+                self._cluster = OllamaCluster(server_addresses=server_addresses)
+                logger.info(f"Cluster initialisé avec {len(server_addresses)} serveurs depuis la base de données")
             
             # Charger les données depuis TinyDB
             self._load_data_from_db()
@@ -661,6 +682,73 @@ class ClusterManager:
             self._stop_refresh.set()
             self._refresh_thread.join(timeout=2.0)
             self._refresh_thread = None
+
+    def check_server_health(self, server_address: str) -> bool:
+        """
+        Vérifie la santé d'un serveur spécifique en essayant de s'y connecter.
+        
+        Args:
+            server_address: L'adresse du serveur à vérifier
+            
+        Returns:
+            bool: True si le serveur est en bonne santé, False sinon
+        """
+        try:
+            # Format host:port simple
+            if server_address.count(':') == 1:
+                host, port_str = server_address.split(':')
+                port = int(port_str)
+                
+                from osync.sync.client import OllamaClient
+                client = OllamaClient(host=host, port=port, timeout=2.0)  # Timeout réduit pour éviter les blocages
+                
+                try:
+                    # Vérifier la santé du serveur avec un timeout court
+                    is_healthy = client.check_health(timeout=1.0)
+                    
+                    # Mettre à jour le cache
+                    with self._cache_lock:
+                        self._cached_server_health[server_address] = is_healthy
+                    
+                    # Si le cluster existe, mettre à jour son état
+                    if self._cluster:
+                        with self._cluster.health_lock:
+                            self._cluster.server_health[server_address] = is_healthy
+                    
+                    return is_healthy
+                    
+                except Exception as e:
+                    logger.warning(f"Erreur lors de la vérification de santé de {server_address}: {str(e)}")
+                    
+                    # Marquer comme non sain en cas d'erreur
+                    with self._cache_lock:
+                        self._cached_server_health[server_address] = False
+                    
+                    if self._cluster:
+                        with self._cluster.health_lock:
+                            self._cluster.server_health[server_address] = False
+                    
+                    return False
+                finally:
+                    # Fermer le client pour libérer les ressources
+                    client.close()
+            else:
+                # Format d'adresse non reconnu
+                logger.warning(f"Format d'adresse non supporté: {server_address}")
+                return False
+                
+        except Exception as e:
+            logger.warning(f"Erreur de connexion au serveur {server_address}: {str(e)}")
+            
+            # Marquer comme non sain en cas d'erreur
+            with self._cache_lock:
+                self._cached_server_health[server_address] = False
+            
+            if self._cluster:
+                with self._cluster.health_lock:
+                    self._cluster.server_health[server_address] = False
+            
+            return False
 
 
 # Instance globale du gestionnaire de cluster

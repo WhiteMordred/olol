@@ -729,3 +729,83 @@ class RPCServer(ollama_pb2_grpc.DistributedOllamaServiceServicer):
             capabilities["error"] = str(e)
         
         return capabilities
+
+
+def check_ollama_running(ollama_host: str = "http://localhost:11434") -> bool:
+    """Vérifie si le serveur Ollama est en cours d'exécution.
+    
+    Args:
+        ollama_host: URL du serveur Ollama (par défaut: http://localhost:11434)
+        
+    Returns:
+        True si le serveur est en cours d'exécution, False sinon
+    """
+    try:
+        # Essayer d'accéder à l'API Ollama pour vérifier son état
+        response = requests.get(f"{ollama_host}/api/version", timeout=2)
+        return response.status_code == 200
+    except Exception as e:
+        logger.debug(f"Ollama server check failed: {str(e)}")
+        return False
+
+def ensure_ollama_running(ollama_host: str = "http://localhost:11434", 
+                        timeout: int = 30,
+                        ollama_command: str = "ollama") -> bool:
+    """Assure que le serveur Ollama est en cours d'exécution, le démarre si nécessaire.
+    
+    Args:
+        ollama_host: URL du serveur Ollama (par défaut: http://localhost:11434)
+        timeout: Temps d'attente maximum en secondes
+        ollama_command: Commande pour démarrer Ollama (par défaut: ollama)
+        
+    Returns:
+        True si le serveur est en cours d'exécution après l'opération, False sinon
+    """
+    # Vérifier d'abord si le serveur est déjà en cours d'exécution
+    if check_ollama_running(ollama_host):
+        logger.debug("Ollama server is already running")
+        return True
+    
+    # Essayer de démarrer le serveur uniquement sur localhost
+    parsed_url = urlparse(ollama_host)
+    hostname = parsed_url.netloc.split(':')[0]
+    
+    if hostname not in ('localhost', '127.0.0.1', '0.0.0.0', '::1'):
+        logger.warning(f"Cannot start Ollama server on remote host: {hostname}")
+        return False
+    
+    try:
+        # Démarrer le serveur Ollama en arrière-plan
+        logger.info("Starting Ollama server...")
+        
+        if platform.system() == "Windows":
+            # Sur Windows, utiliser CREATE_NEW_PROCESS_GROUP pour détacher le processus
+            process = subprocess.Popen(
+                f"{ollama_command} serve",
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
+            )
+        else:
+            # Sur Unix/Linux/macOS, utiliser nohup
+            process = subprocess.Popen(
+                f"nohup {ollama_command} serve > /dev/null 2>&1 &",
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+        
+        # Attendre que le serveur démarre
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            if check_ollama_running(ollama_host):
+                logger.info("Ollama server started successfully")
+                return True
+            time.sleep(1)
+        
+        logger.error(f"Ollama server did not start within {timeout} seconds")
+        return False
+    except Exception as e:
+        logger.error(f"Error starting Ollama server: {str(e)}")
+        return False

@@ -14,17 +14,37 @@ logger = logging.getLogger(__name__)
 class OllamaClient:
     """Synchronous client for interacting with Ollama service."""
     
-    def __init__(self, host: str = 'localhost', port: int = 50051) -> None:
+    def __init__(self, host: str = 'localhost', port: int = 50051, timeout: float = 5.0) -> None:
         """Initialize the Ollama client.
         
         Args:
             host: Server hostname or IP
             port: Server port number
+            timeout: Connection timeout in seconds
         """
-        self.channel = grpc.insecure_channel(f"{host}:{port}")
+        # Si host contient déjà le port (format: "host:port"), on l'utilise directement
+        if ":" in host and not host.startswith("["):  # IPv4 with port or hostname with port
+            self.channel = grpc.insecure_channel(host, options=[
+                ('grpc.enable_http_proxy', 0),
+                ('grpc.keepalive_time_ms', 30000),
+                ('grpc.keepalive_timeout_ms', 10000)
+            ])
+            # Extraire le host et le port pour les stocker
+            self.host, port_str = host.rsplit(":", 1)
+            self.port = int(port_str)
+        else:
+            # Autrement on construit l'adresse avec les paramètres individuels
+            self.channel = grpc.insecure_channel(f"{host}:{port}", options=[
+                ('grpc.enable_http_proxy', 0),
+                ('grpc.keepalive_time_ms', 30000),
+                ('grpc.keepalive_timeout_ms', 10000)
+            ])
+            self.host = host
+            self.port = port
+            
+        # Configurer le timeout pour les appels RPC
+        self.timeout = timeout
         self.stub = ollama_pb2_grpc.OllamaServiceStub(self.channel)
-        self.host = host
-        self.port = port
         
     def generate(self, model: str, prompt: str, 
                 stream: bool = True, 
@@ -223,19 +243,27 @@ class OllamaClient:
             logger.error(f"Version check failed: {str(e)}")
             raise
     
-    def check_health(self) -> bool:
+    def check_health(self, timeout: float = None) -> bool:
         """Check if the server is healthy.
         
         Uses dedicated health check API if available, with fallback to listing models.
         
+        Args:
+            timeout: Optional timeout for the health check call (in seconds)
+            
         Returns:
             True if server is healthy, False otherwise
         """
         try:
+            # Use the provided timeout if any, otherwise use the client's default
+            opts = ()
+            if timeout is not None:
+                opts = [('grpc.timeout', int(timeout * 1000))]
+            
             # First try dedicated health check API
             request = ollama_pb2.HealthCheckRequest(detail=True)
             try:
-                response = self.stub.HealthCheck(request)
+                response = self.stub.HealthCheck(request, timeout=timeout)
                 return response.healthy
             except grpc.RpcError as e:
                 if e.code() == grpc.StatusCode.UNIMPLEMENTED:
