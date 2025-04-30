@@ -3,57 +3,122 @@
 {% block title %}File d'attente - Ollama Sync{% endblock %}
 
 {% block content %}
+<div class="row">
+    <div class="col-lg-12">
+        <h2 class="mb-4 cyber-heading">File d'attente</h2>
+    </div>
+</div>
+
+<!-- Actions principales -->
 <div class="row mb-4">
-    <div class="col">
-        <h2 class="mb-4">
-            <i class="fas fa-tasks me-2"></i> File d'attente
-        </h2>
-        
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span>Tâches en attente et en cours</span>
-                <div class="btn-group">
-                    <button class="btn btn-sm btn-primary" id="refresh-queue">
+    <div class="col-lg-12">
+        <div class="cyber-panel">
+            <div class="cyber-panel-body">
+                <div class="d-flex gap-2">
+                    <button class="cyber-btn cyber-btn-success" id="refresh-queue">
                         <i class="fas fa-sync-alt"></i> Rafraîchir
                     </button>
-                    <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#newTaskModal">
+                    <button class="cyber-btn" data-bs-toggle="modal" data-bs-target="#newTaskModal">
                         <i class="fas fa-plus"></i> Nouvelle tâche
                     </button>
+                    <div class="ms-auto">
+                        <div class="cyber-search">
+                            <input type="text" class="cyber-input" id="taskSearch" placeholder="Rechercher une tâche...">
+                            <button class="cyber-btn cyber-btn-sm" type="button" id="searchBtn">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div class="card-body">
-                <ul class="nav nav-tabs mb-3" id="queueTabs" role="tablist">
+        </div>
+    </div>
+</div>
+
+<!-- Vue d'ensemble -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6">
+        <div class="cyber-card mb-4">
+            <div class="cyber-card-header">
+                <i class="fas fa-tasks"></i> Total des tâches
+            </div>
+            <div class="cyber-card-body">
+                <div class="cyber-value">{{ tasks.total }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="cyber-card mb-4" style="border-left-color: var(--info-color);">
+            <div class="cyber-card-header">
+                <i class="fas fa-play-circle"></i> En cours
+            </div>
+            <div class="cyber-card-body">
+                <div class="cyber-value" style="color: var(--info-color);" id="active-tasks">{{ tasks.active|length }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="cyber-card mb-4" style="border-left-color: var(--warning-color);">
+            <div class="cyber-card-header">
+                <i class="fas fa-clock"></i> En attente
+            </div>
+            <div class="cyber-card-body">
+                <div class="cyber-value" style="color: var(--warning-color);" id="pending-tasks">{{ tasks.pending|length }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="cyber-card mb-4" style="border-left-color: var(--success-color);">
+            <div class="cyber-card-header">
+                <i class="fas fa-check-circle"></i> Terminées
+            </div>
+            <div class="cyber-card-body">
+                <div class="cyber-value" style="color: var(--success-color);" id="completed-tasks">{{ tasks.completed|length }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Liste des tâches -->
+<div class="row mb-4">
+    <div class="col-lg-12">
+        <div class="cyber-panel">
+            <div class="cyber-panel-header">
+                <i class="fas fa-tasks"></i> Tâches en attente et en cours
+                
+                <ul class="nav cyber-tabs" id="queueTabs" role="tablist">
                     <li class="nav-item" role="presentation">
                         <button class="nav-link active" id="active-tab" data-bs-toggle="tab" data-bs-target="#active-queue" 
                                 type="button" role="tab" aria-controls="active-queue" aria-selected="true">
-                            En cours <span class="badge bg-primary ms-2">{{ tasks.active|length }}</span>
+                            En cours <span class="cyber-badge online">{{ tasks.active|length }}</span>
                         </button>
                     </li>
                     <li class="nav-item" role="presentation">
                         <button class="nav-link" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending-queue" 
                                 type="button" role="tab" aria-controls="pending-queue" aria-selected="false">
-                            En attente <span class="badge bg-secondary ms-2">{{ tasks.pending|length }}</span>
+                            En attente <span class="cyber-badge">{{ tasks.pending|length }}</span>
                         </button>
                     </li>
                     <li class="nav-item" role="presentation">
                         <button class="nav-link" id="completed-tab" data-bs-toggle="tab" data-bs-target="#completed-queue" 
                                 type="button" role="tab" aria-controls="completed-queue" aria-selected="false">
-                            Terminées <span class="badge bg-success ms-2">{{ tasks.completed|length }}</span>
+                            Terminées <span class="cyber-badge success">{{ tasks.completed|length }}</span>
                         </button>
                     </li>
                     <li class="nav-item" role="presentation">
                         <button class="nav-link" id="failed-tab" data-bs-toggle="tab" data-bs-target="#failed-queue" 
                                 type="button" role="tab" aria-controls="failed-queue" aria-selected="false">
-                            Échouées <span class="badge bg-danger ms-2">{{ tasks.failed|length }}</span>
+                            Échouées <span class="cyber-badge offline">{{ tasks.failed|length }}</span>
                         </button>
                     </li>
                 </ul>
-                
+            </div>
+            <div class="cyber-panel-body">
                 <div class="tab-content" id="queueTabContent">
                     <!-- Tâches actives -->
                     <div class="tab-pane fade show active" id="active-queue" role="tabpanel" aria-labelledby="active-tab">
                         <div class="table-responsive">
-                            <table class="table table-hover">
+                            <table class="cyber-table">
                                 <thead>
                                     <tr>
                                         <th>ID</th>
@@ -71,16 +136,15 @@
                                         <td><code>{{ task.id }}</code></td>
                                         <td>{{ task.model }}</td>
                                         <td>{{ task.server }}</td>
-                                        <td><span class="badge bg-{{ task.status_class }}">{{ task.status }}</span></td>
+                                        <td><span class="cyber-badge {{ task.status_class }}">{{ task.status }}</span></td>
                                         <td>
-                                            <div class="progress" style="height: 6px;">
-                                                <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                                                     role="progressbar" style="width: {{ task.progress }}%"></div>
+                                            <div class="cyber-progress">
+                                                <div class="cyber-progress-bar info" style="width: {{ task.progress }}%"></div>
                                             </div>
                                         </td>
                                         <td>{{ task.started_relative }}</td>
                                         <td>
-                                            <button class="btn btn-sm btn-danger stop-task" data-task-id="{{ task.id }}">
+                                            <button class="cyber-btn cyber-btn-sm cyber-btn-danger stop-task" data-task-id="{{ task.id }}">
                                                 <i class="fas fa-stop"></i>
                                             </button>
                                         </td>
@@ -98,7 +162,7 @@
                     <!-- Tâches en attente -->
                     <div class="tab-pane fade" id="pending-queue" role="tabpanel" aria-labelledby="pending-tab">
                         <div class="table-responsive">
-                            <table class="table table-hover">
+                            <table class="cyber-table">
                                 <thead>
                                     <tr>
                                         <th>ID</th>
@@ -114,18 +178,18 @@
                                     <tr>
                                         <td><code>{{ task.id }}</code></td>
                                         <td>{{ task.model }}</td>
-                                        <td><span class="badge bg-{{ task.priority_class }}">{{ task.priority }}</span></td>
+                                        <td><span class="cyber-badge {{ task.priority_class }}">{{ task.priority }}</span></td>
                                         <td>{{ task.created_relative }}</td>
                                         <td>{{ task.position }}</td>
                                         <td>
-                                            <div class="btn-group btn-group-sm">
-                                                <button class="btn btn-primary run-now" title="Exécuter maintenant" data-task-id="{{ task.id }}">
+                                            <div class="d-flex gap-1">
+                                                <button class="cyber-btn cyber-btn-sm run-now" title="Exécuter maintenant" data-task-id="{{ task.id }}">
                                                     <i class="fas fa-play"></i>
                                                 </button>
-                                                <button class="btn btn-warning change-priority" title="Modifier la priorité" data-task-id="{{ task.id }}">
+                                                <button class="cyber-btn cyber-btn-sm cyber-btn-warning change-priority" title="Modifier la priorité" data-task-id="{{ task.id }}">
                                                     <i class="fas fa-arrow-up"></i>
                                                 </button>
-                                                <button class="btn btn-danger cancel-task" title="Annuler" data-task-id="{{ task.id }}">
+                                                <button class="cyber-btn cyber-btn-sm cyber-btn-danger cancel-task" title="Annuler" data-task-id="{{ task.id }}">
                                                     <i class="fas fa-times"></i>
                                                 </button>
                                             </div>
@@ -144,7 +208,7 @@
                     <!-- Tâches terminées -->
                     <div class="tab-pane fade" id="completed-queue" role="tabpanel" aria-labelledby="completed-tab">
                         <div class="table-responsive">
-                            <table class="table table-hover">
+                            <table class="cyber-table">
                                 <thead>
                                     <tr>
                                         <th>ID</th>
@@ -164,11 +228,11 @@
                                         <td>{{ task.duration }}</td>
                                         <td>{{ task.completed_relative }}</td>
                                         <td>
-                                            <div class="btn-group btn-group-sm">
-                                                <button class="btn btn-info view-results" title="Voir les résultats" data-task-id="{{ task.id }}">
+                                            <div class="d-flex gap-1">
+                                                <button class="cyber-btn cyber-btn-sm view-results" title="Voir les résultats" data-task-id="{{ task.id }}">
                                                     <i class="fas fa-eye"></i>
                                                 </button>
-                                                <button class="btn btn-secondary retry-task" title="Relancer" data-task-id="{{ task.id }}">
+                                                <button class="cyber-btn cyber-btn-sm cyber-btn-secondary retry-task" title="Relancer" data-task-id="{{ task.id }}">
                                                     <i class="fas fa-redo"></i>
                                                 </button>
                                             </div>
@@ -187,7 +251,7 @@
                     <!-- Tâches échouées -->
                     <div class="tab-pane fade" id="failed-queue" role="tabpanel" aria-labelledby="failed-tab">
                         <div class="table-responsive">
-                            <table class="table table-hover">
+                            <table class="cyber-table">
                                 <thead>
                                     <tr>
                                         <th>ID</th>
@@ -207,11 +271,11 @@
                                         <td><span class="text-danger">{{ task.error }}</span></td>
                                         <td>{{ task.failed_relative }}</td>
                                         <td>
-                                            <div class="btn-group btn-group-sm">
-                                                <button class="btn btn-secondary retry-task" title="Réessayer" data-task-id="{{ task.id }}">
+                                            <div class="d-flex gap-1">
+                                                <button class="cyber-btn cyber-btn-sm cyber-btn-secondary retry-task" title="Réessayer" data-task-id="{{ task.id }}">
                                                     <i class="fas fa-redo"></i>
                                                 </button>
-                                                <button class="btn btn-info view-logs" title="Logs d'erreur" data-task-id="{{ task.id }}">
+                                                <button class="cyber-btn cyber-btn-sm view-logs" title="Logs d'erreur" data-task-id="{{ task.id }}">
                                                     <i class="fas fa-exclamation-circle"></i>
                                                 </button>
                                             </div>
@@ -228,12 +292,12 @@
                     </div>
                 </div>
             </div>
-            <div class="card-footer text-muted d-flex justify-content-between">
+            <div class="cyber-panel-footer d-flex justify-content-between">
                 <div>
                     Total des tâches: <strong>{{ tasks.total }}</strong>
                 </div>
                 <div>
-                    <button class="btn btn-outline-danger btn-sm" id="clear-history">
+                    <button class="cyber-btn cyber-btn-sm cyber-btn-danger" id="clear-history">
                         <i class="fas fa-trash"></i> Vider l'historique
                     </button>
                 </div>
@@ -246,11 +310,11 @@
 <div class="row">
     <!-- Graphique de distribution -->
     <div class="col-lg-6">
-        <div class="card mb-4">
-            <div class="card-header">
-                <i class="fas fa-chart-pie me-2"></i> Distribution des tâches
+        <div class="cyber-panel mb-4">
+            <div class="cyber-panel-header">
+                <i class="fas fa-chart-pie"></i> Distribution des tâches
             </div>
-            <div class="card-body">
+            <div class="cyber-panel-body">
                 <canvas id="queueDistributionChart" height="240"></canvas>
             </div>
         </div>
@@ -258,11 +322,11 @@
     
     <!-- Graphique de performance -->
     <div class="col-lg-6">
-        <div class="card mb-4">
-            <div class="card-header">
-                <i class="fas fa-chart-line me-2"></i> Performance et temps d'attente
+        <div class="cyber-panel mb-4">
+            <div class="cyber-panel-header">
+                <i class="fas fa-chart-line"></i> Performance et temps d'attente
             </div>
-            <div class="card-body">
+            <div class="cyber-panel-body">
                 <canvas id="queuePerformanceChart" height="240"></canvas>
             </div>
         </div>
@@ -272,16 +336,16 @@
 <!-- Modal pour nouvelle tâche -->
 <div class="modal fade" id="newTaskModal" tabindex="-1" aria-labelledby="newTaskModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
+        <div class="modal-content cyber-modal">
+            <div class="cyber-modal-header">
                 <h5 class="modal-title" id="newTaskModalLabel">Créer une nouvelle tâche</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
+            <div class="cyber-modal-body">
                 <form id="newTaskForm">
                     <div class="mb-3">
                         <label for="taskModel" class="form-label">Modèle</label>
-                        <select class="form-select" id="taskModel" required>
+                        <select class="cyber-input form-select" id="taskModel" required>
                             <option value="" selected disabled>Sélectionner un modèle...</option>
                             {% for model in available_models %}
                             <option value="{{ model.id }}">{{ model.name }}</option>
@@ -290,7 +354,7 @@
                     </div>
                     <div class="mb-3">
                         <label for="taskPrompt" class="form-label">Prompt</label>
-                        <textarea class="form-control" id="taskPrompt" rows="5" required></textarea>
+                        <textarea class="cyber-input form-control" id="taskPrompt" rows="5" required></textarea>
                     </div>
                     <div class="row mb-3">
                         <div class="col-md-6">
@@ -304,7 +368,7 @@
                         </div>
                         <div class="col-md-6">
                             <label for="taskPriority" class="form-label">Priorité</label>
-                            <select class="form-select" id="taskPriority">
+                            <select class="cyber-input form-select" id="taskPriority">
                                 <option value="low">Basse</option>
                                 <option value="normal" selected>Normale</option>
                                 <option value="high">Haute</option>
@@ -313,7 +377,7 @@
                     </div>
                     <div class="mb-3">
                         <label for="taskServer" class="form-label">Serveur (optionnel)</label>
-                        <select class="form-select" id="taskServer">
+                        <select class="cyber-input form-select" id="taskServer">
                             <option value="" selected>Auto-sélection</option>
                             {% for server in available_servers %}
                             <option value="{{ server.address }}">{{ server.address }} ({{ server.backend }}{% if server.load %}, charge: {{ server.load }}%{% endif %})</option>
@@ -323,9 +387,32 @@
                     </div>
                 </form>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                <button type="submit" form="newTaskForm" class="btn btn-primary">Créer la tâche</button>
+            <div class="cyber-modal-footer">
+                <button type="button" class="cyber-btn cyber-btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="submit" form="newTaskForm" class="cyber-btn">Créer la tâche</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de confirmation pour vider l'historique -->
+<div class="modal fade" id="confirmClearModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content cyber-modal">
+            <div class="cyber-modal-header">
+                <h5 class="modal-title">Confirmer la suppression</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="cyber-modal-body">
+                <p>Êtes-vous sûr de vouloir vider l'historique des tâches terminées et échouées?</p>
+                <div class="cyber-alert">
+                    <i class="fas fa-exclamation-triangle"></i> 
+                    Cette action ne peut pas être annulée.
+                </div>
+            </div>
+            <div class="cyber-modal-footer">
+                <button type="button" class="cyber-btn cyber-btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="cyber-btn cyber-btn-danger" id="confirmClearBtn">Vider l'historique</button>
             </div>
         </div>
     </div>
@@ -335,6 +422,10 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Configuration graphique pour correspondre au style cyberpunk
+    Chart.defaults.color = '#808080';
+    Chart.defaults.borderColor = '#2A2A2A';
+    
     // Récupérer les données depuis le backend
     const queueData = {{ queue_data|tojson }};
     const performanceData = {{ performance_data|tojson }};
@@ -353,10 +444,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     queueData.failed
                 ],
                 backgroundColor: [
-                    '#0d6efd',  // En cours - primary
-                    '#6c757d',  // En attente - secondary
-                    '#198754',  // Terminées - success
-                    '#dc3545'   // Échouées - danger
+                    '#00F3FF',  // En cours - info
+                    '#FFA800',  // En attente - warning
+                    '#00CC66',  // Terminées - success
+                    '#FF0055'   // Échouées - danger
                 ],
                 borderWidth: 1
             }]
@@ -388,7 +479,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }, {
                 label: 'Tâches par heure',
                 data: performanceData.tasks_per_hour,
-                borderColor: '#0dcaf0',
+                borderColor: '#00F3FF',
                 backgroundColor: 'transparent',
                 tension: 0.4,
                 yAxisID: 'y1'
@@ -403,6 +494,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     title: {
                         display: true,
                         text: 'Temps d\'attente (s)'
+                    },
+                    grid: {
+                        color: 'rgba(42, 42, 42, 0.4)'
                     }
                 },
                 y1: {
@@ -413,8 +507,21 @@ document.addEventListener('DOMContentLoaded', function() {
                         text: 'Tâches par heure'
                     },
                     grid: {
-                        drawOnChartArea: false
+                        drawOnChartArea: false,
+                        color: 'rgba(42, 42, 42, 0.4)'
                     }
+                },
+                x: {
+                    grid: {
+                        color: 'rgba(42, 42, 42, 0.4)'
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    backgroundColor: 'rgba(10, 10, 10, 0.8)',
+                    bodyColor: '#F0F0F0',
+                    borderColor: '#2A2A2A'
                 }
             }
         }
@@ -437,7 +544,7 @@ document.addEventListener('DOMContentLoaded', function() {
         refreshBtn.addEventListener('click', function() {
             // Simuler un chargement avec un spinner
             this.disabled = true;
-            this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Actualisation...';
+            this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Actualisation...';
             
             // Faire une requête AJAX pour actualiser les données
             fetch('/api/queue/refresh', {
@@ -470,6 +577,66 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
+
+    // Filtrage des tâches
+    const searchInput = document.getElementById('taskSearch');
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            const searchText = this.value.toLowerCase();
+            const allRows = document.querySelectorAll('.cyber-table tbody tr');
+            
+            allRows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                if (searchText === '' || text.includes(searchText)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        });
+    }
+    
+    // Gestionnaire pour le bouton de nettoyage de l'historique
+    const clearHistoryBtn = document.getElementById('clear-history');
+    
+    if (clearHistoryBtn) {
+        clearHistoryBtn.addEventListener('click', function() {
+            const modal = new bootstrap.Modal(document.getElementById('confirmClearModal'));
+            modal.show();
+        });
+        
+        // Confirmation de vider l'historique
+        document.getElementById('confirmClearBtn').addEventListener('click', function() {
+            this.disabled = true;
+            this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Traitement...';
+            
+            fetch('/api/queue/clear-history', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                const modal = bootstrap.Modal.getInstance(document.getElementById('confirmClearModal'));
+                modal.hide();
+                
+                showToast('Historique nettoyé', `${data.removed} tâches ont été supprimées de l'historique.`);
+                
+                // Actualiser la liste des tâches
+                if (refreshBtn) {
+                    refreshBtn.click();
+                }
+                
+                this.disabled = false;
+                this.innerHTML = 'Vider l\'historique';
+            })
+            .catch(error => {
+                console.error('Erreur lors du nettoyage de l\'historique:', error);
+                showToast('Erreur', 'Impossible de nettoyer l\'historique.', 'danger');
+                
+                this.disabled = false;
+                this.innerHTML = 'Vider l\'historique';
+            });
+        });
+    }
     
     // Fonction pour afficher un toast
     function showToast(title, message, type = 'success') {
@@ -482,21 +649,27 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         const toast = document.createElement('div');
-        toast.className = 'toast';
+        toast.className = 'toast cyber-toast';
         toast.setAttribute('role', 'alert');
         toast.setAttribute('aria-live', 'assertive');
         toast.setAttribute('aria-atomic', 'true');
         
-        const iconClass = type === 'success' ? 'fas fa-check-circle text-success' : 'fas fa-exclamation-circle text-danger';
+        const toastClass = type === 'success' ? 'success' : 
+                           type === 'danger' ? 'danger' : 
+                           type === 'warning' ? 'warning' : 'info';
+        
+        const iconClass = type === 'success' ? 'fas fa-check-circle' : 
+                          type === 'danger' ? 'fas fa-exclamation-circle' : 
+                          type === 'warning' ? 'fas fa-exclamation-triangle' : 'fas fa-info-circle';
         
         toast.innerHTML = `
-            <div class="toast-header">
+            <div class="cyber-toast-header ${toastClass}">
                 <i class="${iconClass} me-2"></i>
                 <strong class="me-auto">${title}</strong>
                 <small>À l'instant</small>
                 <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
             </div>
-            <div class="toast-body">
+            <div class="cyber-toast-body">
                 ${message}
             </div>
         `;
@@ -513,11 +686,16 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Fonction pour mettre à jour l'interface avec de nouvelles données
     function updateQueueInterface(data) {
-        // Mettre à jour les compteurs dans les onglets
-        document.querySelector('#active-tab .badge').textContent = data.counts.active;
-        document.querySelector('#pending-tab .badge').textContent = data.counts.pending;
-        document.querySelector('#completed-tab .badge').textContent = data.counts.completed;
-        document.querySelector('#failed-tab .badge').textContent = data.counts.failed;
+        // Mettre à jour les compteurs d'onglets
+        document.querySelector('#active-tab .cyber-badge').textContent = data.counts.active;
+        document.querySelector('#pending-tab .cyber-badge').textContent = data.counts.pending;
+        document.querySelector('#completed-tab .cyber-badge').textContent = data.counts.completed;
+        document.querySelector('#failed-tab .cyber-badge').textContent = data.counts.failed;
+        
+        // Mettre à jour les cartes récapitulatives
+        document.getElementById('active-tasks').textContent = data.counts.active;
+        document.getElementById('pending-tasks').textContent = data.counts.pending;
+        document.getElementById('completed-tasks').textContent = data.counts.completed;
         
         // Mettre à jour les tableaux avec les nouvelles données
         updateTaskTable('active-queue', data.tasks.active);
@@ -526,7 +704,7 @@ document.addEventListener('DOMContentLoaded', function() {
         updateTaskTable('failed-queue', data.tasks.failed);
         
         // Mettre à jour le total des tâches
-        document.querySelector('.card-footer strong').textContent = data.counts.total;
+        document.querySelector('.cyber-panel-footer strong').textContent = data.counts.total;
         
         // Mettre à jour les graphiques
         updateCharts(data);
@@ -609,38 +787,15 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Gestionnaire pour le bouton de nettoyage de l'historique
-    const clearHistoryBtn = document.getElementById('clear-history');
-    
-    if (clearHistoryBtn) {
-        clearHistoryBtn.addEventListener('click', function() {
-            if (confirm('Voulez-vous vraiment vider l\'historique des tâches terminées et échouées ?')) {
-                fetch('/api/queue/clear-history', {
-                    method: 'POST'
-                })
-                .then(response => response.json())
-                .then(data => {
-                    showToast('Historique nettoyé', `${data.removed} tâches ont été supprimées de l'historique.`);
-                    
-                    // Actualiser la liste des tâches
-                    if (refreshBtn) {
-                        refreshBtn.click();
-                    }
-                })
-                .catch(error => {
-                    console.error('Erreur lors du nettoyage de l\'historique:', error);
-                    showToast('Erreur', 'Impossible de nettoyer l\'historique.', 'danger');
-                });
-            }
-        });
-    }
-    
     // Ajouter des gestionnaires d'événements pour les actions des tâches
     document.addEventListener('click', function(e) {
         // Arrêt d'une tâche en cours
         if (e.target.closest('.stop-task')) {
             const button = e.target.closest('.stop-task');
             const taskId = button.dataset.taskId;
+            
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
             
             fetch(`/api/queue/task/${taskId}/stop`, {
                 method: 'POST'
@@ -653,6 +808,8 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(error => {
                 console.error('Erreur lors de l\'arrêt de la tâche:', error);
                 showToast('Erreur', 'Impossible d\'arrêter la tâche.', 'danger');
+                button.disabled = false;
+                button.innerHTML = '<i class="fas fa-stop"></i>';
             });
         }
         
@@ -660,6 +817,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.target.closest('.run-now')) {
             const button = e.target.closest('.run-now');
             const taskId = button.dataset.taskId;
+            
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
             
             fetch(`/api/queue/task/${taskId}/run-now`, {
                 method: 'POST'
@@ -672,6 +832,8 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(error => {
                 console.error('Erreur lors du démarrage de la tâche:', error);
                 showToast('Erreur', 'Impossible de démarrer la tâche.', 'danger');
+                button.disabled = false;
+                button.innerHTML = '<i class="fas fa-play"></i>';
             });
         }
         
@@ -679,6 +841,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.target.closest('.cancel-task')) {
             const button = e.target.closest('.cancel-task');
             const taskId = button.dataset.taskId;
+            
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
             
             fetch(`/api/queue/task/${taskId}/cancel`, {
                 method: 'POST'
@@ -691,6 +856,8 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(error => {
                 console.error('Erreur lors de l\'annulation de la tâche:', error);
                 showToast('Erreur', 'Impossible d\'annuler la tâche.', 'danger');
+                button.disabled = false;
+                button.innerHTML = '<i class="fas fa-times"></i>';
             });
         }
         
@@ -707,6 +874,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const button = e.target.closest('.retry-task');
             const taskId = button.dataset.taskId;
             
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            
             fetch(`/api/queue/task/${taskId}/retry`, {
                 method: 'POST'
             })
@@ -718,6 +888,8 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(error => {
                 console.error('Erreur lors du relancement de la tâche:', error);
                 showToast('Erreur', 'Impossible de relancer la tâche.', 'danger');
+                button.disabled = false;
+                button.innerHTML = '<i class="fas fa-redo"></i>';
             });
         }
         
@@ -731,4 +903,69 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+
+<style>
+/* Styles pour les onglets cyber */
+.cyber-tabs {
+    border-bottom: none;
+    margin-top: 10px;
+}
+
+.cyber-tabs .nav-item {
+    margin-right: 5px;
+}
+
+.cyber-tabs .nav-link {
+    background-color: rgba(20, 20, 20, 0.8);
+    color: #999;
+    border: none;
+    border-radius: 4px 4px 0 0;
+    padding: 8px 15px;
+    position: relative;
+    transition: all 0.2s;
+}
+
+.cyber-tabs .nav-link:hover {
+    background-color: rgba(30, 30, 30, 0.9);
+    color: #ccc;
+}
+
+.cyber-tabs .nav-link.active {
+    background-color: rgba(0, 243, 255, 0.1);
+    color: #00F3FF;
+    border-bottom: 2px solid #00F3FF;
+}
+
+.cyber-toast {
+    background-color: rgba(15, 15, 15, 0.9);
+    border: 1px solid #333;
+    border-radius: 4px;
+}
+
+.cyber-toast-header {
+    background-color: rgba(30, 30, 30, 0.9);
+    color: #f0f0f0;
+    border-bottom: 1px solid #444;
+}
+
+.cyber-toast-header.success i {
+    color: var(--success-color);
+}
+
+.cyber-toast-header.danger i {
+    color: var(--danger-color);
+}
+
+.cyber-toast-header.warning i {
+    color: var(--warning-color);
+}
+
+.cyber-toast-header.info i {
+    color: var(--info-color);
+}
+
+.cyber-toast-body {
+    color: #e0e0e0;
+}
+</style>
 {% endblock %}
