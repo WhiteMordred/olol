@@ -33,11 +33,12 @@ dependencies = [
     "requests>=2.31.0",
     "rich>=13.0.0",
     "tinydb>=4.8.0",
+    "psutil"
 ]
 
 [project.urls]
 Homepage = "https://github.com/WhiteMordred/osync"
-Documentation = "https://osync.readthedocs.io/"
+Documentation = "https://olsync.readthedocs.io/"
 Repository = "https://github.com/WhiteMordred/osync.git"
 BugTracker = "https://github.com/WhiteMordred/osync/issues"
 

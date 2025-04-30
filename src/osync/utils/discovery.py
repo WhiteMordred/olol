@@ -24,6 +24,75 @@ MSG_TYPE_SERVER_REGISTER = "server-register"
 MSG_TYPE_PROXY_ACK = "proxy-ack"
 
 
+def get_local_ip(preferred_interface: Optional[str] = None) -> Optional[str]:
+    """Obtient l'adresse IP locale de la machine.
+    
+    Args:
+        preferred_interface: Adresse IP de l'interface réseau préférée
+        
+    Returns:
+        Adresse IP locale ou None si aucune n'a pu être trouvée
+    """
+    # Si une interface préférée est spécifiée, l'utiliser
+    if preferred_interface:
+        return preferred_interface
+        
+    try:
+        # Essayer d'abord de trouver l'IP en se connectant à un hôte externe
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            # Peu importe si cette adresse est atteignable ou non,
+            # cette connexion ne sera pas établie réellement
+            s.connect(("8.8.8.8", 80))
+            local_ip = s.getsockname()[0]
+            s.close()
+            
+            # Vérifier si l'IP est valide (pas 127.0.0.1)
+            if local_ip and not local_ip.startswith("127."):
+                logger.debug(f"Adresse IP locale trouvée: {local_ip}")
+                return local_ip
+        except:
+            s.close()
+            
+        # Deuxième méthode: essayer de trouver l'IP via le nom d'hôte
+        try:
+            hostname = socket.gethostname()
+            local_ip = socket.gethostbyname(hostname)
+            
+            # Vérifier si l'IP est valide (pas 127.0.0.1)
+            if local_ip and not local_ip.startswith("127."):
+                logger.debug(f"Adresse IP locale trouvée via le nom d'hôte: {local_ip}")
+                return local_ip
+        except:
+            pass
+            
+        # Troisième méthode: tenter de trouver l'IP via netifaces si disponible
+        try:
+            import netifaces
+            
+            # Trouver l'interface qui a une adresse non-locale
+            for interface in netifaces.interfaces():
+                addresses = netifaces.ifaddresses(interface)
+                if netifaces.AF_INET in addresses:
+                    for address in addresses[netifaces.AF_INET]:
+                        ip = address.get("addr")
+                        if ip and not ip.startswith("127."):
+                            logger.debug(f"Adresse IP locale trouvée via netifaces: {ip}")
+                            return ip
+        except ImportError:
+            logger.debug("Le module netifaces n'est pas disponible")
+        except:
+            pass
+            
+        # Méthode de dernier recours: utiliser l'adresse de loopback
+        logger.warning("Aucune adresse IP externe n'a pu être trouvée, utilisation de l'adresse de loopback")
+        return "127.0.0.1"
+        
+    except Exception as e:
+        logger.error(f"Erreur lors de la détermination de l'adresse IP locale: {e}")
+        return None
+
+
 class DiscoveryService:
     """Service for automatic discovery of OLOL proxies and servers."""
     
