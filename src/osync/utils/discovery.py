@@ -93,6 +93,79 @@ def get_local_ip(preferred_interface: Optional[str] = None) -> Optional[str]:
         return None
 
 
+def register_server(server_info: Dict[str, Any], 
+                   multicast_group: str = DEFAULT_MULTICAST_GROUP,
+                   multicast_port: int = DEFAULT_MULTICAST_PORT,
+                   discovery_interval: int = DEFAULT_DISCOVERY_INTERVAL) -> bool:
+    """Enregistre un serveur pour la découverte automatique.
+    
+    Cette fonction envoie des annonces multicast périodiques pour permettre aux proxies
+    et autres clients de découvrir ce serveur.
+    
+    Args:
+        server_info: Informations sur le serveur (type, hôte, port, capacités, etc.)
+        multicast_group: Adresse du groupe multicast pour la découverte
+        multicast_port: Port multicast pour la découverte
+        discovery_interval: Intervalle en secondes entre les annonces
+        
+    Returns:
+        True si l'enregistrement a réussi, False sinon
+    """
+    # Vérifier que les informations minimales sont présentes
+    required_fields = ["type", "host", "port"]
+    for field in required_fields:
+        if field not in server_info:
+            logger.error(f"Champ obligatoire manquant dans server_info: {field}")
+            return False
+    
+    # Ajouter un identifiant unique s'il n'existe pas déjà
+    if "id" not in server_info:
+        server_info["id"] = str(uuid.uuid4())
+    
+    # Ajouter un timestamp
+    server_info["timestamp"] = time.time()
+    
+    # Préparer le message d'annonce
+    announce_message = {
+        "type": MSG_TYPE_SERVER_ANNOUNCE,
+        "server": server_info
+    }
+    
+    # Créer une socket pour l'envoi multicast
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 32)
+        
+        # Démarrer un thread pour envoyer périodiquement des annonces
+        def announce_thread():
+            while True:
+                try:
+                    # Mettre à jour le timestamp
+                    announce_message["server"]["timestamp"] = time.time()
+                    
+                    # Envoyer l'annonce
+                    message_bytes = json.dumps(announce_message).encode('utf-8')
+                    sock.sendto(message_bytes, (multicast_group, multicast_port))
+                    logger.debug(f"Annonce de serveur envoyée à {multicast_group}:{multicast_port}")
+                    
+                    # Attendre avant la prochaine annonce
+                    time.sleep(discovery_interval)
+                except Exception as e:
+                    logger.error(f"Erreur lors de l'envoi de l'annonce de découverte: {e}")
+                    time.sleep(discovery_interval)  # Attendre avant de réessayer
+        
+        # Démarrer le thread d'annonce en arrière-plan
+        thread = threading.Thread(target=announce_thread, daemon=True)
+        thread.start()
+        
+        logger.info(f"Serveur {server_info['type']} enregistré pour la découverte sur {multicast_group}:{multicast_port}")
+        return True
+    
+    except Exception as e:
+        logger.error(f"Erreur lors de l'enregistrement du serveur pour la découverte: {e}")
+        return False
+
+
 class DiscoveryService:
     """Service for automatic discovery of OLOL proxies and servers."""
     
