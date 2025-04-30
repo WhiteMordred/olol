@@ -1,0 +1,309 @@
+{% extends "base.html" %}
+
+{% block title %}Paramètres - Ollama Sync{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-12">
+        <h2 class="mb-4">Paramètres du Proxy</h2>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-6">
+        <!-- Paramètres généraux -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="fas fa-cogs me-1"></i> Paramètres généraux
+            </div>
+            <div class="card-body">
+                <form id="generalSettingsForm">
+                    <div class="mb-3">
+                        <label for="healthCheckInterval" class="form-label">Intervalle des vérifications de santé (secondes)</label>
+                        <input type="number" class="form-control" id="healthCheckInterval" value="30" min="5" max="600">
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="autoDiscoveryEnabled" checked>
+                        <label class="form-check-label" for="autoDiscoveryEnabled">Activer la découverte automatique des serveurs</label>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="enableDistributedInference">
+                        <label class="form-check-label" for="enableDistributedInference">Activer l'inférence distribuée</label>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="autoDistributeLarge">
+                        <label class="form-check-label" for="autoDistributeLarge">Distribution automatique des grands modèles</label>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Enregistrer les changements</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6">
+        <!-- Options de journalisation -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="fas fa-file-alt me-1"></i> Journalisation
+            </div>
+            <div class="card-body">
+                <form id="loggingSettingsForm">
+                    <div class="mb-3">
+                        <label for="logLevel" class="form-label">Niveau de journalisation</label>
+                        <select class="form-select" id="logLevel">
+                            <option value="error">Erreur</option>
+                            <option value="warning">Avertissement</option>
+                            <option value="info" selected>Information</option>
+                            <option value="debug">Débogage</option>
+                        </select>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="logToFile">
+                        <label class="form-check-label" for="logToFile">Journaliser dans un fichier</label>
+                    </div>
+                    <div class="mb-3">
+                        <label for="logFilePath" class="form-label">Chemin du fichier journal</label>
+                        <input type="text" class="form-control" id="logFilePath" value="/var/log/osync-proxy.log" disabled>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Appliquer</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-12">
+        <!-- Paramètres avancés -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="fas fa-sliders-h me-1"></i> Paramètres avancés
+            </div>
+            <div class="card-body">
+                <form id="advancedSettingsForm">
+                    <div class="mb-3">
+                        <label for="loadBalanceStrategy" class="form-label">Stratégie d'équilibrage de charge</label>
+                        <select class="form-select" id="loadBalanceStrategy">
+                            <option value="round_robin">Round Robin</option>
+                            <option value="least_loaded" selected>Serveur le moins chargé</option>
+                            <option value="fastest_response">Réponse la plus rapide</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="modelPlacement" class="form-label">Stratégie de placement des modèles</label>
+                        <select class="form-select" id="modelPlacement">
+                            <option value="memory_optimized" selected>Optimisé pour la mémoire</option>
+                            <option value="speed_optimized">Optimisé pour la vitesse</option>
+                            <option value="balanced">Équilibré</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="defaultTimeout" class="form-label">Délai d'attente par défaut (secondes)</label>
+                        <input type="number" class="form-control" id="defaultTimeout" value="60" min="10" max="600">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Actions et maintenance -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="fas fa-tools me-1"></i> Actions de maintenance
+            </div>
+            <div class="card-body">
+                <div class="d-flex flex-wrap gap-3">
+                    <button class="btn btn-warning" id="clearCacheBtn">
+                        <i class="fas fa-broom me-1"></i> Nettoyer le cache
+                    </button>
+                    <button class="btn btn-danger" id="resetConfigBtn">
+                        <i class="fas fa-undo me-1"></i> Réinitialiser la configuration
+                    </button>
+                    <button class="btn btn-info" id="exportConfigBtn">
+                        <i class="fas fa-file-export me-1"></i> Exporter la configuration
+                    </button>
+                    <button class="btn btn-primary" id="importConfigBtn">
+                        <i class="fas fa-file-import me-1"></i> Importer une configuration
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast pour les notifications -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="settingsToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header">
+            <strong class="me-auto" id="toastTitle">Notification</strong>
+            <small id="toastTime">À l'instant</small>
+            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body" id="toastMessage"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Fonction pour afficher les toasts
+    function showToast(title, message, type = 'info') {
+        const toast = document.getElementById('settingsToast');
+        const toastTitle = document.getElementById('toastTitle');
+        const toastMessage = document.getElementById('toastMessage');
+        const toastTime = document.getElementById('toastTime');
+        
+        toastTitle.textContent = title;
+        toastMessage.textContent = message;
+        toastTime.textContent = 'À l\'instant';
+        
+        toast.classList.remove('bg-success', 'bg-danger', 'bg-warning', 'bg-info', 'text-white');
+        
+        switch(type) {
+            case 'success':
+                toast.classList.add('bg-success', 'text-white');
+                break;
+            case 'error':
+                toast.classList.add('bg-danger', 'text-white');
+                break;
+            case 'warning':
+                toast.classList.add('bg-warning');
+                break;
+            case 'info':
+            default:
+                toast.classList.add('bg-info', 'text-white');
+                break;
+        }
+        
+        const bsToast = new bootstrap.Toast(toast);
+        bsToast.show();
+    }
+    
+    // Activer/désactiver le champ de chemin de fichier journal
+    document.getElementById('logToFile').addEventListener('change', function() {
+        document.getElementById('logFilePath').disabled = !this.checked;
+    });
+    
+    // Formulaire des paramètres généraux
+    document.getElementById('generalSettingsForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // Simuler la sauvegarde des paramètres
+        setTimeout(() => {
+            showToast('Paramètres généraux', 'Les paramètres ont été enregistrés avec succès.', 'success');
+        }, 500);
+    });
+    
+    // Formulaire des options de journalisation
+    document.getElementById('loggingSettingsForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // Simuler la sauvegarde des paramètres
+        setTimeout(() => {
+            showToast('Options de journalisation', 'Les options de journalisation ont été mises à jour.', 'success');
+        }, 500);
+    });
+    
+    // Formulaire des paramètres avancés
+    document.getElementById('advancedSettingsForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // Simuler la sauvegarde des paramètres
+        setTimeout(() => {
+            showToast('Paramètres avancés', 'Les paramètres avancés ont été enregistrés avec succès.', 'success');
+        }, 500);
+    });
+    
+    // Bouton de nettoyage du cache
+    document.getElementById('clearCacheBtn').addEventListener('click', function() {
+        if (confirm('Êtes-vous sûr de vouloir nettoyer le cache ? Cette action peut affecter les performances temporairement.')) {
+            // Simuler le nettoyage du cache
+            this.disabled = true;
+            this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Nettoyage...';
+            
+            setTimeout(() => {
+                this.disabled = false;
+                this.innerHTML = '<i class="fas fa-broom me-1"></i> Nettoyer le cache';
+                showToast('Maintenance', 'Le cache a été nettoyé avec succès.', 'success');
+            }, 2000);
+        }
+    });
+    
+    // Bouton de réinitialisation de la configuration
+    document.getElementById('resetConfigBtn').addEventListener('click', function() {
+        if (confirm('Êtes-vous sûr de vouloir réinitialiser la configuration ? Toutes vos modifications seront perdues.')) {
+            // Simuler la réinitialisation
+            this.disabled = true;
+            this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Réinitialisation...';
+            
+            setTimeout(() => {
+                this.disabled = false;
+                this.innerHTML = '<i class="fas fa-undo me-1"></i> Réinitialiser la configuration';
+                showToast('Maintenance', 'La configuration a été réinitialisée.', 'success');
+                
+                // Recharger la page pour afficher les valeurs par défaut
+                setTimeout(() => {
+                    location.reload();
+                }, 1500);
+            }, 2000);
+        }
+    });
+    
+    // Bouton d'exportation de la configuration
+    document.getElementById('exportConfigBtn').addEventListener('click', function() {
+        // Simuler l'exportation
+        this.disabled = true;
+        this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Exportation...';
+        
+        setTimeout(() => {
+            this.disabled = false;
+            this.innerHTML = '<i class="fas fa-file-export me-1"></i> Exporter la configuration';
+            showToast('Exportation', 'La configuration a été exportée avec succès.', 'success');
+            
+            // Simuler un téléchargement
+            const link = document.createElement('a');
+            link.href = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify({
+                general: {
+                    healthCheckInterval: 30,
+                    autoDiscoveryEnabled: true,
+                    enableDistributedInference: false,
+                    autoDistributeLarge: true
+                },
+                logging: {
+                    logLevel: 'info',
+                    logToFile: false,
+                    logFilePath: '/var/log/osync-proxy.log'
+                },
+                advanced: {
+                    loadBalanceStrategy: 'least_loaded',
+                    modelPlacement: 'memory_optimized',
+                    defaultTimeout: 60
+                }
+            }, null, 2));
+            link.download = 'osync-proxy-config.json';
+            link.click();
+        }, 1500);
+    });
+    
+    // Bouton d'importation de la configuration
+    document.getElementById('importConfigBtn').addEventListener('click', function() {
+        // Dans une implémentation réelle, on créerait un input file caché
+        // et on déclencherait un clic dessus, mais pour cette démo on va juste
+        // simuler une importation réussie
+        showToast('Importation', 'Veuillez sélectionner un fichier de configuration à importer.', 'info');
+        
+        // Simuler une importation réussie après un délai
+        setTimeout(() => {
+            showToast('Importation', 'La configuration a été importée avec succès. La page va se recharger.', 'success');
+            
+            // Simuler un rechargement de page
+            setTimeout(() => {
+                // Dans une implémentation réelle, on rechargerait la page
+                // location.reload();
+            }, 2000);
+        }, 3000);
+    });
+});
+</script>
+{% endblock %}

@@ -12,8 +12,8 @@ from setuptools.command.install import install
 
 def generate_proto_files(package_dir):
     """Generate protocol buffer Python files."""
-    proto_dir = os.path.join(package_dir, "src", "olol", "proto")
-    output_dir = os.path.join(package_dir, "src", "olol")
+    proto_dir = os.path.join(package_dir, "src", "osync", "proto")
+    output_dir = os.path.join(package_dir, "src", "osync")
     
     proto_files = [f for f in os.listdir(proto_dir) if f.endswith(".proto")]
     if not proto_files:

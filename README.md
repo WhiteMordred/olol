@@ -1,10 +1,10 @@
-# OLOL - Ollama Load Balancing and Clustering
+# Ollama Sync Load Balancing and Clustering
 
 A distributed inference system that allows you to build a powerful multi-host cluster for Ollama AI models with transparent scaling and fault tolerance.
 
 OLOL (Ollama Load Balancer) is a Python package providing gRPC interfaces with both synchronous and asynchronous support for distributed inference across multiple Ollama instances.
 
-![olol imagry](olol.png  "Olol project mascot's")
+![osync imagry](osync.png  "Olol project mascot's")
 
 ## Overview
 
@@ -295,20 +295,20 @@ sequenceDiagram
 
 ```bash
 # Install from PyPI (once published)
-uv pip install olol
+uv pip install osync
 
 # Install with extras
-uv pip install "olol[proxy,async]"
+uv pip install "osync[proxy,async]"
 
 # Development installation
-git clone https://github.com/K2/olol.git
-cd olol
+git clone https://github.com/K2/osync.git
+cd osync
 uv pip install -e ".[dev]"
 
 # Build and install from source
-cd olol
+cd osync
 ./tools/build-simple.sh
-uv pip install dist/olol-0.1.0-py3-none-any.whl
+uv pip install dist/osync-0.1.0-py3-none-any.whl
 ```
 
 ## Quick Start
@@ -321,29 +321,29 @@ Start multiple Ollama instances on different machines or ports.
 
 ```bash
 # Start a synchronous server
-olol server --host 0.0.0.0 --port 50051 --ollama-host http://localhost:11434
+osync server --host 0.0.0.0 --port 50051 --ollama-host http://localhost:11434
 
 # Start an asynchronous server (on another machine)
-olol server --host 0.0.0.0 --port 50052 --ollama-host http://localhost:11434 --async
+osync server --host 0.0.0.0 --port 50052 --ollama-host http://localhost:11434 --async
 ```
 
 ### 3. Start the load balancing proxy
 
 ```bash
 # Basic proxy with load balancing
-olol proxy --host 0.0.0.0 --port 8000 --servers "192.168.1.10:50051,192.168.1.11:50051"
+osync proxy --host 0.0.0.0 --port 8000 --servers "192.168.1.10:50051,192.168.1.11:50051"
 
 # Start with distributed inference enabled
-olol proxy --host 0.0.0.0 --port 8000 --servers "192.168.1.10:50051,192.168.1.11:50051" --distributed
+osync proxy --host 0.0.0.0 --port 8000 --servers "192.168.1.10:50051,192.168.1.11:50051" --distributed
 
 # With custom RPC servers for distributed inference
-olol proxy --servers "192.168.1.10:50051,192.168.1.11:50051" --distributed --rpc-servers "192.168.1.10:50052,192.168.1.11:50052"
+osync proxy --servers "192.168.1.10:50051,192.168.1.11:50051" --distributed --rpc-servers "192.168.1.10:50052,192.168.1.11:50052"
 
 # Auto-discovery mode (will automatically find and add new servers)
-olol proxy --distributed --discovery
+osync proxy --distributed --discovery
 
 # Specify network interface for multi-network-interface setups
-olol proxy --distributed --interface 10.0.0.5
+osync proxy --distributed --interface 10.0.0.5
 ```
 
 ### 4. Set up distributed inference (optional)
@@ -352,29 +352,29 @@ For large models, you can shard the model across multiple servers for faster inf
 
 ```bash
 # Start RPC servers on each machine that will participate in distributed inference
-olol rpc-server --host 0.0.0.0 --port 50052 --device auto
+osync rpc-server --host 0.0.0.0 --port 50052 --device auto
 
 # With optimized settings for large models
-olol rpc-server --device cuda --flash-attention --context-window 16384 --quantize q5_0
+osync rpc-server --device cuda --flash-attention --context-window 16384 --quantize q5_0
 
 # Auto-discovery mode (servers will automatically find and register with proxies)
-olol rpc-server --discovery
+osync rpc-server --discovery
 
 # Specify preferred network interface when multiple are available
-olol rpc-server --device cuda --interface 192.168.1.10
+osync rpc-server --device cuda --interface 192.168.1.10
 
 # Testing distributed inference directly
-olol dist --servers "192.168.1.10:50052,192.168.1.11:50052" --model llama2:13b --prompt "Hello, world!"
+osync dist --servers "192.168.1.10:50052,192.168.1.11:50052" --model llama2:13b --prompt "Hello, world!"
 ```
 
 ### 5. Use the client
 
 ```bash
 # Test with the command-line client
-olol client --host localhost --port 8000 --model llama2 --prompt "Hello, world!"
+osync client --host localhost --port 8000 --model llama2 --prompt "Hello, world!"
 
 # Or use the async client
-olol client --host localhost --port 8000 --model llama2 --prompt "Hello, world!" --async
+osync client --host localhost --port 8000 --model llama2 --prompt "Hello, world!" --async
 ```
 
 ## Python API
@@ -382,7 +382,7 @@ olol client --host localhost --port 8000 --model llama2 --prompt "Hello, world!"
 ### Synchronous Client
 
 ```python
-from olol.sync import OllamaClient
+from osync.sync import OllamaClient
 
 client = OllamaClient(host="localhost", port=8000)
 try:
@@ -400,7 +400,7 @@ finally:
 
 ```python
 import asyncio
-from olol.async import AsyncOllamaClient
+from osync.async import AsyncOllamaClient
 
 async def main():
     client = AsyncOllamaClient(host="localhost", port=8000)
@@ -454,11 +454,11 @@ The main command-line interface accepts various arguments:
 
 ```bash
 # Show available commands
-olol --help
+osync --help
 
 # Show options for a specific command
-olol server --help
-olol proxy --help
+osync server --help
+osync proxy --help
 ```
 
 ### Direct Command Tools
@@ -467,22 +467,22 @@ OLOL also provides direct command tools that can be used with `uv run`:
 
 ```bash
 # Start a proxy server
-uv run olol-proxy --distributed --discovery
+uv run osync-proxy --distributed --discovery
 
 # Start an RPC server
-uv run olol-rpc --device cuda --quantize q5_0 --context-window 8192
+uv run osync-rpc --device cuda --quantize q5_0 --context-window 8192
 
 # Start a standard server
-uv run olol-server --host 0.0.0.0 --port 50051
+uv run osync-server --host 0.0.0.0 --port 50051
 
 # Run distributed inference
-uv run olol-dist --servers "server1:50052,server2:50052" --model llama2:13b --prompt "Hello!"
+uv run osync-dist --servers "server1:50052,server2:50052" --model llama2:13b --prompt "Hello!"
 
 # Use the client
-uv run olol-client --model llama2 --prompt "Tell me about distributed systems"
+uv run osync-client --model llama2 --prompt "Tell me about distributed systems"
 ```
 
-These command tools accept the same options as their corresponding `olol` commands:
+These command tools accept the same options as their corresponding `osync` commands:
 
 Environment variables:
 

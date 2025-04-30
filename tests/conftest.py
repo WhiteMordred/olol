@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from olol.script.oprotob import build
+from osync.script.oprotob import build
 
 
 @pytest.fixture

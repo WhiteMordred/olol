@@ -32,22 +32,22 @@ update_code() {
   $PYTHON_BIN -m pip install -e . || { echo "[ERROR] pip install failed"; exit 1; }
 }
 
-# Lancer le proxy en mode direct (exécute Python directement sans passer par le point d'entrée olol-proxy)
+# Lancer le proxy en mode direct (exécute Python directement sans passer par le point d'entrée osync-proxy)
 run_direct() {
   echo "[DIRECT] Lancer le proxy directement avec Python pour voir les erreurs en direct"
-  $PYTHON_BIN -c "from olol.proxy import run_proxy; run_proxy(host='$HOST', port=$PORT, server_addresses=['$SERVER_1', '$SERVER_2', '$SERVER_3'], enable_distributed=True, rpc_servers=['$RPC_1', '$RPC_2', '$RPC_3'], debug=True, verbose=True)"
+  $PYTHON_BIN -c "from osync.proxy import run_proxy; run_proxy(host='$HOST', port=$PORT, server_addresses=['$SERVER_1', '$SERVER_2', '$SERVER_3'], enable_distributed=True, rpc_servers=['$RPC_1', '$RPC_2', '$RPC_3'], debug=True, verbose=True)"
 }
 
-# Lancer le proxy avec l'entrée olol-proxy en mode debug
+# Lancer le proxy avec l'entrée osync-proxy en mode debug
 run_debug() {
   echo "[DEBUG] Lancer le proxy en mode debug"
-  PYTHONPATH=$(pwd) FLASK_APP=olol.proxy FLASK_DEBUG=1 $PYTHON_BIN -m olol.proxy --host $HOST --port $PORT --servers "$SERVER_1,$SERVER_2,$SERVER_3" --rpc-servers "$RPC_1,$RPC_2,$RPC_3" --distributed --verbose --debug
+  PYTHONPATH=$(pwd) FLASK_APP=osync.proxy FLASK_DEBUG=1 $PYTHON_BIN -m osync.proxy --host $HOST --port $PORT --servers "$SERVER_1,$SERVER_2,$SERVER_3" --rpc-servers "$RPC_1,$RPC_2,$RPC_3" --distributed --verbose --debug
 }
 
 # Lancer le proxy avec un redirecteur de sortie pour capturer tous les logs
 run_logged() {
   echo "[LOGGED] Lancer le proxy avec logs détaillés"
-  PYTHONPATH=$(pwd) PYTHONUNBUFFERED=1 $PYTHON_BIN -m olol.proxy --host $HOST --port $PORT --servers "$SERVER_1,$SERVER_2,$SERVER_3" --rpc-servers "$RPC_1,$RPC_2,$RPC_3" --distributed --verbose --debug > $LOG_DIR/proxy-debug.log 2>&1
+  PYTHONPATH=$(pwd) PYTHONUNBUFFERED=1 $PYTHON_BIN -m osync.proxy --host $HOST --port $PORT --servers "$SERVER_1,$SERVER_2,$SERVER_3" --rpc-servers "$RPC_1,$RPC_2,$RPC_3" --distributed --verbose --debug > $LOG_DIR/proxy-debug.log 2>&1
 }
 
 # Tester chaque nœud individuellement pour vérifier la connectivité
@@ -56,7 +56,7 @@ test_nodes() {
   
   for node in "${SERVERS[@]}"; do
     echo "Testing connectivity to $node"
-    $PYTHON_BIN -c "from olol.sync.client import OllamaClient; client = OllamaClient(host='${node%:*}', port=${node#*:}); print('Health check:', client.check_health()); models = client.list_models(); print('Models:', [m.name for m in models.models] if hasattr(models, 'models') else 'Error: ' + str(models))"
+    $PYTHON_BIN -c "from osync.sync.client import OllamaClient; client = OllamaClient(host='${node%:*}', port=${node#*:}); print('Health check:', client.check_health()); models = client.list_models(); print('Models:', [m.name for m in models.models] if hasattr(models, 'models') else 'Error: ' + str(models))"
   done
 }
 

@@ -75,8 +75,8 @@ def update_hash_file(proto_path, generated_path):
 
 def build(ctx):
     """Build protocol buffer files with version checks."""
-    proto_file = "src/olol/proto/ollama.proto"
-    generated_file = "src/olol/proto/ollama_pb2.py"
+    proto_file = "src/osync/proto/ollama.proto"
+    generated_file = "src/osync/proto/ollama_pb2.py"
     
     # Check if we need to rebuild the proto files
     if not check_proto_version(proto_file, generated_file):
@@ -97,9 +97,9 @@ def build(ctx):
     # protoc.main expects a list of arguments
     protoc_args = [
         "grpc_tools.protoc",
-        "-I=src/olol",  # include path
-        "--python_out=src/olol",
-        "--grpc_python_out=src/olol",
+        "-I=src/osync",  # include path
+        "--python_out=src/osync",
+        "--grpc_python_out=src/osync",
         proto_file
     ]
     

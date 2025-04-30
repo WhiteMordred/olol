@@ -3,8 +3,8 @@ include README.md
 include CHANGELOG.md
 include CONTRIBUTING.md
 
-recursive-include src/olol *.py
-recursive-include src/olol/proto *.proto
+recursive-include src/osync *.py
+recursive-include src/osync/proto *.proto
 
 global-exclude __pycache__
 global-exclude *.py[cod]

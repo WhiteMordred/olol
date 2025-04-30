@@ -5,8 +5,8 @@ import argparse
 import asyncio
 import sys
 
-from olol import AsyncOllamaClient
-from olol.sync import OllamaClient
+from osync import AsyncOllamaClient
+from osync.sync import OllamaClient
 
 
 def sync_example(host: str, port: int, model: str, prompt: str) -> None:

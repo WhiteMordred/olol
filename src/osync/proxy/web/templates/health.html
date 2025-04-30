@@ -1,0 +1,851 @@
+{% extends "base.html" %}
+
+{% block title %}Surveillance Santé - OLOL Proxy{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-12">
+        <h2 class="mb-4 cyber-heading">Surveillance de la Santé du Cluster</h2>
+    </div>
+</div>
+
+<!-- Résumé de la santé -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="cyber-metric good">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <div class="cyber-metric-label">Serveurs en ligne</div>
+                    <div class="cyber-metric-value">{{ report.cluster_health.healthy_servers }}/{{ report.cluster_health.total_servers }}</div>
+                </div>
+                <div class="cyber-metric-icon">
+                    <i class="fas fa-server fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="cyber-metric {% if report.cluster_health.average_load < 0.7 %}good{% elif report.cluster_health.average_load < 0.9 %}warning{% else %}danger{% endif %}">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <div class="cyber-metric-label">Charge moyenne</div>
+                    <div class="cyber-metric-value">{{ "%.1f"|format(report.cluster_health.average_load * 100) }}%</div>
+                </div>
+                <div class="cyber-metric-icon">
+                    <i class="fas fa-tachometer-alt fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="cyber-metric {% if report.cluster_health.average_latency < 100 %}good{% elif report.cluster_health.average_latency < 250 %}warning{% else %}danger{% endif %}">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <div class="cyber-metric-label">Latence moyenne</div>
+                    <div class="cyber-metric-value">{{ "%.1f"|format(report.cluster_health.average_latency) }} ms</div>
+                </div>
+                <div class="cyber-metric-icon">
+                    <i class="fas fa-stopwatch fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="cyber-metric good">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <div class="cyber-metric-label">Dernière vérification</div>
+                    <div class="cyber-metric-value" id="lastCheckTime">{{ report.timestamp | date }}</div>
+                </div>
+                <div class="cyber-metric-icon">
+                    <i class="fas fa-clock fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Actions -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="cyber-panel">
+            <div class="cyber-panel-body">
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <button id="checkHealthBtn" class="cyber-btn">
+                        <i class="fas fa-sync-alt"></i> Vérifier maintenant
+                    </button>
+                    
+                    <button class="cyber-btn auto-refresh-toggle" id="autoRefreshBtn" data-target="health-data" data-seconds="30">
+                        <i class="fas fa-sync-alt"></i>
+                        <span class="status-text">Actualisation auto</span>
+                    </button>
+                    
+                    <div class="cyber-dropdown ms-2">
+                        <button type="button" class="cyber-btn dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                            Exporter
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" id="exportJsonBtn">Format JSON</a></li>
+                            <li><a class="dropdown-item" href="#" id="exportCsvBtn">Format CSV</a></li>
+                            <li><a class="dropdown-item" href="#" id="exportPdfBtn">Format PDF</a></li>
+                        </ul>
+                    </div>
+                    
+                    <div class="ms-auto">
+                        <span class="cyber-text-secondary me-2">Dernière actualisation:</span>
+                        <span id="last-refresh">{{ report.timestamp | date }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Graphiques de surveillance -->
+<div class="row mb-4">
+    <div class="col-lg-6">
+        <div class="cyber-panel mb-4">
+            <div class="cyber-panel-header">
+                <i class="fas fa-chart-area"></i> Historique de charge
+            </div>
+            <div class="cyber-panel-body">
+                <canvas id="loadHistoryChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="cyber-panel mb-4">
+            <div class="cyber-panel-header">
+                <i class="fas fa-chart-line"></i> Historique de latence
+            </div>
+            <div class="cyber-panel-body">
+                <canvas id="latencyHistoryChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Santé détaillée des serveurs -->
+<div class="row">
+    <div class="col-12">
+        <div class="cyber-panel mb-4">
+            <div class="cyber-panel-header d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="fas fa-server"></i> Santé détaillée des serveurs
+                </div>
+                <div class="cyber-search">
+                    <input type="text" class="cyber-input" id="serverSearchInput" placeholder="Filtrer les serveurs...">
+                    <button class="cyber-btn cyber-btn-sm" type="button" id="serverSearchBtn">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="cyber-panel-body">
+                <div class="table-responsive">
+                    <table class="cyber-table" id="serversHealthTable">
+                        <thead>
+                            <tr>
+                                <th>Serveur</th>
+                                <th>État</th>
+                                <th>Charge</th>
+                                <th>Latence</th>
+                                <th>Temps de réponse moyen</th>
+                                <th>Mémoire</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for server_name, server in report.servers.items() %}
+                            <tr>
+                                <td>{{ server_name }}</td>
+                                <td>
+                                    {% if server.healthy %}
+                                    <span class="cyber-badge online">
+                                        <span class="cyber-dot"></span> En ligne
+                                    </span>
+                                    {% else %}
+                                    <span class="cyber-badge offline">
+                                        <span class="cyber-dot"></span> Hors ligne
+                                    </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="cyber-progress">
+                                        <div class="cyber-progress-bar 
+                                        {% if server.load < 0.5 %}good
+                                        {% elif server.load < 0.8 %}warning
+                                        {% else %}danger{% endif %}" 
+                                        style="width: {{ server.load * 100 }}%"></div>
+                                    </div>
+                                    <small class="cyber-text-secondary">{{ "%.0f"|format(server.load * 100) }}%</small>
+                                </td>
+                                <td>{{ "%.1f"|format(server.latency_ms) }} ms</td>
+                                <td>
+                                    {% if server.avg_response_time is defined %}
+                                        {{ "%.1f"|format(server.avg_response_time) }} ms
+                                    {% else %}
+                                        <span class="cyber-text-secondary">N/A</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if server.memory_usage is defined %}
+                                    <div class="cyber-progress">
+                                        <div class="cyber-progress-bar 
+                                        {% if server.memory_usage < 0.5 %}good
+                                        {% elif server.memory_usage < 0.8 %}warning
+                                        {% else %}danger{% endif %}" 
+                                        style="width: {{ server.memory_usage * 100 }}%"></div>
+                                    </div>
+                                    <small class="cyber-text-secondary">
+                                        {{ "%.0f"|format(server.memory_usage * 100) }}%
+                                        {% if server.memory_used is defined and server.memory_total is defined %}
+                                        ({{ server.memory_used | filesizeformat }}/{{ server.memory_total | filesizeformat }})
+                                        {% endif %}
+                                    </small>
+                                    {% else %}
+                                    <span class="cyber-text-secondary">N/A</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <button class="cyber-btn cyber-btn-sm cyber-btn-info view-history-btn" data-server="{{ server_name }}">
+                                        <i class="fas fa-history"></i>
+                                    </button>
+                                    <button class="cyber-btn cyber-btn-sm restart-service-btn" data-server="{{ server_name }}">
+                                        <i class="fas fa-redo"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="7" class="text-center">Aucun serveur disponible</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Historique des problèmes -->
+<div class="row">
+    <div class="col-12">
+        <div class="cyber-panel mb-4">
+            <div class="cyber-panel-header">
+                <i class="fas fa-exclamation-triangle"></i> Historique des problèmes
+            </div>
+            <div class="cyber-panel-body">
+                {% if report.issues and report.issues|length > 0 %}
+                <div class="cyber-timeline">
+                    {% for issue in report.issues %}
+                    <div class="cyber-timeline-item">
+                        <div class="cyber-timeline-point 
+                            {% if issue.severity == 'critical' %}danger
+                            {% elif issue.severity == 'warning' %}warning
+                            {% else %}info{% endif %}">
+                            <i class="fas 
+                                {% if issue.severity == 'critical' %}fa-times
+                                {% elif issue.severity == 'warning' %}fa-exclamation
+                                {% else %}fa-info{% endif %}">
+                            </i>
+                        </div>
+                        <div class="cyber-timeline-content">
+                            <div class="cyber-timeline-header">
+                                <span class="cyber-badge 
+                                    {% if issue.severity == 'critical' %}danger
+                                    {% elif issue.severity == 'warning' %}warning
+                                    {% else %}info{% endif %}">
+                                    {{ issue.severity|upper }}
+                                </span>
+                                <span class="cyber-timeline-time">{{ issue.timestamp | date }}</span>
+                            </div>
+                            <div class="cyber-timeline-body">
+                                <h6>{{ issue.title }}</h6>
+                                <p>{{ issue.description }}</p>
+                                {% if issue.server %}
+                                <div class="cyber-text-secondary">Serveur: {{ issue.server }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="cyber-alert cyber-alert-success">
+                    <i class="fas fa-check-circle"></i> Aucun problème détecté.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal d'historique du serveur -->
+<div class="modal fade" id="serverHistoryModal" tabindex="-1" aria-labelledby="serverHistoryModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content cyber-modal">
+            <div class="cyber-modal-header">
+                <h5 class="modal-title" id="serverHistoryModalLabel">Historique du serveur</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="cyber-modal-body">
+                <div class="mb-4">
+                    <canvas id="serverHistoryChart" height="250"></canvas>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="cyber-table cyber-table-sm" id="serverHistoryTable">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>État</th>
+                                <th>Charge</th>
+                                <th>Latence</th>
+                                <th>Mémoire</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Rempli dynamiquement -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="cyber-modal-footer">
+                <button type="button" class="cyber-btn cyber-btn-secondary" data-bs-dismiss="modal">Fermer</button>
+                <button type="button" class="cyber-btn" id="exportServerHistoryBtn">Exporter l'historique</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast pour les notifications -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="healthToast" class="cyber-toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="cyber-toast-header">
+            <strong class="me-auto" id="toastTitle">Notification</strong>
+            <small id="toastTime">À l'instant</small>
+            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="cyber-toast-body" id="toastMessage"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Configuration graphique pour correspondre au style cyberpunk
+    Chart.defaults.color = '#808080';
+    Chart.defaults.borderColor = '#2A2A2A';
+    
+    // Données simulées pour les graphiques
+    const timestamps = [
+        {% for i in range(10) %}
+        new Date(Date.now() - {{ i * 300000 }}),
+        {% endfor %}
+    ].reverse();
+    
+    const formattedLabels = timestamps.map(date => {
+        return date.getHours().toString().padStart(2, '0') + ':' + 
+               date.getMinutes().toString().padStart(2, '0');
+    });
+    
+    // Graphique d'historique de charge
+    const loadChartCtx = document.getElementById('loadHistoryChart').getContext('2d');
+    const loadData = {
+        labels: formattedLabels,
+        datasets: [
+            {% for server_name, server in report.servers.items() %}
+            {
+                label: '{{ server_name }}',
+                data: [
+                    {% for i in range(10) %}
+                    Math.random() * 0.3 + {{ server.load }} - 0.15,
+                    {% endfor %}
+                ],
+                borderColor: getCyberColor({{ loop.index }}),
+                tension: 0.4,
+                fill: false,
+                borderWidth: 2
+            },
+            {% endfor %}
+        ]
+    };
+    
+    const loadHistoryChart = new Chart(loadChartCtx, {
+        type: 'line',
+        data: loadData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 1,
+                    grid: {
+                        color: 'rgba(42, 42, 42, 0.4)',
+                    },
+                    ticks: {
+                        callback: function(value) {
+                            return (value * 100).toFixed(0) + '%';
+                        }
+                    },
+                    title: {
+                        display: true,
+                        text: 'Charge CPU',
+                        color: '#F0F0F0'
+                    }
+                },
+                x: {
+                    grid: {
+                        color: 'rgba(42, 42, 42, 0.4)',
+                    },
+                    title: {
+                        display: true,
+                        text: 'Heure',
+                        color: '#F0F0F0'
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    backgroundColor: 'rgba(10, 10, 10, 0.8)',
+                    bodyColor: '#F0F0F0',
+                    borderColor: '#2A2A2A',
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            label += (context.parsed.y * 100).toFixed(1) + '%';
+                            return label;
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    // Graphique d'historique de latence
+    const latencyChartCtx = document.getElementById('latencyHistoryChart').getContext('2d');
+    const latencyData = {
+        labels: formattedLabels,
+        datasets: [
+            {% for server_name, server in report.servers.items() %}
+            {
+                label: '{{ server_name }}',
+                data: [
+                    {% for i in range(10) %}
+                    Math.random() * 30 + {{ server.latency_ms }} - 15,
+                    {% endfor %}
+                ],
+                borderColor: getCyberColor({{ loop.index }}),
+                tension: 0.4,
+                fill: false,
+                borderWidth: 2
+            },
+            {% endfor %}
+        ]
+    };
+    
+    const latencyHistoryChart = new Chart(latencyChartCtx, {
+        type: 'line',
+        data: latencyData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        color: 'rgba(42, 42, 42, 0.4)',
+                    },
+                    title: {
+                        display: true,
+                        text: 'Latence (ms)',
+                        color: '#F0F0F0'
+                    }
+                },
+                x: {
+                    grid: {
+                        color: 'rgba(42, 42, 42, 0.4)',
+                    },
+                    title: {
+                        display: true,
+                        text: 'Heure',
+                        color: '#F0F0F0'
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    backgroundColor: 'rgba(10, 10, 10, 0.8)',
+                    bodyColor: '#F0F0F0',
+                    borderColor: '#2A2A2A'
+                }
+            }
+        }
+    });
+    
+    // Fonction pour générer des couleurs cyberpunk
+    function getCyberColor(index) {
+        const colors = [
+            '#00F3FF', // primary
+            '#00CC66', // success
+            '#FF3333', // danger
+            '#DE3163', // accent
+            '#FFC107', // warning
+            '#0DCAF0', // info
+            '#7B68EE', // purple
+            '#FFA500'  // orange
+        ];
+        
+        return colors[index % colors.length];
+    }
+    
+    // Fonction pour afficher les toasts
+    function showToast(title, message, type = 'info') {
+        const toast = document.getElementById('healthToast');
+        const toastTitle = document.getElementById('toastTitle');
+        const toastMessage = document.getElementById('toastMessage');
+        const toastTime = document.getElementById('toastTime');
+        
+        toastTitle.textContent = title;
+        toastMessage.textContent = message;
+        toastTime.textContent = 'À l\'instant';
+        
+        toast.classList.remove('success', 'danger', 'warning', 'info');
+        toast.classList.add(type);
+        
+        const bsToast = new bootstrap.Toast(toast);
+        bsToast.show();
+    }
+    
+    // Recherche de serveurs
+    const serverSearchInput = document.getElementById('serverSearchInput');
+    const serverSearchBtn = document.getElementById('serverSearchBtn');
+    
+    function filterServers() {
+        const query = serverSearchInput.value.toLowerCase();
+        const rows = document.querySelectorAll('#serversHealthTable tbody tr');
+        
+        rows.forEach(row => {
+            const serverName = row.cells[0].textContent.toLowerCase();
+            if (serverName.includes(query)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+    
+    serverSearchBtn.addEventListener('click', filterServers);
+    serverSearchInput.addEventListener('keyup', function(e) {
+        if (e.key === 'Enter') {
+            filterServers();
+        }
+    });
+    
+    // Bouton d'actualisation manuelle
+    document.getElementById('checkHealthBtn').addEventListener('click', function() {
+        this.disabled = true;
+        const originalText = this.innerHTML;
+        this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Vérification...';
+        
+        // Simuler une vérification de santé
+        setTimeout(() => {
+            this.disabled = false;
+            this.innerHTML = originalText;
+            
+            // Mettre à jour les timestamps
+            document.getElementById('lastCheckTime').textContent = new Date().toLocaleString();
+            document.getElementById('last-refresh').textContent = new Date().toLocaleString();
+            
+            showToast('Vérification terminée', 'La santé du cluster a été mise à jour.', 'success');
+        }, 2000);
+    });
+    
+    // Gestion de l'actualisation automatique
+    document.getElementById('autoRefreshBtn').addEventListener('click', function() {
+        this.classList.toggle('active');
+        const isActive = this.classList.contains('active');
+        const statusText = this.querySelector('.status-text');
+        
+        if (isActive) {
+            statusText.textContent = 'Actualisation active';
+            
+            // Démarrer l'actualisation automatique
+            window.healthRefreshInterval = setInterval(() => {
+                // Mettre à jour les timestamps
+                document.getElementById('lastCheckTime').textContent = new Date().toLocaleString();
+                document.getElementById('last-refresh').textContent = new Date().toLocaleString();
+                
+                // Simuler des changements dans les données des graphiques
+                loadHistoryChart.data.datasets.forEach(dataset => {
+                    dataset.data.shift();
+                    const baseValue = Math.random() * 0.3 + 0.3; // Entre 30% et 60%
+                    dataset.data.push(baseValue);
+                });
+                loadHistoryChart.update();
+                
+                latencyHistoryChart.data.datasets.forEach(dataset => {
+                    dataset.data.shift();
+                    const baseValue = Math.random() * 50 + 50; // Entre 50ms et 100ms
+                    dataset.data.push(baseValue);
+                });
+                latencyHistoryChart.update();
+                
+                // Afficher une notification d'actualisation
+                showToast('Actualisation automatique', 'Les données de santé ont été mises à jour.', 'info');
+            }, 30000); // Toutes les 30 secondes
+        } else {
+            statusText.textContent = 'Actualisation auto';
+            clearInterval(window.healthRefreshInterval);
+        }
+    });
+    
+    // Affichage de l'historique d'un serveur
+    document.querySelectorAll('.view-history-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const serverName = this.getAttribute('data-server');
+            showServerHistory(serverName);
+        });
+    });
+    
+    function showServerHistory(serverName) {
+        // Mettre à jour le titre du modal
+        document.getElementById('serverHistoryModalLabel').textContent = `Historique - ${serverName}`;
+        
+        // Générer des données d'historique simulées
+        const historyTimestamps = [];
+        const loadHistory = [];
+        const latencyHistory = [];
+        const memoryHistory = [];
+        const statusHistory = [];
+        
+        // Données pour les 24 dernières heures, par intervalle d'une heure
+        for (let i = 24; i >= 0; i--) {
+            const timestamp = new Date(Date.now() - i * 3600 * 1000); // i heures plus tôt
+            historyTimestamps.push(timestamp);
+            
+            const load = Math.random() * 0.3 + 0.3; // Entre 30% et 60%
+            loadHistory.push(load);
+            
+            const latency = Math.random() * 50 + 50; // Entre 50ms et 100ms
+            latencyHistory.push(latency);
+            
+            const memory = Math.random() * 0.2 + 0.4; // Entre 40% et 60%
+            memoryHistory.push(memory);
+            
+            const status = Math.random() > 0.1; // 90% de chance d'être en ligne
+            statusHistory.push(status);
+        }
+        
+        // Formater les labels pour le graphique
+        const formattedHistoryLabels = historyTimestamps.map(date => {
+            return date.getHours().toString().padStart(2, '0') + ':00';
+        });
+        
+        // Créer le graphique d'historique
+        const serverHistoryCtx = document.getElementById('serverHistoryChart').getContext('2d');
+        if (window.serverHistoryChart) {
+            window.serverHistoryChart.destroy();
+        }
+        
+        window.serverHistoryChart = new Chart(serverHistoryCtx, {
+            type: 'line',
+            data: {
+                labels: formattedHistoryLabels,
+                datasets: [
+                    {
+                        label: 'Charge (%)',
+                        data: loadHistory.map(val => val * 100),
+                        borderColor: '#00F3FF', // primary-color
+                        backgroundColor: 'rgba(0, 243, 255, 0.1)',
+                        fill: true,
+                        yAxisID: 'y',
+                        borderWidth: 2
+                    },
+                    {
+                        label: 'Latence (ms)',
+                        data: latencyHistory,
+                        borderColor: '#FF3333', // danger-color
+                        backgroundColor: 'rgba(255, 51, 51, 0.1)',
+                        fill: true,
+                        yAxisID: 'y1',
+                        borderWidth: 2
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                scales: {
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        grid: {
+                            color: 'rgba(42, 42, 42, 0.4)',
+                        },
+                        title: {
+                            display: true,
+                            text: 'Charge (%)',
+                            color: '#F0F0F0'
+                        },
+                        max: 100
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        grid: {
+                            color: 'rgba(42, 42, 42, 0.4)',
+                            drawOnChartArea: false
+                        },
+                        title: {
+                            display: true,
+                            text: 'Latence (ms)',
+                            color: '#F0F0F0'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            color: 'rgba(42, 42, 42, 0.4)',
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        backgroundColor: 'rgba(10, 10, 10, 0.8)',
+                        bodyColor: '#F0F0F0',
+                        borderColor: '#2A2A2A'
+                    }
+                }
+            }
+        });
+        
+        // Remplir le tableau d'historique
+        const tableBody = document.querySelector('#serverHistoryTable tbody');
+        tableBody.innerHTML = '';
+        
+        for (let i = 0; i < historyTimestamps.length; i++) {
+            const row = document.createElement('tr');
+            
+            const timeCell = document.createElement('td');
+            timeCell.textContent = historyTimestamps[i].toLocaleString();
+            row.appendChild(timeCell);
+            
+            const statusCell = document.createElement('td');
+            const statusBadge = document.createElement('span');
+            statusBadge.className = `cyber-badge ${statusHistory[i] ? 'online' : 'offline'}`;
+            const statusDot = document.createElement('span');
+            statusDot.className = 'cyber-dot';
+            statusBadge.appendChild(statusDot);
+            statusBadge.appendChild(document.createTextNode(statusHistory[i] ? ' En ligne' : ' Hors ligne'));
+            statusCell.appendChild(statusBadge);
+            row.appendChild(statusCell);
+            
+            const loadCell = document.createElement('td');
+            loadCell.textContent = (loadHistory[i] * 100).toFixed(1) + '%';
+            row.appendChild(loadCell);
+            
+            const latencyCell = document.createElement('td');
+            latencyCell.textContent = latencyHistory[i].toFixed(1) + ' ms';
+            row.appendChild(latencyCell);
+            
+            const memoryCell = document.createElement('td');
+            memoryCell.textContent = (memoryHistory[i] * 100).toFixed(1) + '%';
+            row.appendChild(memoryCell);
+            
+            tableBody.appendChild(row);
+        }
+        
+        // Afficher le modal
+        const modal = new bootstrap.Modal(document.getElementById('serverHistoryModal'));
+        modal.show();
+    }
+    
+    // Gestion du redémarrage de service
+    document.querySelectorAll('.restart-service-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const serverName = this.getAttribute('data-server');
+            
+            if (confirm(`Êtes-vous sûr de vouloir redémarrer le service sur ${serverName} ?`)) {
+                // Afficher l'indicateur de chargement
+                this.disabled = true;
+                const originalIcon = this.innerHTML;
+                this.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                
+                // Simuler un redémarrage
+                setTimeout(() => {
+                    this.disabled = false;
+                    this.innerHTML = originalIcon;
+                    
+                    showToast('Service redémarré', `Le service a été redémarré avec succès sur ${serverName}.`, 'success');
+                }, 3000);
+            }
+        });
+    });
+    
+    // Exportation des données
+    document.getElementById('exportJsonBtn').addEventListener('click', function() {
+        // Simuler l'exportation
+        showToast('Export en cours', 'Exportation des données au format JSON...', 'info');
+        
+        // Simuler un délai de traitement
+        setTimeout(() => {
+            showToast('Export terminé', 'Les données ont été exportées avec succès.', 'success');
+            
+            // Dans une implémentation réelle, on déclencherait un téléchargement
+            // Ici, on simule
+            const link = document.createElement('a');
+            link.href = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify({ message: "Exemple d'export" }));
+            link.download = `health_report_${new Date().toISOString().split('T')[0]}.json`;
+            link.click();
+        }, 1000);
+    });
+    
+    document.getElementById('exportCsvBtn').addEventListener('click', function() {
+        showToast('Export en cours', 'Exportation des données au format CSV...', 'info');
+        
+        setTimeout(() => {
+            showToast('Export terminé', 'Les données ont été exportées avec succès.', 'success');
+            
+            const link = document.createElement('a');
+            link.href = 'data:text/csv;charset=utf-8,server,status,load,latency\nlocalhost:50051,online,45.2,78.5';
+            link.download = `health_report_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+        }, 1000);
+    });
+    
+    document.getElementById('exportPdfBtn').addEventListener('click', function() {
+        showToast('Export en cours', 'Préparation du rapport PDF...', 'info');
+        
+        setTimeout(() => {
+            showToast('Export terminé', 'Le rapport PDF a été généré avec succès.', 'success');
+            
+            // Dans une implémentation réelle, on générerait un PDF côté serveur
+            // et on fournirait un lien de téléchargement
+        }, 2000);
+    });
+    
+    // Export de l'historique d'un serveur
+    document.getElementById('exportServerHistoryBtn').addEventListener('click', function() {
+        showToast('Export en cours', 'Exportation de l\'historique du serveur...', 'info');
+        
+        setTimeout(() => {
+            showToast('Export terminé', 'L\'historique a été exporté avec succès.', 'success');
+            
+            const link = document.createElement('a');
+            link.href = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify({ message: "Exemple d'export d'historique" }));
+            link.download = `server_history_${new Date().toISOString().split('T')[0]}.json`;
+            link.click();
+        }, 1000);
+    });
+});

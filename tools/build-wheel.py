@@ -31,8 +31,8 @@ def clean_package():
 
 def generate_proto():
     """Generate protocol buffer files."""
-    proto_dir = Path("src/olol/proto")
-    output_dir = Path("src/olol")
+    proto_dir = Path("src/osync/proto")
+    output_dir = Path("src/osync")
     
     # Ensure proto directory exists
     if not proto_dir.exists():

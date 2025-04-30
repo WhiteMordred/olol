@@ -1,6 +1,6 @@
 import pytest
 
-from olol.script.oprotob import build
+from osync.script.oprotob import build
 
 
 def test_build_exists():

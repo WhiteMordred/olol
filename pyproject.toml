@@ -1,13 +1,13 @@
 [project]
-name = "olol"
+name = "osync"
 version = "0.1.0"
 description = "Ollama gRPC interface with sync/async support for distributed clustering"
 readme = "README.md"
 authors = [
-    { name = "Shane Macaulay", email = "ktwo@ktwo.ca" }
+    { name = "WhiteMordred", email = "WhiteMordred@dev2real.com" }
 ]
 maintainers = [
-    { name = "K2", email = "ktwo@ktwo.ca" }
+    { name = "WhiteMo", email = "WhiteMordred@dev2real.com" }
 ]
 
 license = { text = "MIT" }
@@ -35,39 +35,39 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/K2/olol"
-Documentation = "https://olol.readthedocs.io/"
-Repository = "https://github.com/K2/olol.git"
-BugTracker = "https://github.com/K2/olol/issues"
+Homepage = "https://github.com/WhiteMordred/osync"
+Documentation = "https://osync.readthedocs.io/"
+Repository = "https://github.com/WhiteMordred/osync.git"
+BugTracker = "https://github.com/WhiteMordred/osync/issues"
 
 [project.scripts]
-olol = "olol.__main__:main"
-olol-protoc = "olol.utils.protoc:build"
-olol-proxy = "olol.__main__:run_proxy_entrypoint"
-olol-server = "olol.__main__:run_server_entrypoint"
-olol-rpc = "olol.__main__:run_rpc_server_entrypoint"
-olol-dist = "olol.__main__:run_dist_entrypoint"
-olol-client = "olol.__main__:run_client_entrypoint"
+osync = "osync.__main__:main"
+osync-protoc = "osync.utils.protoc:build"
+osync-proxy = "osync.__main__:run_proxy_entrypoint"
+osync-server = "osync.__main__:run_server_entrypoint"
+osync-rpc = "osync.__main__:run_rpc_server_entrypoint"
+osync-dist = "osync.__main__:run_dist_entrypoint"
+osync-client = "osync.__main__:run_client_entrypoint"
 
 [build-system]
 requires = ["hatchling>=1.18.0"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/olol"]
+packages = ["src/osync"]
 include = [
-    "src/olol/**/*.py",
-    "src/olol/proto/*.proto",
+    "src/osync/**/*.py",
+    "src/osync/proto/*.proto",
 ]
 only-packages = false
 
 [tool.hatch.build.targets.wheel.force-include]
-"src/olol/proto/ollama.proto" = "olol/proto/ollama.proto"
+"src/osync/proto/ollama.proto" = "osync/proto/ollama.proto"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-addopts = "-v -ra --cov=olol"
+addopts = "-v -ra --cov=osync"
 asyncio_mode = "auto"
 
 [tool.coverage.run]

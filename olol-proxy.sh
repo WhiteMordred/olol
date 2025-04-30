@@ -14,7 +14,7 @@ update_code() {
   echo "[UPDATE] Pulling latest code..."
   git pull --ff-only || { echo "[ERROR] Git pull failed"; exit 1; }
 
-  echo "[INSTALL] Reinstalling olol package..."
+  echo "[INSTALL] Reinstalling osync package..."
   $PYTHON_BIN -m pip install -e . || { echo "[ERROR] pip install failed"; exit 1; }
 }
 
@@ -22,7 +22,7 @@ start() {
   update_code
 
   echo "[START] Proxy frontend"
-  nohup olol proxy \
+  nohup osync proxy \
     --host 0.0.0.0 \
     --port $PORT \
     --servers "$SERVERS" \
@@ -33,8 +33,8 @@ start() {
 }
 
 stop() {
-  echo "[STOP] Killing olol proxy"
-  pkill -f "olol proxy"
+  echo "[STOP] Killing osync proxy"
+  pkill -f "osync proxy"
 }
 
 restart() {
@@ -45,7 +45,7 @@ restart() {
 
 status() {
   echo "[STATUS]"
-  pgrep -a -f "olol proxy"
+  pgrep -a -f "osync proxy"
   ss -tuln | grep $PORT
   tail -n 20 $LOG
 }

@@ -15,7 +15,7 @@ update_code() {
   echo "[UPDATE] Pulling latest code..."
   git pull --ff-only || { echo "[ERROR] Git pull failed"; exit 1; }
 
-  echo "[INSTALL] Reinstalling olol package..."
+  echo "[INSTALL] Reinstalling osync package..."
   $PYTHON_BIN -m pip install -e . || { echo "[ERROR] pip install failed"; exit 1; }
 }
 
@@ -24,17 +24,17 @@ start() {
 
   if [ "$MODE" == "sync" ]; then
     echo "[START] Sync server"
-    nohup olol server --host 0.0.0.0 --port $PORT_SYNC --ollama-host $OLLAMA_HOST > $LOG_DIR/server.log 2>&1 &
+    nohup osync server --host 0.0.0.0 --port $PORT_SYNC --ollama-host $OLLAMA_HOST > $LOG_DIR/server.log 2>&1 &
   elif [ "$MODE" == "async" ]; then
     echo "[START] Async RPC server"
-    nohup olol rpc-server --host 0.0.0.0 --port $PORT_ASYNC --device $DEVICE --flash-attention --context-window 16384 --quantize q5_0 > $LOG_DIR/rpc.log 2>&1 &
+    nohup osync rpc-server --host 0.0.0.0 --port $PORT_ASYNC --device $DEVICE --flash-attention --context-window 16384 --quantize q5_0 > $LOG_DIR/rpc.log 2>&1 &
   fi
 }
 
 stop() {
-  echo "[STOP] Killing olol server processes"
-  pkill -f "olol server"
-  pkill -f "olol rpc-server"
+  echo "[STOP] Killing osync server processes"
+  pkill -f "osync server"
+  pkill -f "osync rpc-server"
 }
 
 restart() {
@@ -45,8 +45,8 @@ restart() {
 
 status() {
   echo "[STATUS]"
-  pgrep -a -f "olol server"
-  pgrep -a -f "olol rpc-server"
+  pgrep -a -f "osync server"
+  pgrep -a -f "osync rpc-server"
   ss -tuln | grep 500
 }
 
