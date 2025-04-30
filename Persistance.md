@@ -7,8 +7,10 @@ Ce document présente la roadmap détaillée pour l'implémentation d'un systèm
 **Objectifs principaux :**
 - Remplacer les structures en mémoire (verrous, dictionnaires) par une persistance basée sur TinyDB
 - Collecter des informations détaillées sur les ressources matérielles des nœuds
-- Mettre en place un mécanisme robuste de synchronisation des données
+- Mettre en place un mécanisme robuste de synchronisation des données entre TinyDB et la RAM
 - Assurer une abstraction permettant une migration future vers d'autres systèmes de stockage
+- Implémenter un système de registre des modèles pour la gestion centralisée
+- Développer un mécanisme de file d'attente pour optimiser les inférences et gérer la charge
 
 ## Phase 1 : Mise en place de l'infrastructure de persistance
 
@@ -106,250 +108,276 @@ Définition du schéma des tables pour la persistance des données :
 }
 ```
 
-## Phase 2 : Intégration au gestionnaire de cluster
+#### Table `inference_queue`
+```json
+{
+  "id": "request-uuid",
+  "model": "llama3",
+  "prompt": "Texte du prompt",
+  "status": "pending|processing|completed|failed",
+  "priority": 1,
+  "created_at": "2025-04-30T14:30:00",
+  "started_at": "2025-04-30T14:30:05",
+  "completed_at": "2025-04-30T14:30:10",
+  "server_assigned": "host:port",
+  "batch_id": "batch-uuid"
+}
+```
 
-### 2.1 Modification du ClusterManager
+## Phase 2 : Synchronisation DB-RAM et communication gRPC
 
-**Fichier :** `/src/osync/proxy/cluster/manager.py`
+### 2.1 Architecture de synchronisation
+
+**Principes fondamentaux :**
+- La base de données TinyDB est la source de vérité persistante
+- Les structures en mémoire sont utilisées pour les accès rapides
+- Toute modification est d'abord écrite en DB puis synchronisée en RAM
+- Un mécanisme de chargement initial charge les données depuis TinyDB au démarrage
+
+**Mécanisme de synchronisation :**
+```mermaid
+sequenceDiagram
+    participant D as TinyDB
+    participant R as RAM Cache
+    participant C as Composant
+    
+    Note over D,R: Démarrage du système
+    D->>R: Chargement initial
+    
+    Note over D,R: Opération d'écriture
+    C->>D: write_to_db()
+    D-->>C: Confirmation
+    D->>R: sync_to_ram()
+    
+    Note over D,R: Opération de lecture
+    C->>R: read_from_ram()
+    R-->>C: Données
+```
+
+### 2.2 Implémentation de la synchronisation
+
+**Fichier :** `/src/osync/proxy/db/sync_manager.py`
 
 **Tâches :**
-- [ ] Modifier la méthode `refresh_cache` pour synchroniser avec TinyDB
-- [ ] Modifier `initialize` pour charger les données depuis TinyDB
-- [ ] Ajouter des méthodes dédiées pour la persistance des serveurs et modèles
+- [ ] Créer une classe `SyncManager` pour gérer la synchronisation
+- [ ] Implémenter les méthodes de synchronisation bidirectionnelle
+- [ ] Ajouter des mécanismes de verrouillage pour les accès concurrents
+- [ ] Gérer les cas de conflits et de réconciliation
 
-**Méthodes à modifier :**
+**Méthodes à implémenter :**
 ```python
-def refresh_cache(self):
-    """
-    Met à jour le cache des informations du cluster et persiste dans TinyDB.
-    """
-    # 1. Obtenir les données du cluster (code existant)
-    # 2. Synchroniser avec TinyDB
-    # 3. Mettre à jour le cache local
+class SyncManager:
+    def __init__(self):
+        self.db = get_db()
+        self._ram_cache = {}
+        self._locks = {}
     
-def initialize(self, cluster_config=None):
-    """
-    Initialise ou réinitialise le cluster et charge les données depuis TinyDB.
-    """
-    # 1. Initialiser le cluster (code existant)
-    # 2. Charger les données de TinyDB
-    # 3. Réconcilier avec l'état actuel
+    def load_initial_state(self):
+        """Charge l'état initial depuis TinyDB vers la RAM."""
+        
+    def write_and_sync(self, table, data, doc_id=None):
+        """Écrit dans TinyDB et synchronise avec la RAM."""
+        
+    def read_from_ram(self, table, query=None):
+        """Lit les données depuis la RAM."""
+        
+    def force_sync(self, table=None):
+        """Force la synchronisation entre TinyDB et la RAM."""
 ```
 
-**Nouvelles méthodes à ajouter :**
-```python
-def persist_server(self, server_address, health=None, load=None):
-    """
-    Persiste les informations d'un serveur dans TinyDB.
-    """
-    
-def persist_model_map(self, model_name, servers):
-    """
-    Persiste la mapping modèle-serveurs dans TinyDB.
-    """
-```
+## Phase 3 : Intégration gRPC et système de registre de modèles
 
-**Relations :**
-- Utilise `database.get_db()` pour accéder à TinyDB
-- Appelé par `proxy.app` au démarrage
-
-### 2.2 Initialisation au démarrage
-
-**Fichier :** `/src/osync/proxy/app.py`
-
-**Tâches :**
-- [ ] Modifier l'initialisation pour charger l'état depuis TinyDB
-- [ ] Ajouter une logique de réconciliation entre l'état persisté et l'état actuel
-- [ ] Gérer la persistance des nouvelles données au démarrage
-
-## Phase 3 : Intégration au moniteur de santé
-
-### 3.1 Modification du HealthMonitor
-
-**Fichier :** `/src/osync/proxy/cluster/health.py`
-
-**Tâches :**
-- [ ] Stocker l'historique de santé dans TinyDB
-- [ ] Modifier `check_all_servers_health` pour persister les données
-- [ ] Modifier `get_health_report` pour utiliser TinyDB
-
-**Méthodes à modifier :**
-```python
-def check_all_servers_health(self):
-    """
-    Vérifie la santé de tous les serveurs et persiste les données.
-    """
-    # 1. Vérifier la santé (code existant)
-    # 2. Persister dans TinyDB
-    # 3. Mettre à jour l'historique en mémoire (optionnel)
-    
-def get_health_report(self):
-    """
-    Génère un rapport de santé complet en utilisant les données de TinyDB.
-    """
-    # 1. Requêter TinyDB pour les données récentes
-    # 2. Générer le rapport
-```
-
-**Nouvelles méthodes à ajouter :**
-```python
-def cleanup_old_stats(self, days_to_keep=30):
-    """
-    Nettoie les anciennes statistiques au-delà de la période spécifiée.
-    """
-```
-
-### 3.2 Extraction de l'historique de santé
-
-**Tâches :**
-- [ ] Créer des méthodes pour extraire des statistiques historiques
-- [ ] Implémenter l'agrégation des données pour différentes périodes
-- [ ] Fournir des méthodes d'accès pour l'API et l'interface web
-
-## Phase 4 : Intégration aux statistiques de requêtes
-
-### 4.1 Modification du module de statistiques
-
-**Fichier :** `/src/osync/proxy/stats.py`
-
-**Tâches :**
-- [ ] Persister les statistiques dans TinyDB
-- [ ] Implémenter un mécanisme d'agrégation périodique
-- [ ] Ajouter des fonctions pour interroger les statistiques historiques
-
-**Méthodes à modifier :**
-```python
-def update_request_stats(request_type: str, increment: bool = True):
-    """
-    Met à jour les statistiques et les persiste dans TinyDB.
-    """
-    
-def get_stats_snapshot():
-    """
-    Récupère une image des statistiques depuis TinyDB.
-    """
-```
-
-**Nouvelles méthodes à ajouter :**
-```python
-def aggregate_stats(period="hourly"):
-    """
-    Agrège les statistiques pour la période spécifiée.
-    """
-    
-def get_historical_stats(period="daily", days=7):
-    """
-    Récupère les statistiques historiques pour la période spécifiée.
-    """
-```
-
-## Phase 5 : Collecte d'informations matérielles des nœuds
-
-### 5.1 Extension du service Ollama
+### 3.1 Amélioration de la communication gRPC
 
 **Fichier :** `/src/osync/service.py`
 
 **Tâches :**
-- [ ] Ajouter une nouvelle méthode RPC `GetSystemInfo`
-- [ ] Implémenter la collecte d'informations système (CPU, RAM, GPU, stockage)
-- [ ] Intégrer avec le framework gRPC
+- [ ] Étendre le service gRPC pour collecter toutes les métriques des nœuds
+- [ ] Ajouter des endpoints pour accéder à toutes les fonctionnalités d'Ollama
+- [ ] Implémenter des méthodes pour la gestion des modèles à distance
 
 **Nouvelles méthodes à ajouter :**
 ```python
-def GetSystemInfo(self, request, context):
+def GetCompleteNodeStatus(self, request, context):
     """
-    Collecte et retourne les informations système détaillées du nœud.
+    Collecte l'état complet du nœud, incluant les métriques système.
+    """
+
+def RemoteModelCommand(self, request, context):
+    """
+    Exécute une commande sur un modèle à distance (pull, push, delete).
     """
 ```
 
-### 5.2 Mise à jour du fichier Proto
+### 3.2 Système de registre des modèles
 
-**Fichier :** `/src/osync/proto/ollama.proto`
+**Fichier :** `/src/osync/proxy/cluster/registry.py`
 
 **Tâches :**
-- [ ] Définir les messages `SystemInfoRequest` et `SystemInfoResponse`
-- [ ] Ajouter la méthode RPC au service
+- [ ] Créer un système centralisé de gestion des modèles
+- [ ] Implémenter les opérations CRUD pour les modèles
+- [ ] Gérer la synchronisation des modèles entre les nœuds
 
-**Exemple de définition :**
-```protobuf
-message SystemInfoRequest {
-  bool include_hardware_details = 1;
-}
+**Fonctionnalités clés :**
+- Pull des modèles sur des nœuds spécifiques
+- Distribution intelligente des modèles basée sur les ressources
+- Suivi de l'utilisation et de la disponibilité des modèles
+- Vérification périodique de la cohérence du registre
 
-message SystemInfoResponse {
-  string system = 1;  // JSON avec les informations système
-  string cpu = 2;     // JSON avec les informations CPU
-  string memory = 3;  // JSON avec les informations de mémoire
-  string disk = 4;    // JSON avec les informations de disque
-  string gpu = 5;     // JSON avec les informations GPU
-}
-
-service OllamaService {
-  // Autres méthodes RPC existantes
-  
-  // Récupère les informations système détaillées
-  rpc GetSystemInfo(SystemInfoRequest) returns (SystemInfoResponse);
-}
+**Méthodes à implémenter :**
+```python
+class ModelRegistry:
+    def __init__(self, cluster_manager):
+        self.cluster_manager = cluster_manager
+        self.sync_manager = SyncManager()
+        
+    def pull_model(self, model_name, target_nodes=None):
+        """Pull un modèle sur les nœuds spécifiés ou auto-sélectionnés."""
+        
+    def remove_model(self, model_name, target_nodes=None):
+        """Supprime un modèle des nœuds spécifiés."""
+        
+    def synchronize_models(self):
+        """Synchronise la disponibilité des modèles entre tous les nœuds."""
+        
+    def get_model_status(self, model_name=None):
+        """Récupère le statut du/des modèle(s) dans le cluster."""
+        
+    def optimize_model_distribution(self):
+        """Optimise la distribution des modèles selon la charge et les ressources."""
 ```
 
-### 5.3 Intégration au ClusterManager
+## Phase 4 : Système de file d'attente pour les inférences
 
-**Fichier :** `/src/osync/proxy/cluster/manager.py`
+### 4.1 Architecture de la file d'attente
 
-**Tâches :**
-- [ ] Ajouter une méthode pour récupérer les informations système des nœuds
-- [ ] Planifier des collectes périodiques d'informations
-- [ ] Persister les informations dans TinyDB
+**Principes de conception :**
+- File d'attente persistante stockée dans TinyDB
+- Synchronisation en mémoire pour les accès rapides
+- Nettoyage automatique des requêtes anciennes ou traitées
+- Regroupement (batching) des demandes similaires
+- Priorisation des requêtes
 
-## Phase 6 : API et interface utilisateur
-
-### 6.1 Extension de l'API
-
-**Fichier :** `/src/osync/proxy/api/routes.py`
-
-**Tâches :**
-- [ ] Ajouter des endpoints pour accéder aux données persistées
-- [ ] Fournir des méthodes d'agrégation et de filtrage
-- [ ] Documenter l'API avec Swagger
-
-**Endpoints à ajouter :**
-```
-GET /api/v1/servers/history?server={server}&metric={metric}&period={period}
-GET /api/v1/stats/requests?period={period}&type={type}
-GET /api/v1/nodes/hardware?server={server}
+**Schéma de la file d'attente :**
+```mermaid
+graph TD
+    A[Client] -->|Requête| B[File d'attente]
+    B -->|Stockage| C[TinyDB]
+    B -->|Synchronisation| D[Cache RAM]
+    E[Scheduler] -->|Planification| D
+    E -->|Allocation| F[Serveurs d'inférence]
+    F -->|Résultats| G[Gestionnaire de réponses]
+    G -->|Réponse| A
 ```
 
-### 6.2 Mise à jour de l'interface web
+### 4.2 Implémentation du système de file d'attente
 
-**Fichiers :** Divers templates dans `/src/osync/proxy/web/templates/`
-
-**Tâches :**
-- [ ] Ajouter des visualisations pour les données historiques
-- [ ] Créer une page dédiée aux métriques matérielles
-- [ ] Améliorer la page de santé avec des graphiques basés sur les données persistées
-
-## Phase 7 : Tests et optimisation
-
-### 7.1 Tests unitaires et d'intégration
+**Fichier :** `/src/osync/proxy/queue/manager.py`
 
 **Tâches :**
-- [ ] Écrire des tests unitaires pour `DatabaseManager`
-- [ ] Tester la récupération après redémarrage
-- [ ] Tester les performances avec différentes charges de données
+- [ ] Créer une classe `QueueManager` pour gérer la file d'attente
+- [ ] Implémenter les opérations d'ajout, de consultation et de suppression
+- [ ] Développer un algorithme de regroupement (batching) pour optimiser les inférences
+- [ ] Implémenter la priorisation des requêtes
 
-### 7.2 Optimisation des performances
+**Méthodes à implémenter :**
+```python
+class QueueManager:
+    def __init__(self):
+        self.db = get_db()
+        self.sync_manager = SyncManager()
+        
+    def enqueue(self, request):
+        """Ajoute une requête à la file d'attente."""
+        
+    def dequeue(self, batch_size=1, model=None):
+        """Récupère des requêtes à traiter."""
+        
+    def update_request_status(self, request_id, status, result=None):
+        """Met à jour le statut d'une requête."""
+        
+    def batch_similar_requests(self):
+        """Regroupe les requêtes similaires pour optimiser le traitement."""
+        
+    def clean_old_requests(self, max_age_hours=24):
+        """Nettoie les requêtes anciennes ou traitées."""
+        
+    def get_queue_stats(self):
+        """Obtient des statistiques sur la file d'attente actuelle."""
+```
+
+### 4.3 Planificateur de tâches
+
+**Fichier :** `/src/osync/proxy/queue/scheduler.py`
 
 **Tâches :**
-- [ ] Mettre en place des index dans TinyDB
-- [ ] Optimiser les requêtes fréquentes
-- [ ] Implémenter un mécanisme de mise en cache pour réduire les accès à la base de données
+- [ ] Développer un planificateur qui assigne les requêtes aux serveurs
+- [ ] Implémenter des stratégies d'équilibrage de charge avancées
+- [ ] Gérer les échecs et les tentatives de réessai
 
-### 7.3 Documentation
+**Méthodes à implémenter :**
+```python
+class RequestScheduler:
+    def __init__(self, queue_manager, cluster_manager):
+        self.queue_manager = queue_manager
+        self.cluster_manager = cluster_manager
+        
+    def schedule_next_batch(self):
+        """Planifie le traitement du prochain lot de requêtes."""
+        
+    def assign_server(self, request_batch):
+        """Assigne un serveur optimal pour traiter un lot de requêtes."""
+        
+    def handle_server_failure(self, server_address):
+        """Gère l'échec d'un serveur en réassignant ses requêtes."""
+```
+
+## Phase 5 : Validation et test du système global
+
+### 5.1 Tests d'intégration DB-RAM
 
 **Tâches :**
-- [ ] Documenter l'architecture de persistance
-- [ ] Fournir des exemples d'utilisation
-- [ ] Mettre à jour le README avec les nouvelles fonctionnalités
+- [ ] Tester la synchronisation entre TinyDB et les structures en mémoire
+- [ ] Valider la cohérence des données après redémarrage
+- [ ] Mesurer les performances et optimiser les goulots d'étranglement
+
+### 5.2 Tests de communication gRPC
+
+**Tâches :**
+- [ ] Vérifier que tous les endpoints Ollama sont correctement relayés via gRPC
+- [ ] Tester la collecte complète des métriques des nœuds
+- [ ] Valider la transmission fiable des commandes aux nœuds distants
+
+### 5.3 Tests du registre de modèles
+
+**Tâches :**
+- [ ] Tester la distribution des modèles à travers le cluster
+- [ ] Valider les opérations CRUD sur les modèles
+- [ ] Vérifier la cohérence du registre après des pannes de nœuds
+
+### 5.4 Tests du système de file d'attente
+
+**Tâches :**
+- [ ] Tester les performances sous charge élevée
+- [ ] Valider le mécanisme de batching et de priorisation
+- [ ] Vérifier le nettoyage automatique et la gestion des erreurs
+
+## Phase 6 : Optimisations finales et documentation
+
+### 6.1 Optimisations de performance
+
+**Tâches :**
+- [ ] Optimiser les requêtes TinyDB fréquentes
+- [ ] Améliorer les stratégies de mise en cache
+- [ ] Réduire la latence du système de file d'attente
+
+### 6.2 Documentation complète
+
+**Tâches :**
+- [ ] Documenter l'architecture de persistance et de synchronisation
+- [ ] Fournir des guides pour l'utilisation du registre de modèles
+- [ ] Documenter le système de file d'attente et ses paramètres
+- [ ] Mettre à jour les diagrammes d'architecture
 
 ## Suivi du progrès
 
@@ -357,39 +385,52 @@ GET /api/v1/nodes/hardware?server={server}
 |-------|-------|--------|------|-------|
 | 1.1 | Classe d'abstraction DatabaseManager | ✅ | 2025-04-30 | Implémentation initiale complète |
 | 1.2 | Ajout de la dépendance à TinyDB | ✅ | 2025-04-30 | Ajouté à pyproject.toml |
-| 1.3 | Schéma des données | ⏳ | - | En cours de finalisation |
-| 2.1 | Modification du ClusterManager | 🔄 | - | À commencer |
+| 1.3 | Schéma des données | ✅ | 2025-04-30 | Toutes les tables définies |
+| 2.1 | Architecture de synchronisation | 🔄 | - | Conception terminée, implémentation en cours |
+| 2.2 | Implémentation de la synchronisation | 🔄 | - | En développement |
+| 3.1 | Amélioration de la communication gRPC | 🔄 | - | Endpoints à compléter |
+| 3.2 | Système de registre des modèles | 🔶 | - | À commencer |
+| 4.1 | Architecture de la file d'attente | ✅ | 2025-04-30 | Conception validée |
+| 4.2 | Implémentation du système de file d'attente | 🔶 | - | À commencer |
+| 4.3 | Planificateur de tâches | 🔶 | - | À commencer |
 | ... | ... | ... | ... | ... |
 
-## Structure des dépendances entre composants
+## Structure révisée des dépendances entre composants
 
 ```mermaid
 graph TD
-    A[DatabaseManager] --> B[ClusterManager]
-    A --> C[HealthMonitor]
-    A --> D[RequestStats]
-    B --> E[ProxyApp]
-    C --> E
-    D --> E
-    F[OllamaService] --> G[HardwareCollector]
-    G --> B
+    A[DatabaseManager] --> B[SyncManager]
+    B --> C[ClusterManager]
+    B --> D[HealthMonitor]
+    B --> E[RequestStats]
+    B --> F[QueueManager]
+    C --> G[ProxyApp]
+    D --> G
+    E --> G
+    F --> H[RequestScheduler]
+    H --> G
+    I[ModelRegistry] --> C
+    I --> J[gRPC Service]
+    J --> K[Ollama Nodes]
 ```
 
-## Migration future vers d'autres systèmes de base de données
+## Simplification de l'approche GRPC
 
-L'architecture a été conçue pour faciliter une migration future vers d'autres systèmes de base de données plus robustes. Voici les étapes clés pour une telle migration :
+L'approche sync/async de gRPC est simplifiée en faveur d'un système centralisé de file d'attente au niveau du proxy. Les principales modifications sont :
 
-1. Créer une nouvelle implémentation de `DatabaseManager` pour le nouveau système
-2. Migrer les données depuis TinyDB
-3. Remplacer les instances `get_db()` par la nouvelle implémentation
-
-Les systèmes potentiels pour une migration future incluent :
-- SQLite pour une persistance locale plus robuste
-- PostgreSQL pour un déploiement en production à grande échelle
-- MongoDB pour une architecture distribuée
+1. **Élimination du mode asynchrone complexe** : Le proxy gère désormais toutes les files d'attente et le batching
+2. **Communication gRPC simplifiée** : Les appels aux nœuds sont maintenant synchrones et déterministes
+3. **Optimisation des ressources** : Le batching est effectué côté proxy pour une meilleure utilisation des ressources
+4. **Prévention des surcharges** : Le planificateur tient compte de la charge des serveurs pour éviter les surcharges
 
 ## Conclusion
 
-Cette roadmap fournit un plan détaillé pour l'implémentation progressive de la persistance des données avec TinyDB dans le projet OLOL. En suivant cette approche modulaire, nous pouvons assurer que chaque composant est correctement intégré et testé tout en maintenant la cohérence globale du système.
+Cette nouvelle architecture offre plusieurs avantages significatifs :
 
-La conception orientée abstraction nous permet également de faciliter une migration future vers d'autres systèmes de base de données si nécessaire, tout en maintenant une interface cohérente pour les développeurs travaillant sur le projet.
+1. **Robustesse** : La persistance complète avec TinyDB assure la survie des données même en cas de redémarrage
+2. **Performance** : La synchronisation DB-RAM offre à la fois durabilité et rapidité d'accès
+3. **Scalabilité** : Le système de file d'attente permet de gérer efficacement les pics de charge
+4. **Administration simplifiée** : Le registre centralisé des modèles facilite la gestion du cluster
+5. **Maintenance facilitée** : L'architecture modulaire permet des mises à jour sans perturbation du service
+
+Les prochaines étapes se concentreront sur l'implémentation de ces composants, en commençant par le système de synchronisation DB-RAM et la communication gRPC améliorée.

@@ -49,11 +49,11 @@ class RPCClient:
         """Initialize device capabilities for each server."""
         for address, stub in self.stubs.items():
             try:
-                # Request capabilities from the server
+                # Request capabilities from the server with details flag set to true
                 request = ollama_pb2.DeviceCapabilitiesRequest(detail=True)
                 response = stub.GetDeviceCapabilities(request)
                 
-                # Convert response to dictionary for the partitioner
+                # Base capabilities from response
                 capabilities = {
                     "backend_type": response.device_type,
                     "device_id": response.device_id,
@@ -62,9 +62,47 @@ class RPCClient:
                     "compute_capability": response.compute_capability
                 }
                 
-                # Add any additional details
+                # Add all additional details from the server response
                 for key, value in response.details.items():
                     capabilities[key] = value
+                
+                # Request additional health information
+                health_request = ollama_pb2.HealthCheckRequest(detail=True)
+                health_response = stub.HealthCheck(health_request)
+                
+                # Add health details to capabilities
+                capabilities["healthy"] = health_response.healthy
+                capabilities["status"] = health_response.status
+                capabilities["version"] = health_response.version
+                capabilities["uptime_seconds"] = health_response.uptime_seconds
+                
+                # Add additional health details
+                for key, value in health_response.details.items():
+                    capabilities[f"health_{key}"] = value
+                    
+                # Query Ollama model list via the server if available
+                try:
+                    # Create empty list request
+                    list_request = ollama_pb2.ListRequest()
+                    # Try to call the List method through the server
+                    list_response = stub.List(list_request)
+                    
+                    # Add model information to capabilities
+                    if hasattr(list_response, 'models') and list_response.models:
+                        capabilities["models"] = []
+                        for model in list_response.models:
+                            model_info = {
+                                "name": model.name,
+                                "size": model.parameter_size,
+                                "quantization": model.quantization_level,
+                            }
+                            # Add model details if available
+                            if hasattr(model, 'details') and model.details:
+                                for k, v in model.details.items():
+                                    model_info[k] = v
+                            capabilities["models"].append(model_info)
+                except Exception as e:
+                    logger.debug(f"Failed to get models from {address}: {e}")
                 
                 logger.info(f"Got capabilities from {address}: {capabilities}")
                 self.partitioner.register_device(address, capabilities)

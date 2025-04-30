@@ -17,6 +17,10 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
 from rich import box
 
 from .stats import stats_lock, request_stats
+from .db.database import get_db
+from .db.sync_manager import get_sync_manager
+from .cluster.registry import get_model_registry
+from .queue.queue import get_queue_manager
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -52,8 +56,15 @@ class RichUI:
         self.verbose = params.get("verbose", False) if params else False
         self.debug = params.get("debug", False) if params else False
         
+        # Access to persistent storage
+        self.db = get_db()
+        self.sync_manager = get_sync_manager()
+        self.model_registry = get_model_registry()
+        self.queue_manager = get_queue_manager()
+        
         # Add first status message
         self.add_status_message("Rich Console UI started")
+        self.add_status_message("Connecté à la base de données TinyDB")
         
     def _make_layout(self) -> Layout:
         """Create the layout structure for the UI."""
@@ -118,11 +129,22 @@ class RichUI:
             f"[yellow]Uptime: {uptime_str}[/yellow]"
         )
         
-        from . import app
-        use_distributed_inference = getattr(app, 'use_distributed_inference', False)
+        # Récupérer les paramètres depuis la base de données
+        config = self.db.search_one("config", lambda q: q.key == "distributed_inference")
+        use_distributed_inference = config.get("value", False) if config else False
+        
         dist_status = f"[green]ENABLED[/green]" if use_distributed_inference else "[yellow]DISABLED[/yellow]"
         
         grid.add_row(f"Distributed Inference: {dist_status}", "")
+        
+        # Ajouter des statistiques de la file d'attente
+        try:
+            queue_stats = self.queue_manager.get_queue_stats()
+            pending_count = queue_stats.get("pending", 0)
+            processing_count = queue_stats.get("processing", 0)
+            grid.add_row(f"Queue: [cyan]{pending_count}[/cyan] pending, [cyan]{processing_count}[/cyan] processing", "")
+        except Exception as e:
+            logger.debug(f"Erreur lors de la récupération des statistiques de file d'attente: {str(e)}")
         
         return Panel(grid, border_style="blue", box=box.ROUNDED)
     
@@ -132,9 +154,39 @@ class RichUI:
         grid.add_column(justify="left", ratio=1)
         grid.add_column(justify="right")
         
+        # Récupérer les statistiques de la base de données
+        try:
+            db_stats = self.db.search_one("stats", lambda q: q.key == "request_stats") or {}
+            if isinstance(db_stats, dict) and "value" in db_stats:
+                db_stats = db_stats["value"]
+            else:
+                db_stats = {}
+            
+            # Fusionner avec les stats en mémoire
+            for key, value in db_stats.items():
+                if key not in stats:
+                    stats[key] = value
+        except Exception as e:
+            logger.debug(f"Erreur lors de la récupération des statistiques depuis la DB: {str(e)}")
+        
+        # Obtenir les stats de la file d'attente
+        queue_stats = {}
+        try:
+            queue_stats = self.queue_manager.get_queue_stats()
+        except Exception as e:
+            logger.debug(f"Erreur lors de la récupération des statistiques de la file: {str(e)}")
+        
+        active_requests = stats.get('active_requests', 0)
+        total_requests = stats.get('total_requests', 0)
+        
+        # Intégrer les données de la file d'attente si disponibles
+        if queue_stats:
+            queue_total = queue_stats.get("total_requests", 0)
+            total_requests = max(total_requests, queue_total)  # Prendre le plus grand
+        
         grid.add_row(
             "[bold]Request Statistics[/bold]", 
-            f"[yellow]Active: {stats['active_requests']} | Total: {stats['total_requests']}[/yellow]"
+            f"[yellow]Active: {active_requests} | Total: {total_requests}[/yellow]"
         )
         
         stats_table = Table(expand=True, box=box.SIMPLE)
@@ -144,19 +196,32 @@ class RichUI:
         
         stats_table.add_row(
             "Generate", 
-            str(stats['generate_requests']),
-            f"{stats['last_generate_time']:.2f}s" if stats.get('last_generate_time') else "N/A"
+            str(stats.get('generate_requests', 0)),
+            f"{stats.get('last_generate_time', 0):.2f}s" if stats.get('last_generate_time') else "N/A"
         )
         stats_table.add_row(
             "Chat", 
-            str(stats['chat_requests']),
-            f"{stats['last_chat_time']:.2f}s" if stats.get('last_chat_time') else "N/A"
+            str(stats.get('chat_requests', 0)),
+            f"{stats.get('last_chat_time', 0):.2f}s" if stats.get('last_chat_time') else "N/A"
         )
         stats_table.add_row(
             "Embeddings", 
-            str(stats['embedding_requests']),
-            f"{stats['last_embedding_time']:.2f}s" if stats.get('last_embedding_time') else "N/A"
+            str(stats.get('embedding_requests', 0)),
+            f"{stats.get('last_embedding_time', 0):.2f}s" if stats.get('last_embedding_time') else "N/A"
         )
+        
+        # Ajouter des données du système de file d'attente
+        if queue_stats:
+            stats_table.add_row(
+                "Completed", 
+                str(queue_stats.get("completed", 0)),
+                ""
+            )
+            stats_table.add_row(
+                "Failed/Canceled", 
+                str(queue_stats.get("failed", 0) + queue_stats.get("canceled", 0)),
+                ""
+            )
         
         return Panel(
             stats_table,
@@ -165,16 +230,13 @@ class RichUI:
             box=box.ROUNDED
         )
     
-    def _create_servers_panel(self, cluster=None) -> Panel:
-        """Create servers panel with server status."""
-        if not cluster or not hasattr(cluster, 'server_addresses'):
-            return Panel("Initialisation du cluster en cours...", title="Servers", border_style="yellow")
-        
+    def _create_servers_panel(self) -> Panel:
+        """Create servers panel with server status from database."""
         try:
-            # Récupération des informations sans verrous qui pourraient bloquer
-            server_addresses = getattr(cluster, 'server_addresses', [])[:]  # Copie pour éviter les problèmes de concurrence
+            # Récupérer les serveurs depuis la base de données
+            servers = self.sync_manager.read_from_ram("servers")
             
-            if not server_addresses:
+            if not servers:
                 return Panel("Aucun serveur trouvé.\nVérifiez que vos serveurs Ollama sont bien accessibles.", 
                             title="Servers", border_style="yellow")
                 
@@ -182,91 +244,52 @@ class RichUI:
             table = Table(box=box.SIMPLE, expand=True)
             table.add_column("Serveur", style="dim")
             table.add_column("État", justify="center")
-            
-            # Récupérer l'état de santé de manière sécurisée
-            server_health = {}
-            try:
-                # Tentative d'accès à l'état de santé sans verrou
-                server_health = {s: cluster.server_health.get(s, False) for s in server_addresses}
-            except:
-                # En cas d'erreur, considérer tous les serveurs comme disponibles pour l'affichage
-                server_health = {s: True for s in server_addresses}
+            table.add_column("Charge", justify="right")
             
             # Afficher chaque serveur
-            for server in server_addresses:
-                is_healthy = server_health.get(server, True)  # Par défaut considéré comme sain
-                table.add_row(server, "[green]✓ Disponible[/green]" if is_healthy else "[red]✗ Indisponible[/red]")
+            for server in servers:
+                address = server.get("address", "Unknown")
+                is_healthy = server.get("healthy", False)
+                load = server.get("load", 0.0)
                 
-            return Panel(table, title=f"[bold]Serveurs[/bold] ({len(server_addresses)} détectés)", 
+                # Formater la charge
+                load_str = f"{load:.2f}"
+                load_color = "green" if load < 0.7 else "yellow" if load < 0.9 else "red"
+                
+                table.add_row(
+                    address, 
+                    "[green]✓ Disponible[/green]" if is_healthy else "[red]✗ Indisponible[/red]",
+                    f"[{load_color}]{load_str}[/{load_color}]"
+                )
+                
+            return Panel(table, title=f"[bold]Serveurs[/bold] ({len(servers)} détectés)", 
                         border_style="blue", box=box.ROUNDED)
         except Exception as e:
             logger.exception("Erreur lors de la création du panneau des serveurs")
             return Panel(f"Erreur d'accès aux serveurs: {str(e)}", title="Serveurs", border_style="red")
     
-    def _create_models_panel(self, cluster=None) -> Panel:
-        """Create models panel with model availability info."""
-        if not cluster:
-            return Panel("Initialisation du cluster en cours...", title="Modèles", border_style="yellow")
-            
+    def _create_models_panel(self) -> Panel:
+        """Create models panel with model availability from registry."""
         try:
-            # Récupération des modèles de manière sécurisée sans verrous
-            models_info = []
+            # Utiliser le registre de modèles pour obtenir les informations
+            models_status = self.model_registry.get_model_status()
             
-            # Essayer d'abord d'accéder à model_server_map directement
-            try:
-                server_map = getattr(cluster, 'model_server_map', {})
-                
-                # Créer une liste de modèles à partir de la carte
-                for model_name, servers in server_map.items():
-                    if servers:  # Si au moins un serveur a ce modèle
-                        models_info.append({
-                            'name': model_name,
-                            'server': servers[0]  # Utiliser le premier serveur
-                        })
-            except Exception:
-                # Si problème d'accès à model_server_map, utiliser l'approche directe
-                pass
-                
-            # Si aucun modèle n'est trouvé dans la carte, essayer l'approche directe
-            if not models_info:
-                for server in getattr(cluster, 'server_addresses', []):
-                    # Essayer de contacter directement chaque serveur, sans utiliser les verrous du cluster
-                    try:
-                        if server.count(':') == 1:
-                            host, port_str = server.split(':')
-                            port = int(port_str)
-                            
-                            # Créer un client temporaire
-                            from osync.sync.client import OllamaClient
-                            client = OllamaClient(host=host, port=port)
-                            
-                            try:
-                                models_response = client.list_models()
-                                
-                                if hasattr(models_response, 'models'):
-                                    for model in models_response.models:
-                                        model_name = model.name
-                                        if model_name not in [m['name'] for m in models_info]:
-                                            models_info.append({
-                                                'name': model_name,
-                                                'server': server
-                                            })
-                            finally:
-                                client.close()
-                    except Exception:
-                        # Ignorer les erreurs pour ce serveur et continuer
-                        continue
+            models_list = []
+            if "models" in models_status:
+                models_list = models_status["models"]
+            elif not isinstance(models_status, dict) or "error" in models_status:
+                # En cas d'erreur spécifique du registre
+                error_msg = models_status.get("error", "Erreur inconnue") if isinstance(models_status, dict) else str(models_status)
+                return Panel(f"Erreur du registre: {error_msg}", title="Modèles", border_style="red")
             
-            # Si toujours aucun modèle trouvé
-            if not models_info:
-                # Vérifier combien de serveurs sont disponibles
-                try:
-                    healthy_servers = sum(1 for h in getattr(cluster, 'server_health', {}).values() if h)
-                    if healthy_servers == 0:
-                        return Panel("Aucun serveur n'est disponible.\nVérifiez la connexion avec vos serveurs Ollama.", 
-                                    title="Modèles", border_style="yellow")
-                except:
-                    pass
+            if not models_list:
+                # Vérifier s'il y a des serveurs actifs
+                servers = self.sync_manager.read_from_ram("servers")
+                healthy_servers = sum(1 for server in servers if server.get("healthy", False))
+                
+                if healthy_servers == 0:
+                    return Panel("Aucun serveur n'est disponible.\nVérifiez la connexion avec vos serveurs Ollama.", 
+                                title="Modèles", border_style="yellow")
                 
                 return Panel("Aucun modèle disponible actuellement.\nVérifiez vos serveurs Ollama.", 
                             title="Modèles", border_style="yellow")
@@ -274,17 +297,31 @@ class RichUI:
             # Créer le tableau des modèles
             table = Table(box=box.SIMPLE, expand=True)
             table.add_column("Modèle", style="cyan")
-            table.add_column("Serveur", justify="right")
+            table.add_column("Serveurs", justify="right")
+            table.add_column("Utilisations", justify="right")
                 
             # Afficher les modèles (limité pour éviter un tableau trop grand)
-            for model_info in models_info[:10]:
-                table.add_row(model_info['name'], model_info['server'])
+            for model_info in models_list[:10]:
+                model_name = model_info.get("name", "Unknown")
+                servers = model_info.get("servers", [])
+                usage_count = model_info.get("usage_count", 0)
+                
+                # Formater le nombre de serveurs
+                servers_str = str(len(servers))
+                if len(servers) > 0:
+                    servers_str = f"[green]{servers_str}[/green]"
+                
+                table.add_row(
+                    model_name, 
+                    servers_str,
+                    str(usage_count)
+                )
                 
             # Indiquer s'il y a plus de modèles que ceux affichés
-            if len(models_info) > 10:
-                table.add_row(f"...et {len(models_info) - 10} autres", "")
+            if len(models_list) > 10:
+                table.add_row(f"...et {len(models_list) - 10} autres", "", "")
                 
-            return Panel(table, title=f"[bold]Modèles disponibles[/bold] ({len(models_info)})", 
+            return Panel(table, title=f"[bold]Modèles disponibles[/bold] ({len(models_list)})", 
                         border_style="cyan", box=box.ROUNDED)
                 
         except Exception as e:
@@ -311,6 +348,15 @@ class RichUI:
         elif self.verbose:
             footer_text += " [yellow][VERBOSE][/yellow]"
             
+        # Ajouter des statistiques de la file d'attente
+        try:
+            queue_stats = self.queue_manager.get_queue_stats()
+            if "batches" in queue_stats:
+                batch_info = queue_stats["batches"]
+                footer_text += f" | Batches: {batch_info.get('total', 0)} ({batch_info.get('pending', 0)} pending)"
+        except Exception:
+            pass
+            
         return Panel(Text.from_markup(footer_text), border_style="blue", box=box.ROUNDED)
     
     def _generate_layout(self) -> Layout:
@@ -320,16 +366,12 @@ class RichUI:
             with stats_lock:
                 stats = request_stats.copy()
             
-            # Import needed here to avoid circular imports
-            from . import app
-            cluster = getattr(app, 'cluster', None)
-            
             # Update layout components
             self.layout["header"].update(self._create_header(stats))
             self.layout["stats"].update(self._create_stats_panel(stats))
-            self.layout["servers"].update(self._create_servers_panel(cluster))
+            self.layout["servers"].update(self._create_servers_panel())
             self.layout["status_messages"].update(self._create_status_panel())
-            self.layout["models"].update(self._create_models_panel(cluster))
+            self.layout["models"].update(self._create_models_panel())
             self.layout["footer"].update(self._create_footer())
             
             return self.layout
@@ -382,24 +424,8 @@ def run_console_ui(params=None):
         # Start with Rich UI instead of curses UI
         ui = RichUI(params)
         
-        # Import needed only here to avoid circular imports
-        from . import app
-        cluster = getattr(app, 'cluster', None)
-        
-        # Register listeners for discovery events to update UI
-        if cluster and (params.get('verbose', False) or params.get('debug', False)):
-            # Add a custom function to receive notifications when servers are discovered
-            def handle_server_discovered(server_address, details=None):
-                # Add server discovery to status messages
-                ui.add_status_message(f"Server discovered: {server_address}")
-                
-            # Set up a callback for server discovery
-            try:
-                if hasattr(cluster, 'register_discovery_callback'):
-                    cluster.register_discovery_callback(handle_server_discovered)
-            except Exception:
-                # If registration fails, just continue without callbacks
-                pass
+        # Monitorer les changements dans la base de données pour les refléter dans l'UI
+        ui.add_status_message("Surveillance active des changements de la base de données")
         
         # Start the UI
         ui.start()

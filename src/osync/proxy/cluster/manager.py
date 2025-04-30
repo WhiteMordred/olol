@@ -131,8 +131,14 @@ class ClusterManager:
         """
         with self._cache_lock:
             # Convertir les ensembles en listes pour la sérialisation
-            return {model: list(servers) if isinstance(servers, set) else servers 
-                   for model, servers in self._cached_model_servers.items()}
+            result = {}
+            for model, servers in self._cached_model_servers.items():
+                if isinstance(servers, set):
+                    result[model] = list(servers)
+                else:
+                    # Si c'est déjà une liste, la copier simplement
+                    result[model] = servers.copy() if isinstance(servers, list) else list(servers)
+            return result
             
     def _load_data_from_db(self):
         """

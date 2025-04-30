@@ -2,7 +2,11 @@ import asyncio
 import json
 import logging
 import subprocess
+import platform
+import psutil
 from concurrent import futures
+import os
+import time
 
 import aiohttp
 import grpc
@@ -708,6 +712,442 @@ class OllamaService(ollama_pb2_grpc.OllamaServiceServicer):
                     return loop.run_until_complete(attr(*args, **kwargs))
             return wrapper
         return attr
+
+    def GetCompleteNodeStatus(self, request, context):
+        """
+        Collecte l'état complet du nœud, incluant les métriques système.
+        """
+        logger.info("Collecting complete node status")
+        
+        try:
+            # Collecter les informations sur le système
+            system_info = self._collect_system_info()
+            
+            # Collecter les informations sur Ollama
+            ollama_info = self._collect_ollama_info()
+            
+            # Collecter les informations sur les modèles chargés
+            models_info = self._collect_models_info()
+            
+            # Assembler toutes les informations
+            status = {
+                "system": system_info,
+                "ollama": ollama_info,
+                "models": models_info,
+                "timestamp": time.time()
+            }
+            
+            # Créer et retourner la réponse
+            return ollama_pb2.NodeStatusResponse(
+                status_json=json.dumps(status),
+                healthy=ollama_info.get("healthy", False),
+                load=system_info.get("cpu", {}).get("percent", 0)
+            )
+            
+        except Exception as e:
+            error_msg = f"Error collecting node status: {str(e)}"
+            logger.error(error_msg)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(error_msg)
+            return ollama_pb2.NodeStatusResponse(
+                status_json="{}",
+                healthy=False,
+                load=0
+            )
+    
+    def _collect_system_info(self):
+        """Collecte les informations sur le système."""
+        # Informations sur le CPU
+        cpu_info = {
+            "physical_cores": psutil.cpu_count(logical=False),
+            "logical_cores": psutil.cpu_count(logical=True),
+            "percent": psutil.cpu_percent(interval=0.1),
+            "frequency": {
+                "current": psutil.cpu_freq().current if hasattr(psutil.cpu_freq(), "current") else None,
+                "min": psutil.cpu_freq().min if hasattr(psutil.cpu_freq(), "min") else None,
+                "max": psutil.cpu_freq().max if hasattr(psutil.cpu_freq(), "max") else None
+            }
+        }
+        
+        # Informations sur la mémoire
+        memory = psutil.virtual_memory()
+        memory_info = {
+            "total": memory.total,
+            "available": memory.available,
+            "used": memory.used,
+            "percent": memory.percent
+        }
+        
+        # Informations sur le stockage
+        disk = psutil.disk_usage('/')
+        disk_info = {
+            "total": disk.total,
+            "used": disk.used,
+            "free": disk.free,
+            "percent": disk.percent
+        }
+        
+        # Informations sur le GPU
+        gpu_info = self._collect_gpu_info()
+        
+        # Assembler toutes les informations système
+        return {
+            "platform": platform.platform(),
+            "architecture": platform.machine(),
+            "hostname": platform.node(),
+            "python_version": platform.python_version(),
+            "cpu": cpu_info,
+            "memory": memory_info,
+            "disk": disk_info,
+            "gpu": gpu_info
+        }
+    
+    def _collect_gpu_info(self):
+        """Collecte les informations sur les GPU disponibles."""
+        gpu_info = {"detected": False, "devices": []}
+        
+        try:
+            # Essayer de détecter NVIDIA GPU avec nvidia-smi
+            nvidia_smi_output = subprocess.run(
+                ["nvidia-smi", "--query-gpu=name,memory.total,memory.used,memory.free,temperature.gpu,utilization.gpu", 
+                 "--format=csv,noheader,nounits"],
+                capture_output=True, text=True, timeout=5
+            )
+            
+            if nvidia_smi_output.returncode == 0:
+                gpu_info["detected"] = True
+                gpu_info["type"] = "NVIDIA"
+                
+                # Parser la sortie de nvidia-smi
+                lines = nvidia_smi_output.stdout.strip().split('\n')
+                for i, line in enumerate(lines):
+                    if line.strip():
+                        parts = line.strip().split(', ')
+                        if len(parts) >= 6:
+                            device = {
+                                "name": parts[0],
+                                "memory_total_mb": float(parts[1]),
+                                "memory_used_mb": float(parts[2]),
+                                "memory_free_mb": float(parts[3]),
+                                "temperature_c": float(parts[4]),
+                                "utilization_percent": float(parts[5])
+                            }
+                            gpu_info["devices"].append(device)
+        except:
+            # Si nvidia-smi échoue, essayer avec AMD ROCm
+            try:
+                rocm_smi_output = subprocess.run(
+                    ["rocm-smi", "--showuse", "--json"],
+                    capture_output=True, text=True, timeout=5
+                )
+                
+                if rocm_smi_output.returncode == 0:
+                    data = json.loads(rocm_smi_output.stdout)
+                    gpu_info["detected"] = True
+                    gpu_info["type"] = "AMD"
+                    
+                    for gpu_id, gpu_data in data.items():
+                        if isinstance(gpu_data, dict):
+                            device = {
+                                "name": gpu_data.get("Card name", "Unknown AMD GPU"),
+                                "memory_total_mb": gpu_data.get("VRAM Total Memory", 0),
+                                "memory_used_mb": gpu_data.get("VRAM Memory Used", 0),
+                                "temperature_c": gpu_data.get("Temperature (Sensor edge)", 0),
+                                "utilization_percent": gpu_data.get("GPU use (%)", 0)
+                            }
+                            gpu_info["devices"].append(device)
+            except:
+                # Si aucun outil GPU n'est disponible
+                pass
+        
+        # Essayer de détecter Metal sur macOS
+        if platform.system() == "Darwin" and not gpu_info["detected"]:
+            try:
+                system_profiler_output = subprocess.run(
+                    ["system_profiler", "SPDisplaysDataType"],
+                    capture_output=True, text=True, timeout=5
+                )
+                
+                if system_profiler_output.returncode == 0 and "Metal" in system_profiler_output.stdout:
+                    gpu_info["detected"] = True
+                    gpu_info["type"] = "Apple Silicon"
+                    
+                    # Extraction des informations basiques sur le GPU
+                    lines = system_profiler_output.stdout.strip().split('\n')
+                    current_device = {}
+                    
+                    for line in lines:
+                        line = line.strip()
+                        if "Chipset Model" in line:
+                            if current_device:
+                                gpu_info["devices"].append(current_device)
+                            current_device = {"name": line.split(": ")[1]}
+                        elif "Metal" in line and "supported" in line.lower():
+                            current_device["metal_support"] = True
+                    
+                    if current_device:
+                        gpu_info["devices"].append(current_device)
+            except:
+                # En cas d'échec de détection Metal
+                pass
+        
+        return gpu_info
+    
+    def _collect_ollama_info(self):
+        """Collecte les informations sur l'instance Ollama."""
+        ollama_info = {
+            "healthy": False,
+            "version": "unknown",
+            "api_url": self.ollama_host
+        }
+        
+        try:
+            # Vérifier si Ollama est en cours d'exécution en appelant l'API
+            result = subprocess.run(
+                ["curl", "-s", f"{self.ollama_host}/api/version"],
+                capture_output=True, text=True, timeout=5
+            )
+            
+            if result.returncode == 0 and result.stdout:
+                try:
+                    version_data = json.loads(result.stdout)
+                    ollama_info["healthy"] = True
+                    ollama_info["version"] = version_data.get("version", "unknown")
+                except json.JSONDecodeError:
+                    pass
+            
+            # Vérifier le processus Ollama pour des informations supplémentaires
+            for proc in psutil.process_iter(['pid', 'name', 'username', 'cmdline']):
+                if 'ollama' in proc.info['name'].lower() or any('ollama' in cmd.lower() for cmd in proc.info['cmdline'] if cmd):
+                    try:
+                        process = psutil.Process(proc.info['pid'])
+                        ollama_info["process"] = {
+                            "pid": proc.info['pid'],
+                            "cpu_percent": process.cpu_percent(interval=0.1),
+                            "memory_percent": process.memory_percent(),
+                            "memory_info": {
+                                "rss": process.memory_info().rss,
+                                "vms": process.memory_info().vms
+                            },
+                            "create_time": process.create_time(),
+                            "status": process.status()
+                        }
+                        break
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        pass
+        except Exception as e:
+            logger.error(f"Error collecting Ollama info: {str(e)}")
+        
+        return ollama_info
+    
+    def _collect_models_info(self):
+        """Collecte des informations détaillées sur les modèles."""
+        models_info = []
+        
+        try:
+            # Obtenir la liste des modèles
+            result = subprocess.run(
+                ["ollama", "list"],
+                capture_output=True, text=True, timeout=10
+            )
+            
+            if result.returncode == 0:
+                lines = result.stdout.strip().split('\n')
+                
+                # Ignorer l'en-tête
+                if len(lines) > 1 and "NAME" in lines[0].upper():
+                    lines = lines[1:]
+                
+                for line in lines:
+                    if line.strip():
+                        parts = line.split()
+                        if len(parts) >= 1:
+                            model_name = parts[0]
+                            
+                            # Collecter des informations détaillées pour ce modèle
+                            try:
+                                show_result = subprocess.run(
+                                    ["ollama", "show", model_name],
+                                    capture_output=True, text=True, timeout=10
+                                )
+                                
+                                model_info = {
+                                    "name": model_name,
+                                    "id": parts[1] if len(parts) > 1 else "",
+                                    "size": parts[2] if len(parts) > 2 else "",
+                                }
+                                
+                                if show_result.returncode == 0:
+                                    try:
+                                        # Essayer de parser le résultat comme JSON
+                                        model_details = json.loads(show_result.stdout)
+                                        model_info.update(model_details)
+                                    except json.JSONDecodeError:
+                                        # Parser le format texte si ce n'est pas du JSON
+                                        for detail_line in show_result.stdout.split('\n'):
+                                            if ':' in detail_line:
+                                                key, value = detail_line.split(':', 1)
+                                                model_info[key.strip().lower().replace(' ', '_')] = value.strip()
+                                
+                                models_info.append(model_info)
+                            except Exception as e:
+                                logger.error(f"Error collecting details for model {model_name}: {str(e)}")
+                                models_info.append({
+                                    "name": model_name,
+                                    "error": str(e)
+                                })
+        except Exception as e:
+            logger.error(f"Error collecting models information: {str(e)}")
+        
+        return models_info
+    
+    def RemoteModelCommand(self, request, context):
+        """
+        Exécute une commande sur un modèle à distance (pull, push, delete).
+        """
+        command = request.command
+        model_name = request.model_name
+        options = json.loads(request.options_json) if request.options_json else {}
+        
+        logger.info(f"Remote model command: {command} on model {model_name}")
+        
+        try:
+            result = {
+                "success": False,
+                "message": "",
+                "command": command,
+                "model": model_name
+            }
+            
+            if command == "pull":
+                # Exécuter la commande pull
+                process = subprocess.Popen(
+                    ["ollama", "pull", model_name],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1
+                )
+                
+                output = []
+                for line in iter(process.stdout.readline, ''):
+                    output.append(line.strip())
+                
+                return_code = process.wait()
+                result["success"] = return_code == 0
+                result["output"] = output
+                
+                if return_code == 0:
+                    self.loaded_models.add(model_name)
+                    result["message"] = "Model pulled successfully"
+                else:
+                    result["message"] = "Failed to pull model"
+                
+            elif command == "push":
+                # Exécuter la commande push
+                process = subprocess.Popen(
+                    ["ollama", "push", model_name],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1
+                )
+                
+                output = []
+                for line in iter(process.stdout.readline, ''):
+                    output.append(line.strip())
+                
+                return_code = process.wait()
+                result["success"] = return_code == 0
+                result["output"] = output
+                
+                if return_code == 0:
+                    result["message"] = "Model pushed successfully"
+                else:
+                    result["message"] = "Failed to push model"
+                
+            elif command == "delete":
+                # Exécuter la commande delete
+                process = subprocess.Popen(
+                    ["ollama", "rm", model_name],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1
+                )
+                
+                output = []
+                for line in iter(process.stdout.readline, ''):
+                    output.append(line.strip())
+                
+                return_code = process.wait()
+                result["success"] = return_code == 0
+                result["output"] = output
+                
+                if return_code == 0:
+                    if model_name in self.loaded_models:
+                        self.loaded_models.remove(model_name)
+                    result["message"] = "Model deleted successfully"
+                else:
+                    result["message"] = "Failed to delete model"
+                
+            elif command == "create":
+                # Exécuter la commande create
+                modelfile_content = options.get("modelfile_content", "")
+                modelfile_path = f"/tmp/modelfile_{int(time.time())}"
+                
+                # Écrire le contenu du Modelfile dans un fichier temporaire
+                with open(modelfile_path, 'w') as f:
+                    f.write(modelfile_content)
+                
+                # Créer le modèle avec le fichier temporaire
+                process = subprocess.Popen(
+                    ["ollama", "create", model_name, "-f", modelfile_path],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1
+                )
+                
+                output = []
+                for line in iter(process.stdout.readline, ''):
+                    output.append(line.strip())
+                
+                return_code = process.wait()
+                
+                # Supprimer le fichier temporaire
+                try:
+                    os.remove(modelfile_path)
+                except:
+                    pass
+                
+                result["success"] = return_code == 0
+                result["output"] = output
+                
+                if return_code == 0:
+                    self.loaded_models.add(model_name)
+                    result["message"] = "Model created successfully"
+                else:
+                    result["message"] = "Failed to create model"
+                
+            else:
+                result["message"] = f"Unsupported command: {command}"
+            
+            return ollama_pb2.RemoteCommandResponse(result_json=json.dumps(result))
+            
+        except Exception as e:
+            error_msg = f"Error executing remote command: {str(e)}"
+            logger.error(error_msg)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(error_msg)
+            return ollama_pb2.RemoteCommandResponse(
+                result_json=json.dumps({
+                    "success": False,
+                    "message": error_msg,
+                    "command": command,
+                    "model": model_name
+                })
+            )
 
 # Update server to handle both sync and async
 def serve():
