@@ -546,7 +546,7 @@ class OllamaProxyService:
                 }
             
             # Ajouter au cluster via l'attribut _cluster de ClusterManager
-            if hasattr(self.cluster_manager, '_cluster') et self.cluster_manager._cluster:
+            if hasattr(self.cluster_manager, '_cluster') and self.cluster_manager._cluster:
                 with self.cluster_manager._cluster.server_lock:
                     # Vérifier si le serveur existe déjà
                     if address in self.cluster_manager._cluster.server_addresses:
@@ -641,7 +641,7 @@ class OllamaProxyService:
         """
         try:
             # Supprimer du cluster via l'attribut _cluster de ClusterManager
-            if hasattr(self.cluster_manager, '_cluster') et self.cluster_manager._cluster:
+            if hasattr(self.cluster_manager, '_cluster') and self.cluster_manager._cluster:
                 with self.cluster_manager._cluster.server_lock:
                     # Vérifier si le serveur existe
                     if address not in self.cluster_manager._cluster.server_addresses:
