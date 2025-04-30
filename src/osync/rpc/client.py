@@ -49,36 +49,71 @@ class RPCClient:
         """Initialize device capabilities for each server."""
         for address, stub in self.stubs.items():
             try:
-                # Request capabilities from the server with details flag set to true
-                request = ollama_pb2.DeviceCapabilitiesRequest(detail=True)
-                response = stub.GetDeviceCapabilities(request)
-                
-                # Base capabilities from response
+                # Initialiser un dictionnaire de capacités par défaut
                 capabilities = {
-                    "backend_type": response.device_type,
-                    "device_id": response.device_id,
-                    "memory": response.memory,
-                    "cores": response.cores,
-                    "compute_capability": response.compute_capability
+                    "backend_type": "cpu",  # Par défaut CPU
+                    "device_id": 0,
+                    "memory": 8 * 1024 * 1024 * 1024,  # 8 Go par défaut
+                    "cores": 8,
+                    "compute_capability": ""
                 }
                 
-                # Add all additional details from the server response
-                for key, value in response.details.items():
-                    capabilities[key] = value
-                
-                # Request additional health information
-                health_request = ollama_pb2.HealthCheckRequest(detail=True)
-                health_response = stub.HealthCheck(health_request)
-                
-                # Add health details to capabilities
-                capabilities["healthy"] = health_response.healthy
-                capabilities["status"] = health_response.status
-                capabilities["version"] = health_response.version
-                capabilities["uptime_seconds"] = health_response.uptime_seconds
-                
-                # Add additional health details
-                for key, value in health_response.details.items():
-                    capabilities[f"health_{key}"] = value
+                # Essayer d'obtenir les capacités détaillées du serveur
+                try:
+                    # Request capabilities from the server with details flag set to true
+                    request = ollama_pb2.DeviceCapabilitiesRequest(detail=True)
+                    response = stub.GetDeviceCapabilities(request)
+                    
+                    # Mettre à jour avec les capacités réelles
+                    capabilities.update({
+                        "backend_type": response.device_type,
+                        "device_id": response.device_id,
+                        "memory": response.memory,
+                        "cores": response.cores,
+                        "compute_capability": response.compute_capability
+                    })
+                    
+                    # Add all additional details from the server response
+                    if hasattr(response, 'details'):
+                        for key, value in response.details.items():
+                            capabilities[key] = value
+                except grpc.RpcError as e:
+                    if e.code() == grpc.StatusCode.UNIMPLEMENTED:
+                        logger.warning(f"GetDeviceCapabilities non implémenté sur {address}, utilisation des valeurs par défaut")
+                    else:
+                        # Si l'erreur n'est pas liée à une méthode non implémentée, on la propage
+                        raise
+
+                # Essayer d'obtenir des informations de santé supplémentaires
+                try:
+                    health_request = ollama_pb2.HealthCheckRequest(detail=True)
+                    health_response = stub.HealthCheck(health_request)
+                    
+                    # Add health details to capabilities
+                    capabilities.update({
+                        "healthy": health_response.healthy,
+                        "status": health_response.status,
+                        "version": health_response.version,
+                        "uptime_seconds": health_response.uptime_seconds
+                    })
+                    
+                    # Add additional health details
+                    if hasattr(health_response, 'details'):
+                        for key, value in health_response.details.items():
+                            capabilities[f"health_{key}"] = value
+                except grpc.RpcError as health_e:
+                    if health_e.code() == grpc.StatusCode.UNIMPLEMENTED:
+                        logger.warning(f"HealthCheck non implémenté sur {address}, utilisation des valeurs par défaut")
+                        # Définir quelques valeurs par défaut pour la santé
+                        capabilities.update({
+                            "healthy": True,  # Supposer que le serveur est sain par défaut
+                            "status": "unknown",
+                            "version": "unknown",
+                            "uptime_seconds": 0
+                        })
+                    else:
+                        # Si l'erreur n'est pas liée à une méthode non implémentée, on la propage
+                        raise
                     
                 # Query Ollama model list via the server if available
                 try:
@@ -88,19 +123,28 @@ class RPCClient:
                     list_response = stub.List(list_request)
                     
                     # Add model information to capabilities
+                    models_list = []
                     if hasattr(list_response, 'models') and list_response.models:
-                        capabilities["models"] = []
                         for model in list_response.models:
                             model_info = {
                                 "name": model.name,
-                                "size": model.parameter_size,
-                                "quantization": model.quantization_level,
+                                "size": getattr(model, 'parameter_size', 0),
+                                "quantization": getattr(model, 'quantization_level', ""),
                             }
                             # Add model details if available
                             if hasattr(model, 'details') and model.details:
                                 for k, v in model.details.items():
                                     model_info[k] = v
-                            capabilities["models"].append(model_info)
+                            models_list.append(model_info)
+                    
+                    # Ne stocker la liste des modèles que si elle n'est pas vide
+                    if models_list:
+                        capabilities["models"] = models_list
+                except grpc.RpcError as list_e:
+                    if list_e.code() == grpc.StatusCode.UNIMPLEMENTED:
+                        logger.debug(f"List non implémenté sur {address}")
+                    else:
+                        logger.debug(f"Failed to get models from {address}: {list_e}")
                 except Exception as e:
                     logger.debug(f"Failed to get models from {address}: {e}")
                 
@@ -110,7 +154,7 @@ class RPCClient:
                 logger.error(f"Failed to get capabilities from {address}: {e}")
                 # Use default capabilities as fallback
                 capabilities = {
-                    "backend_type": "cpu",  # Default to CPU
+                    "backend_type": "cuda",  # Optimiste - on suppose CUDA pour ne pas pénaliser les serveurs en panne
                     "memory": 8 * 1024 * 1024 * 1024,  # 8 GB default
                     "cores": 8,
                 }

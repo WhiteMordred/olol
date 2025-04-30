@@ -582,22 +582,36 @@ class OllamaCluster:
                     
                     # Si sain, récupérer les modèles
                     if is_healthy:
-                        models_response = client.list_models()
-                        
-                        if hasattr(models_response, 'models'):
-                            # Mise à jour de la carte des modèles de façon atomique
+                        try:
+                            # Notre client retourne maintenant toujours une liste de dictionnaires
+                            models_list = client.list_models()
+                            
+                            # Mettre à jour la carte des modèles de façon atomique
                             try:
                                 # Essayer d'acquérir le verrou avec un timeout
                                 acquired = self.model_lock.acquire(timeout=0.5)
                                 if acquired:
-                                    for model_info in models_response.models:
-                                        model_name = model_info.name
+                                    # Traiter chaque modèle retourné
+                                    for model_info in models_list:
+                                        # S'assurer qu'on a un dictionnaire même si la version du nœud est ancienne
+                                        if isinstance(model_info, str):
+                                            model_name = model_info
+                                        else:
+                                            model_name = model_info.get('name', '')
                                         
-                                        if model_name not in self.model_server_map:
-                                            self.model_server_map[model_name] = []
-                                            
-                                        if server_address not in self.model_server_map[model_name]:
-                                            self.model_server_map[model_name].append(server_address)
+                                        if model_name:
+                                            # Initialiser la liste si nécessaire (pas un set)
+                                            if model_name not in self.model_server_map:
+                                                self.model_server_map[model_name] = []
+                                                
+                                            # S'assurer que self.model_server_map[model_name] est bien une liste
+                                            if isinstance(self.model_server_map[model_name], set):
+                                                # Convertir en liste si c'est un set (pour compatibilité avec ancien code)
+                                                self.model_server_map[model_name] = list(self.model_server_map[model_name])
+                                                
+                                            # Ajouter le serveur à la liste si pas déjà présent
+                                            if server_address not in self.model_server_map[model_name]:
+                                                self.model_server_map[model_name].append(server_address)
                                 else:
                                     # Si on ne peut pas acquérir le verrou, on garde l'information pour plus tard
                                     logger.warning(f"Impossible d'acquérir le verrou model_lock pour {server_address}")
@@ -605,6 +619,8 @@ class OllamaCluster:
                                 # S'assurer de relâcher le verrou s'il a été acquis
                                 if self.model_lock._is_owned():
                                     self.model_lock.release()
+                        except Exception as list_e:
+                            logger.error(f"Erreur lors de la récupération des modèles sur {server_address}: {str(list_e)}")
                 except Exception as e:
                     # Si une erreur se produit, marquer le serveur comme non sain
                     logger.warning(f"Erreur lors de la découverte du serveur {server_address}: {str(e)}")

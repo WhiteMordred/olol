@@ -91,6 +91,93 @@ class OllamaClient:
             logger.error(f"Generate error: {str(e)}")
             raise
     
+    def list_models(self) -> List[Dict[str, any]]:
+        """Liste tous les modèles disponibles sur ce serveur Ollama.
+        
+        Returns:
+            Liste de dictionnaires contenant les informations des modèles
+        
+        Raises:
+            grpc.RpcError: Si l'appel gRPC échoue
+        """
+        try:
+            # Essayer d'abord avec la nouvelle API List
+            try:
+                request = ollama_pb2.ListRequest()
+                response = self.stub.List(request, timeout=self.timeout)
+                
+                # Vérifier si la réponse est itérable comme prévu
+                if hasattr(response, 'models') and hasattr(response.models, '__iter__'):
+                    models_list = []
+                    for model in response.models:
+                        model_info = {
+                            "name": model.name,
+                            "size": getattr(model, 'size', 0),
+                            "modified_at": getattr(model, 'modified_at', ""),
+                            "digest": getattr(model, 'digest', None)
+                        }
+                        models_list.append(model_info)
+                    return models_list
+                else:
+                    # Si la réponse a un format différent mais est une ListResponse
+                    # (API évoluée mais pas standard)
+                    logger.debug(f"Format de réponse non standard pour List: {type(response)}")
+                    models_list = []
+                    if hasattr(response, 'model'):
+                        # Format potentiel avec un seul modèle
+                        models_list.append({"name": response.model})
+                    return models_list
+            except (AttributeError, grpc.RpcError) as e:
+                # Si le stub n'a pas la méthode List, on passe à l'alternative
+                logger.debug(f"Server does not support List API, using fallback: {str(e)}")
+                
+            # Si List n'existe pas ou échoue, essayer avec l'API Legacy GetModels
+            try:
+                request = ollama_pb2.GetModelsRequest()
+                response = self.stub.GetModels(request, timeout=self.timeout)
+                
+                if hasattr(response, 'models'):
+                    models_list = []
+                    for model in response.models:
+                        model_info = {
+                            "name": model.name,
+                            "size": getattr(model, 'size', 0),
+                            "modified_at": getattr(model, 'modified_at', ""),
+                            "digest": getattr(model, 'digest', None)
+                        }
+                        models_list.append(model_info)
+                    return models_list
+                else:
+                    return []
+            except (AttributeError, grpc.RpcError) as e:
+                logger.debug(f"Server does not support GetModels API: {str(e)}")
+                
+            # En dernier recours, essayer de demander la liste des modèles avec info
+            try:
+                # Cette approche utilise l'API générique pour obtenir des informations
+                request = ollama_pb2.InfoRequest()
+                response = self.stub.Info(request, timeout=self.timeout)
+                
+                if hasattr(response, 'models'):
+                    if isinstance(response.models, list) or hasattr(response.models, '__iter__'):
+                        return [{"name": model_name} for model_name in response.models]
+                    elif isinstance(response.models, str):
+                        # Si models est une chaîne unique, la convertir en liste d'un élément
+                        return [{"name": response.models}]
+                    else:
+                        logger.warning(f"Unexpected models type: {type(response.models)}")
+                        return []
+                else:
+                    return []
+            except (AttributeError, grpc.RpcError):
+                logger.debug("Server does not support Info API for model listing")
+                return []
+                
+        except Exception as e:
+            logger.error(f"Error listing models: {str(e)}")
+            # En cas d'erreur, retourner une liste vide plutôt que de planter
+            return []
+    
     def chat(self, model: str, messages: List[Dict[str, str]], 
             stream: bool = True,
             options: Optional[Dict[str, str]] = None) -> Iterator[ollama_pb2.ChatResponse]:
@@ -151,23 +238,6 @@ class OllamaClient:
             logger.error(f"Chat error: {str(e)}")
             raise
     
-    def list_models(self) -> ollama_pb2.ListResponse:
-        """List available models.
-        
-        Returns:
-            ListResponse with available models
-            
-        Raises:
-            grpc.RpcError: If the gRPC call fails
-        """
-        try:
-            request = ollama_pb2.ListRequest()
-            response = self.stub.List(request)
-            return response
-        except grpc.RpcError as e:
-            logger.error(f"gRPC error: {e.code()}: {e.details()}")
-            raise
-            
     def embeddings(self, model: str, prompt: str, options: Optional[Dict[str, str]] = None) -> ollama_pb2.EmbeddingsResponse:
         """Get embeddings for text.
         
@@ -294,8 +364,8 @@ def main() -> None:
     try:
         print("Available models:")
         models = client.list_models()
-        for model in models.models:
-            print(f"- {model.name} ({model.parameter_size}, {model.quantization_level})")
+        for model in models:
+            print(f"- {model['name']} ({model.get('parameter_size', 'unknown')}, {model.get('quantization_level', 'unknown')})")
         
         # Simple generation
         model_name = "llama2"  # replace with an available model
