@@ -23,6 +23,8 @@ from .api.swagger import init_swagger
 from .cluster.manager import get_cluster_manager, ClusterManager
 from .cluster.health import get_health_monitor, start_health_monitoring
 from .queue.queue import get_queue_manager
+from .db.sync_manager import get_sync_manager
+import os
 
 try:
     from osync.rpc.coordinator import InferenceCoordinator
