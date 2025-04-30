@@ -74,6 +74,66 @@ class ClusterManager:
             logger.error(f"Erreur lors de l'initialisation du cluster: {str(e)}")
             return False
     
+    # Méthodes d'accès aux données du cluster pour l'interface web
+    
+    def get_server_addresses(self) -> Set[str]:
+        """
+        Retourne l'ensemble des adresses de serveurs.
+        
+        Returns:
+            Un ensemble d'adresses de serveurs sous forme de chaînes de caractères.
+        """
+        with self._cache_lock:
+            return self._cached_server_addresses.copy()
+    
+    def get_server_health(self, server_address: str) -> bool:
+        """
+        Retourne l'état de santé d'un serveur spécifique.
+        
+        Args:
+            server_address: L'adresse du serveur
+            
+        Returns:
+            True si le serveur est en bonne santé, False sinon.
+        """
+        with self._cache_lock:
+            return self._cached_server_health.get(server_address, False)
+    
+    def get_server_load(self, server_address: str) -> float:
+        """
+        Retourne la charge actuelle d'un serveur spécifique.
+        
+        Args:
+            server_address: L'adresse du serveur
+            
+        Returns:
+            La charge du serveur (float entre 0.0 et 1.0).
+        """
+        with self._cache_lock:
+            return self._cached_server_loads.get(server_address, 0.0)
+    
+    def get_healthy_servers(self) -> List[str]:
+        """
+        Retourne la liste des serveurs en bonne santé.
+        
+        Returns:
+            Liste d'adresses de serveurs en bonne santé.
+        """
+        with self._cache_lock:
+            return [addr for addr, healthy in self._cached_server_health.items() if healthy]
+    
+    def get_all_models(self) -> Dict[str, List[str]]:
+        """
+        Retourne tous les modèles avec leurs serveurs associés.
+        
+        Returns:
+            Dictionnaire avec les noms de modèles comme clés et listes de serveurs comme valeurs.
+        """
+        with self._cache_lock:
+            # Convertir les ensembles en listes pour la sérialisation
+            return {model: list(servers) if isinstance(servers, set) else servers 
+                   for model, servers in self._cached_model_servers.items()}
+            
     def _load_data_from_db(self):
         """
         Charge les données de TinyDB et les réconcilie avec l'état actuel.
