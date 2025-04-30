@@ -9,7 +9,7 @@ import logging
 import os
 from typing import Dict, Any
 
-from flask import Blueprint, request, jsonify, Response, stream_with_context
+from flask import Blueprint, request, jsonify, Response, stream_with_context, Flask
 
 from .models import (
     GenerateRequest, GenerateResponse, 
@@ -24,6 +24,23 @@ logger = logging.getLogger(__name__)
 
 # Création du blueprint
 api_bp = Blueprint('api', __name__)
+
+
+def register_api_routes(app: Flask, ollamaproxy_service: OllamaProxyService):
+    """
+    Enregistre les routes API avec l'application Flask et attache le service proxy.
+    
+    Args:
+        app: L'application Flask
+        ollamaproxy_service: Le service proxy Ollama
+    """
+    # Attacher le service au contexte de l'application
+    app.ollamaproxy_service = ollamaproxy_service
+    
+    # Enregistrer le blueprint
+    app.register_blueprint(api_bp, url_prefix='')
+    
+    logger.info("Routes API enregistrées avec succès")
 
 
 @api_bp.route('/v1/generate', methods=['POST'])
