@@ -256,7 +256,9 @@ def get_load_chart_data():
     datasets = []
     
     # Generate random-like data for each server
-    for i, server in enumerate(servers[:5]):  # Limit to 5 servers for clarity
+    # Convert set to list before slicing
+    servers_list = list(servers)
+    for i, server in enumerate(servers_list[:5]):  # Limit to 5 servers for clarity
         base_load = cm.get_server_load(server)
         
         # Generate data points with small variations
@@ -308,7 +310,9 @@ def get_health_chart_data():
     datasets = []
     
     # Generate health data for each server
-    for i, server in enumerate(servers[:5]):  # Limit to 5 servers for clarity
+    # Convert set to list before slicing
+    servers_list = list(servers)
+    for i, server in enumerate(servers_list[:5]):  # Limit to 5 servers for clarity
         current_health = 1 if cm.get_server_health(server) else 0
         
         # Generate data points with occasional health changes
