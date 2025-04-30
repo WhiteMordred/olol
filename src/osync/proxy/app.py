@@ -137,14 +137,40 @@ def queue():
     # Récupérer les données de la file d'attente via le gestionnaire de queue
     queue_manager = get_queue_manager()
     queue_stats = queue_manager.get_queue_stats()
-    queue_tasks = {
-        'active': queue_manager.get_active_tasks(),
-        'pending': queue_manager.get_pending_tasks(),
-        'completed': queue_manager.get_completed_tasks(limit=12),
-        'failed': queue_manager.get_failed_tasks(limit=5)
+    
+    # Créer des collections de tâches filtrées par statut
+    tasks = {
+        'active': [],
+        'pending': [],
+        'completed': [],
+        'failed': []
     }
     
-    return render_template('queue.html', stats=queue_stats, tasks=queue_tasks)
+    # Récupérer les requêtes de chaque statut en filtrant le cache de requêtes
+    with queue_manager._queue_lock:  # Utiliser le verrou pour éviter les problèmes de concurrence
+        for request_id, request in queue_manager._requests_cache.items():
+            status = request.get("status", "")
+            
+            if status == queue_manager.STATUS_PROCESSING:
+                if len(tasks['active']) < 20:  # Limiter à 20 tâches actives
+                    tasks['active'].append(request)
+            elif status == queue_manager.STATUS_PENDING:
+                if len(tasks['pending']) < 20:  # Limiter à 20 tâches en attente
+                    tasks['pending'].append(request)
+            elif status == queue_manager.STATUS_COMPLETED:
+                if len(tasks['completed']) < 12:  # Limiter à 12 tâches complétées
+                    tasks['completed'].append(request)
+            elif status == queue_manager.STATUS_FAILED or status == queue_manager.STATUS_CANCELED:
+                if len(tasks['failed']) < 5:  # Limiter à 5 tâches échouées
+                    tasks['failed'].append(request)
+    
+    # Trier les collections par date de création ou mise à jour
+    tasks['active'].sort(key=lambda x: x.get('started_at', ''), reverse=True)
+    tasks['pending'].sort(key=lambda x: x.get('created_at', ''), reverse=True)
+    tasks['completed'].sort(key=lambda x: x.get('completed_at', ''), reverse=True)
+    tasks['failed'].sort(key=lambda x: x.get('completed_at', ''), reverse=True)
+    
+    return render_template('queue.html', stats=queue_stats, tasks=tasks)
 
 @app.route('/log')
 def logs():
