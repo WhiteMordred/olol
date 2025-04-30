@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+
+{% block title %}Journaux - Ollama Sync{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2 class="mb-4">
+            <i class="fas fa-clipboard-list me-2"></i> Journaux système
+        </h2>
+        
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Logs du système</span>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-primary" id="refresh-logs">
+                        <i class="fas fa-sync-alt"></i> Rafraîchir
+                    </button>
+                    <button class="btn btn-sm btn-secondary dropdown-toggle" id="log-level-dropdown" 
+                            data-bs-toggle="dropdown" aria-expanded="false">
+                        Niveau: INFO
+                    </button>
+                    <ul class="dropdown-menu" aria-labelledby="log-level-dropdown">
+                        <li><a class="dropdown-item" href="#" data-level="DEBUG">DEBUG</a></li>
+                        <li><a class="dropdown-item" href="#" data-level="INFO">INFO</a></li>
+                        <li><a class="dropdown-item" href="#" data-level="WARNING">WARNING</a></li>
+                        <li><a class="dropdown-item" href="#" data-level="ERROR">ERROR</a></li>
+                        <li><a class="dropdown-item" href="#" data-level="CRITICAL">CRITICAL</a></li>
+                    </ul>
+                    <button class="btn btn-sm btn-outline-secondary" id="toggle-autoscroll">
+                        <i class="fas fa-scroll"></i> Auto-défil
+                    </button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="log-container" id="log-container">
+                    <div class="log-filters mb-2 p-2">
+                        <div class="row g-2">
+                            <div class="col-md-4">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                    <input type="text" class="form-control" id="log-search" placeholder="Filtrer les logs...">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text"><i class="fas fa-tag"></i></span>
+                                    <select class="form-select" id="log-component">
+                                        <option value="">Tous les composants</option>
+                                        <option value="osync.proxy.app">Proxy</option>
+                                        <option value="osync.utils.cluster">Cluster</option>
+                                        <option value="osync.sync.client">Client</option>
+                                        <option value="osync.rpc.client">RPC</option>
+                                        <option value="osync.proxy.cluster.health">Santé</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text"><i class="fas fa-calendar"></i></span>
+                                    <input type="datetime-local" class="form-control" id="log-date">
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <button class="btn btn-sm btn-secondary w-100" id="clear-filters">
+                                    <i class="fas fa-eraser"></i> Effacer
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="log-entries" id="log-entries">
+                        <pre class="log-content">
+DEBUG:osync.proxy.app:Debug mode enabled - maximum verbosity
+INFO:osync.proxy.app:Starting proxy with server addresses: ['10.0.9.245:50051', '10.0.9.248:50051', '10.0.9.249:50051']
+DEBUG:osync.sync.client:Server does not support HealthCheck API, using fallback
+DEBUG:osync.sync.client:Format de réponse non standard pour List: &lt;class 'ollama_pb2.ListResponse'&gt;
+DEBUG:osync.sync.client:Format de réponse non standard pour List: &lt;class 'ollama_pb2.ListResponse'&gt;
+DEBUG:osync.sync.client:Server does not support HealthCheck API, using fallback
+DEBUG:osync.sync.client:Format de réponse non standard pour List: &lt;class 'ollama_pb2.ListResponse'&gt;
+DEBUG:osync.sync.client:Format de réponse non standard pour List: &lt;class 'ollama_pb2.ListResponse'&gt;
+INFO:osync.proxy.cluster.manager:Cluster initialisé avec 3 serveurs depuis la base de données
+INFO:osync.proxy.cluster.manager:Données chargées depuis la base de données: 3 serveurs, 1 modèles
+DEBUG:osync.proxy.db.database:Mis à jour dans servers: 1 documents
+DEBUG:osync.proxy.db.database:Mis à jour dans servers: 1 documents
+DEBUG:osync.proxy.db.database:Mis à jour dans servers: 1 documents
+DEBUG:osync.proxy.db.database:Mis à jour dans models: 1 documents
+INFO:osync.rpc.client:Connected to RPC server at 10.0.9.245:50052
+INFO:osync.rpc.client:Connected to RPC server at 10.0.9.248:50052
+INFO:osync.rpc.client:Connected to RPC server at 10.0.9.249:50052
+WARNING:osync.rpc.client:GetDeviceCapabilities non implémenté sur 10.0.9.245:50052, utilisation des valeurs par défaut
+WARNING:osync.rpc.client:HealthCheck non implémenté sur 10.0.9.245:50052, utilisation des valeurs par défaut
+DEBUG:osync.rpc.client:Failed to get models from 10.0.9.245:50052: 'DistributedOllamaServiceStub' object has no attribute 'List'
+INFO:osync.rpc.client:Got capabilities from 10.0.9.245:50052: {'backend_type': 'cpu', 'device_id': 0, 'memory': 8589934592, 'cores': 8}
+INFO:osync.utils.cluster:Registered server 10.0.9.245:50052 with capabilities: {'backend_type': 'cpu', 'device_id': 0, 'memory': 8589934592, 'cores': 8}
+                        </pre>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer d-flex justify-content-between">
+                <div>
+                    <small>Taille du fichier: <span id="log-size">1.2 MB</span></small>
+                </div>
+                <div>
+                    <button class="btn btn-sm btn-outline-danger" id="clear-logs">
+                        <i class="fas fa-trash"></i> Effacer les logs
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary" id="download-logs">
+                        <i class="fas fa-download"></i> Télécharger
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-chart-pie me-2"></i> Distribution des niveaux de log
+            </div>
+            <div class="card-body">
+                <canvas id="log-level-chart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-chart-bar me-2"></i> Activité par composant
+            </div>
+            <div class="card-body">
+                <canvas id="log-component-chart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Graphique de distribution des niveaux de log
+    const levelCtx = document.getElementById('log-level-chart').getContext('2d');
+    const levelChart = new Chart(levelCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+            datasets: [{
+                data: [65, 20, 10, 4, 1],
+                backgroundColor: [
+                    '#0dcaf0',  // DEBUG - info-light
+                    '#20c997',  // INFO - success
+                    '#ffc107',  // WARNING - warning
+                    '#dc3545',  // ERROR - danger
+                    '#6610f2'   // CRITICAL - purple
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right'
+                }
+            }
+        }
+    });
+    
+    // Graphique d'activité par composant
+    const componentCtx = document.getElementById('log-component-chart').getContext('2d');
+    const componentChart = new Chart(componentCtx, {
+        type: 'bar',
+        data: {
+            labels: ['Proxy', 'Cluster', 'Client', 'RPC', 'DB', 'API'],
+            datasets: [{
+                label: 'Entrées de log',
+                data: [120, 80, 100, 60, 50, 30],
+                backgroundColor: '#6f42c1',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+    
+    // Fonctionnalités interactives
+    const refreshBtn = document.getElementById('refresh-logs');
+    const logSearch = document.getElementById('log-search');
+    const logEntries = document.getElementById('log-entries');
+    const toggleAutoscroll = document.getElementById('toggle-autoscroll');
+    
+    let autoScroll = true;
+    
+    toggleAutoscroll.addEventListener('click', function() {
+        autoScroll = !autoScroll;
+        this.classList.toggle('btn-outline-secondary');
+        this.classList.toggle('btn-secondary');
+        
+        if (autoScroll) {
+            logEntries.scrollTop = logEntries.scrollHeight;
+        }
+    });
+    
+    refreshBtn.addEventListener('click', function() {
+        // Simulation d'actualisation des logs (à remplacer par un appel AJAX réel)
+        const loadingToast = showToast('Actualisation des logs...', 'En cours de chargement');
+        
+        setTimeout(() => {
+            // Simuler l'ajout de nouvelles entrées de log
+            const pre = logEntries.querySelector('pre');
+            pre.innerHTML += 'INFO:osync.proxy.app:Log refresh requested by user\n';
+            pre.innerHTML += 'DEBUG:osync.proxy.db.database:Fetching latest log entries\n';
+            
+            if (autoScroll) {
+                logEntries.scrollTop = logEntries.scrollHeight;
+            }
+            
+            // Mettre à jour les graphiques avec de nouvelles données
+            levelChart.data.datasets[0].data = [70, 22, 12, 5, 1];
+            levelChart.update();
+            
+            componentChart.data.datasets[0].data = [125, 85, 110, 65, 55, 35];
+            componentChart.update();
+            
+            // Fermer le toast de chargement
+            loadingToast.hide();
+            
+            // Afficher un toast de succès
+            showToast('Logs actualisés', 'Les journaux ont été mis à jour avec succès');
+        }, 1000);
+    });
+    
+    logSearch.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase();
+        const pre = logEntries.querySelector('pre');
+        const lines = pre.textContent.split('\n');
+        
+        let filteredContent = '';
+        lines.forEach(line => {
+            if (line.toLowerCase().includes(searchTerm)) {
+                filteredContent += line + '\n';
+            }
+        });
+        
+        if (filteredContent) {
+            pre.textContent = filteredContent;
+        } else if (searchTerm === '') {
+            // Recharger tous les logs si le filtre est vide
+            // Ceci serait remplacé par un appel AJAX dans une implémentation réelle
+            refreshBtn.click();
+        } else {
+            pre.textContent = 'Aucun résultat correspondant à votre recherche.\n';
+        }
+    });
+    
+    // Fonction pour afficher un toast
+    function showToast(title, message) {
+        const toast = document.getElementById('notificationToast');
+        const toastTitle = document.getElementById('toastTitle');
+        const toastMessage = document.getElementById('toastMessage');
+        const toastTime = document.getElementById('toastTime');
+        
+        toastTitle.textContent = title;
+        toastMessage.textContent = message;
+        toastTime.textContent = 'À l\'instant';
+        
+        const bsToast = new bootstrap.Toast(toast);
+        bsToast.show();
+        
+        return bsToast;
+    }
+    
+    // Colorisation des niveaux de log
+    function colorizeLogLevels() {
+        const pre = logEntries.querySelector('pre');
+        let content = pre.innerHTML;
+        
+        // Colorer les différents niveaux de log
+        content = content.replace(/DEBUG:/g, '<span class="text-info">DEBUG:</span>');
+        content = content.replace(/INFO:/g, '<span class="text-success">INFO:</span>');
+        content = content.replace(/WARNING:/g, '<span class="text-warning">WARNING:</span>');
+        content = content.replace(/ERROR:/g, '<span class="text-danger">ERROR:</span>');
+        content = content.replace(/CRITICAL:/g, '<span class="text-purple">CRITICAL:</span>');
+        
+        pre.innerHTML = content;
+    }
+    
+    // Appliquer la colorisation initiale
+    colorizeLogLevels();
+});
+</script>
+{% endblock %}

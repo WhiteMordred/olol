@@ -39,6 +39,10 @@
                     <i class="fas fa-brain fa-fw me-2"></i>
                     <span class="d-none d-sm-inline">Modèles</span>
                 </a>
+                <a href="/queue" class="list-group-item list-group-item-action py-3 {% if request.path == '/queue' %}active{% endif %}">
+                    <i class="fas fa-tasks fa-fw me-2"></i>
+                    <span class="d-none d-sm-inline">File d'attente</span>
+                </a>
                 <a href="/playground" class="list-group-item list-group-item-action py-3 {% if request.path == '/playground' %}active{% endif %}">
                     <i class="fas fa-play-circle fa-fw me-2"></i>
                     <span class="d-none d-sm-inline">Playground</span>
@@ -46,6 +50,14 @@
                 <a href="/health" class="list-group-item list-group-item-action py-3 {% if request.path == '/health' %}active{% endif %}">
                     <i class="fas fa-heartbeat fa-fw me-2"></i>
                     <span class="d-none d-sm-inline">Santé</span>
+                </a>
+                <a href="/log" class="list-group-item list-group-item-action py-3 {% if request.path == '/log' %}active{% endif %}">
+                    <i class="fas fa-clipboard-list fa-fw me-2"></i>
+                    <span class="d-none d-sm-inline">Journaux</span>
+                </a>
+                <a href="/terminal" class="list-group-item list-group-item-action py-3 {% if request.path == '/terminal' %}active{% endif %}">
+                    <i class="fas fa-terminal fa-fw me-2"></i>
+                    <span class="d-none d-sm-inline">Terminal</span>
                 </a>
                 <a href="/settings" class="list-group-item list-group-item-action py-3 {% if request.path == '/settings' %}active{% endif %}">
                     <i class="fas fa-cogs fa-fw me-2"></i>
