@@ -235,31 +235,37 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Commande de statut
         if (cmd === 'status') {
-            // Simulation de chargement
+            // Affichage d'un message de chargement
             addTerminalOutput('Interrogation du statut du cluster...', 'text-info');
             
-            // Dans une implémentation réelle, vous feriez un appel AJAX ici
-            setTimeout(() => {
-                addTerminalOutput('\nÉtat du cluster Ollama Sync:');
-                addTerminalOutput('  - Serveurs: 3 en ligne, 1 hors ligne');
-                addTerminalOutput('  - Modèles disponibles: 8');
-                addTerminalOutput('  - Tâches actives: 2');
-                addTerminalOutput('  - Tâches en attente: 5');
-                addTerminalOutput('  - Santé globale: Bonne');
-                addTerminalOutput('\n');
-                
-                // Mettre à jour les informations système
-                updateSystemInfo({
-                    version: '1.0.0',
-                    serversCount: '4 (3 en ligne)',
-                    modelsCount: '8',
-                    osInfo: 'Linux 5.15.0-48-generic',
-                    uptime: '3j 4h 25m'
+            // Récupération des données via l'API
+            fetch('/api/v1/cluster/status')
+                .then(response => response.json())
+                .then(data => {
+                    // Affichage des données réelles du cluster
+                    addTerminalOutput('\nÉtat du cluster Ollama Sync:');
+                    addTerminalOutput(`  - Serveurs: ${data.online_servers} en ligne, ${data.offline_servers} hors ligne`);
+                    addTerminalOutput(`  - Modèles disponibles: ${data.models_count}`);
+                    addTerminalOutput(`  - Tâches actives: ${data.active_tasks}`);
+                    addTerminalOutput(`  - Tâches en attente: ${data.pending_tasks}`);
+                    addTerminalOutput(`  - Santé globale: ${data.health_status}`);
+                    addTerminalOutput('\n');
+                    
+                    // Mise à jour des informations système
+                    updateSystemInfo({
+                        version: data.version,
+                        serversCount: `${data.total_servers} (${data.online_servers} en ligne)`,
+                        modelsCount: data.models_count.toString(),
+                        osInfo: data.os_info,
+                        uptime: data.uptime
+                    });
+                    
+                    // Ajouter aux actions récentes
+                    addRecentAction('Vérification du statut du cluster', 'fas fa-check-circle text-success');
+                })
+                .catch(error => {
+                    addTerminalOutput(`\nErreur lors de la récupération du statut: ${error.message}`, 'text-danger');
                 });
-                
-                // Ajouter aux actions récentes
-                addRecentAction('Vérification du statut du cluster', 'fas fa-check-circle text-success');
-            }, 1000);
             return;
         }
         
@@ -267,25 +273,49 @@ document.addEventListener('DOMContentLoaded', function() {
         if (cmd === 'list models') {
             addTerminalOutput('Récupération des modèles...', 'text-info');
             
-            setTimeout(() => {
-                addTerminalOutput('\nModèles disponibles dans le cluster:');
-                addTerminalOutput('+-----------------+--------+--------------+----------+');
-                addTerminalOutput('| Nom             | Taille | Serveurs     | Statut   |');
-                addTerminalOutput('+-----------------+--------+--------------+----------+');
-                addTerminalOutput('| llama2:7b       | 3.8 GB | 2 serveurs   | Prêt     |');
-                addTerminalOutput('| llama2:13b      | 7.3 GB | 1 serveur    | Prêt     |');
-                addTerminalOutput('| mistral:7b      | 4.1 GB | 3 serveurs   | Prêt     |');
-                addTerminalOutput('| codellama:7b    | 3.9 GB | 2 serveurs   | Prêt     |');
-                addTerminalOutput('| mixtral:8x7b    | 26 GB  | 1 serveur    | Prêt     |');
-                addTerminalOutput('| stable-diffusion | 2.9 GB | 1 serveur    | Prêt     |');
-                addTerminalOutput('| gpt-j:6b        | 3.8 GB | 2 serveurs   | En cours |');
-                addTerminalOutput('| falcon:7b       | 4.2 GB | Non disponible | Pull    |');
-                addTerminalOutput('+-----------------+--------+--------------+----------+');
-                addTerminalOutput('\nTotal: 8 modèles (7 prêts, 1 en téléchargement)\n');
-                
-                // Ajouter aux actions récentes
-                addRecentAction('Liste des modèles affichée', 'fas fa-list text-info');
-            }, 1000);
+            fetch('/api/v1/models')
+                .then(response => response.json())
+                .then(data => {
+                    // En-tête du tableau
+                    addTerminalOutput('\nModèles disponibles dans le cluster:');
+                    addTerminalOutput('+-----------------+--------+--------------+----------+');
+                    addTerminalOutput('| Nom             | Taille | Serveurs     | Statut   |');
+                    addTerminalOutput('+-----------------+--------+--------------+----------+');
+                    
+                    // Affichage dynamique des modèles
+                    if (data.models && data.models.length > 0) {
+                        data.models.forEach(model => {
+                            const name = model.name.padEnd(16).substring(0, 16);
+                            const size = (model.size || '?').toString().padEnd(7).substring(0, 7);
+                            const servers = model.servers ? 
+                                `${model.servers.length} serveur${model.servers.length > 1 ? 's' : ''}`.padEnd(13) : 
+                                'Non disponible'.padEnd(13);
+                            const status = (model.status || 'Inconnu').padEnd(9).substring(0, 9);
+                            
+                            addTerminalOutput(`| ${name} | ${size} | ${servers} | ${status} |`);
+                        });
+                        
+                        // Pied du tableau
+                        addTerminalOutput('+-----------------+--------+--------------+----------+');
+                        
+                        // Comptage des modèles prêts
+                        const readyModels = data.models.filter(m => 
+                            (m.status || '').toLowerCase() === 'prêt' || (m.status || '').toLowerCase() === 'ready'
+                        ).length;
+                        
+                        addTerminalOutput(`\nTotal: ${data.models.length} modèles (${readyModels} prêts, ${data.models.length - readyModels} autres)\n`);
+                    } else {
+                        addTerminalOutput('| Aucun modèle disponible                               |');
+                        addTerminalOutput('+-----------------+--------+--------------+----------+');
+                        addTerminalOutput('\nAucun modèle trouvé dans le cluster.\n');
+                    }
+                    
+                    // Ajouter aux actions récentes
+                    addRecentAction('Liste des modèles affichée', 'fas fa-list text-info');
+                })
+                .catch(error => {
+                    addTerminalOutput(`\nErreur lors de la récupération des modèles: ${error.message}`, 'text-danger');
+                });
             return;
         }
         
@@ -293,21 +323,47 @@ document.addEventListener('DOMContentLoaded', function() {
         if (cmd === 'list servers') {
             addTerminalOutput('Récupération des serveurs...', 'text-info');
             
-            setTimeout(() => {
-                addTerminalOutput('\nServeurs dans le cluster:');
-                addTerminalOutput('+----------------+--------+-------+--------+-------------+');
-                addTerminalOutput('| Adresse        | État   | Charge | Modèles | Backend    |');
-                addTerminalOutput('+----------------+--------+-------+--------+-------------+');
-                addTerminalOutput('| 10.0.9.245:50051 | En ligne | 65%   | 5      | CUDA (24GB) |');
-                addTerminalOutput('| 10.0.9.248:50051 | En ligne | 30%   | 3      | CUDA (16GB) |');
-                addTerminalOutput('| 10.0.9.249:50051 | En ligne | 10%   | 2      | CPU         |');
-                addTerminalOutput('| 10.0.9.250:50051 | Hors ligne | -    | -      | Inconnu     |');
-                addTerminalOutput('+----------------+--------+-------+--------+-------------+');
-                addTerminalOutput('\nTotal: 4 serveurs (3 en ligne)\n');
-                
-                // Ajouter aux actions récentes
-                addRecentAction('Liste des serveurs affichée', 'fas fa-server text-info');
-            }, 1000);
+            fetch('/api/v1/servers')
+                .then(response => response.json())
+                .then(data => {
+                    // En-tête du tableau
+                    addTerminalOutput('\nServeurs dans le cluster:');
+                    addTerminalOutput('+----------------+--------+-------+--------+-------------+');
+                    addTerminalOutput('| Adresse        | État   | Charge | Modèles | Backend    |');
+                    addTerminalOutput('+----------------+--------+-------+--------+-------------+');
+                    
+                    // Affichage dynamique des serveurs
+                    if (data.servers && data.servers.length > 0) {
+                        let onlineCount = 0;
+                        
+                        data.servers.forEach(server => {
+                            const address = server.address.padEnd(15).substring(0, 15);
+                            const isOnline = server.healthy || false;
+                            if (isOnline) onlineCount++;
+                            
+                            const status = isOnline ? 'En ligne ' : 'Hors ligne';
+                            const load = isOnline ? `${Math.round(server.load * 100)}%  ` : '-    ';
+                            const models = isOnline ? (server.models ? server.models.length.toString().padEnd(7) : '0      ') : '-      ';
+                            const backend = isOnline ? (server.backend || 'Inconnu').padEnd(12) : 'Inconnu     ';
+                            
+                            addTerminalOutput(`| ${address} | ${status} | ${load} | ${models} | ${backend} |`);
+                        });
+                        
+                        // Pied du tableau
+                        addTerminalOutput('+----------------+--------+-------+--------+-------------+');
+                        addTerminalOutput(`\nTotal: ${data.servers.length} serveurs (${onlineCount} en ligne)\n`);
+                    } else {
+                        addTerminalOutput('| Aucun serveur disponible                              |');
+                        addTerminalOutput('+----------------+--------+-------+--------+-------------+');
+                        addTerminalOutput('\nAucun serveur trouvé dans le cluster.\n');
+                    }
+                    
+                    // Ajouter aux actions récentes
+                    addRecentAction('Liste des serveurs affichée', 'fas fa-server text-info');
+                })
+                .catch(error => {
+                    addTerminalOutput(`\nErreur lors de la récupération des serveurs: ${error.message}`, 'text-danger');
+                });
             return;
         }
         
@@ -325,28 +381,32 @@ document.addEventListener('DOMContentLoaded', function() {
                         
                         addTerminalOutput('Redémarrage du service proxy en cours...', 'text-warning');
                         
-                        // Simuler un processus de redémarrage
-                        setTimeout(() => {
-                            addTerminalOutput('Arrêt des connexions clients...', 'text-muted');
-                        }, 500);
-                        setTimeout(() => {
-                            addTerminalOutput('Sauvegarde de l\'état...', 'text-muted');
-                        }, 1000);
-                        setTimeout(() => {
-                            addTerminalOutput('Arrêt du service...', 'text-muted');
-                        }, 1500);
-                        setTimeout(() => {
-                            addTerminalOutput('Démarrage du service proxy...', 'text-muted');
-                        }, 2000);
-                        setTimeout(() => {
-                            addTerminalOutput('Reconnexion aux serveurs...', 'text-muted');
-                        }, 2500);
-                        setTimeout(() => {
-                            addTerminalOutput('Service proxy redémarré avec succès!', 'text-success');
+                        // Appel API réel pour redémarrer le proxy
+                        fetch('/api/v1/admin/restart', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            }
+                        })
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`Erreur HTTP: ${response.status}`);
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            // Afficher le processus de redémarrage basé sur les données réelles
+                            if (data.status === "in_progress") {
+                                addTerminalOutput('Le processus de redémarrage a été initié.', 'text-muted');
+                                addTerminalOutput('Le service sera bientôt indisponible puis se reconnectera.', 'text-muted');
+                            }
                             
                             // Ajouter aux actions récentes
                             addRecentAction('Redémarrage du service proxy', 'fas fa-sync text-warning');
-                        }, 3000);
+                        })
+                        .catch(error => {
+                            addTerminalOutput(`\nErreur lors du redémarrage: ${error.message}`, 'text-danger');
+                        });
                     } else {
                         addCommandLine(confirmCmd);
                         addTerminalOutput('Opération annulée.', 'text-danger');
@@ -405,21 +465,40 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Charger les informations initiales du système
-    setTimeout(() => {
-        updateSystemInfo({
-            version: '1.0.0',
-            serversCount: '4 (3 en ligne)',
-            modelsCount: '8',
-            osInfo: 'Linux 5.15.0-48-generic',
-            uptime: '2j 16h 42m'
+    // Charger les informations initiales du système via l'API
+    fetch('/api/v1/system/info')
+        .then(response => response.json())
+        .then(data => {
+            updateSystemInfo({
+                version: data.version || '1.0.0',
+                serversCount: `${data.total_servers} (${data.online_servers} en ligne)`,
+                modelsCount: data.models_count?.toString() || '0',
+                osInfo: data.os_info || '-',
+                uptime: data.uptime || '0j 0h 0m'
+            });
+            
+            // Charger les dernières actions depuis les logs
+            return fetch('/api/v1/logs?limit=3');
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Ajouter les actions récentes si disponibles
+            if (data.logs && data.logs.length > 0) {
+                data.logs.forEach(log => {
+                    let iconClass = 'fas fa-info-circle text-info';
+                    
+                    // Déterminer l'icône en fonction du type de log
+                    if (log.type === 'error') iconClass = 'fas fa-exclamation-circle text-danger';
+                    else if (log.type === 'warning') iconClass = 'fas fa-exclamation-triangle text-warning';
+                    else if (log.type === 'success') iconClass = 'fas fa-check-circle text-success';
+                    
+                    addRecentAction(log.message, iconClass);
+                });
+            }
+        })
+        .catch(error => {
+            console.error("Erreur lors du chargement des informations:", error);
         });
-        
-        // Ajouter quelques actions récentes initiales
-        addRecentAction('Service proxy démarré', 'fas fa-play-circle text-success');
-        addRecentAction('Modèle mistral:7b chargé', 'fas fa-brain text-info');
-        addRecentAction('Nouveau serveur découvert', 'fas fa-server text-primary');
-    }, 500);
     
     // Focus sur le champ de saisie
     inputField.focus();
