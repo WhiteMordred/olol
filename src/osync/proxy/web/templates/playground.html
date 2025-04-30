@@ -2,98 +2,14 @@
 
 {% block title %}Playground - Ollama Sync{% endblock %}
 
-{% block head %}
-<style>
-    .chat-container {
-        height: 60vh;
-        overflow-y: auto;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        background-color: rgba(0, 0, 0, 0.2);
-        border-radius: 0.5rem;
-        padding: 1rem;
-        margin-bottom: 1rem;
-    }
-    
-    .message {
-        padding: 0.75rem 1rem;
-        margin: 0.5rem 0;
-        border-radius: 0.5rem;
-        max-width: 80%;
-    }
-    
-    .user-message {
-        background-color: #4a6da7;
-        align-self: flex-end;
-        margin-left: auto;
-    }
-    
-    .ai-message {
-        background-color: #3a3a3c;
-        align-self: flex-start;
-    }
-    
-    .typing-indicator span {
-        display: inline-block;
-        width: 8px;
-        height: 8px;
-        background-color: #ccc;
-        border-radius: 50%;
-        margin-right: 5px;
-        animation: typing 1s infinite;
-    }
-    
-    .typing-indicator span:nth-child(2) {
-        animation-delay: 0.2s;
-    }
-    
-    .typing-indicator span:nth-child(3) {
-        animation-delay: 0.4s;
-    }
-    
-    @keyframes typing {
-        0% { transform: translateY(0); }
-        50% { transform: translateY(-5px); }
-        100% { transform: translateY(0); }
-    }
-    
-    .input-group .form-control {
-        background-color: #3a3a3c;
-        border-color: rgba(255, 255, 255, 0.1);
-        color: #f1f1f1;
-    }
-    
-    .model-params .form-control, .model-params .form-select {
-        background-color: #3a3a3c;
-        border-color: rgba(255, 255, 255, 0.1);
-        color: #f1f1f1;
-    }
-    
-    .model-params .form-label {
-        margin-bottom: 0.25rem;
-        font-size: 0.85rem;
-    }
-    
-    .model-card {
-        cursor: pointer;
-        transition: all 0.2s ease-in-out;
-    }
-    
-    .model-card:hover, .model-card.active {
-        transform: translateY(-3px);
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-        border-color: #4a6da7;
-    }
-</style>
-{% endblock %}
-
 {% block content %}
-<h1 class="mb-4"><i class="fas fa-play-circle me-2"></i>Playground</h1>
+<h1 class="mb-4 cyber-heading"><i class="fas fa-play-circle me-2"></i>Playground</h1>
 
 <div class="row mb-4">
     <div class="col-md-8 col-lg-9">
         <!-- Chat Interface -->
-        <div class="card bg-dark">
-            <div class="card-header d-flex justify-content-between align-items-center">
+        <div class="cyber-panel">
+            <div class="cyber-panel-header d-flex justify-content-between align-items-center">
                 <div>
                     <span class="fw-bold">
                         <i class="fas fa-comments me-2"></i>Chat avec
@@ -105,17 +21,17 @@
                     </span>
                 </div>
                 <div>
-                    <button class="btn btn-sm btn-outline-light" id="clearChatBtn" title="Effacer la conversation">
+                    <button class="cyber-btn cyber-btn-sm" id="clearChatBtn" title="Effacer la conversation">
                         <i class="fas fa-trash"></i>
                     </button>
-                    <button class="btn btn-sm btn-outline-light ms-2" id="exportChatBtn" title="Exporter la conversation">
+                    <button class="cyber-btn cyber-btn-sm ms-2" id="exportChatBtn" title="Exporter la conversation">
                         <i class="fas fa-download"></i>
                     </button>
                 </div>
             </div>
-            <div class="card-body p-0">
-                <div class="chat-container d-flex flex-column" id="chatContainer">
-                    <div class="message ai-message">
+            <div class="cyber-panel-body p-0">
+                <div class="cyber-chat-container d-flex flex-column" id="chatContainer">
+                    <div class="cyber-message ai">
                         <p class="mb-0">👋 Bonjour ! Je suis une IA basée sur 
                         {% if selected_model %}
                             <strong>{{ selected_model }}</strong>
@@ -127,7 +43,7 @@
                     <!-- Messages will be added here dynamically -->
                     
                     <!-- Typing indicator (hidden by default) -->
-                    <div class="message ai-message typing-indicator d-none">
+                    <div class="cyber-message ai cyber-typing-indicator d-none">
                         <span></span>
                         <span></span>
                         <span></span>
@@ -135,9 +51,9 @@
                 </div>
                 
                 <form id="chatForm" class="p-3 border-top">
-                    <div class="input-group">
-                        <textarea class="form-control" id="userInput" rows="2" placeholder="Écrivez votre message ici..."></textarea>
-                        <button class="btn btn-primary" type="submit">
+                    <div class="cyber-input-group">
+                        <textarea class="cyber-input" id="userInput" rows="2" placeholder="Écrivez votre message ici..."></textarea>
+                        <button class="cyber-btn" type="submit">
                             <i class="fas fa-paper-plane"></i>
                         </button>
                     </div>
@@ -148,14 +64,14 @@
     
     <div class="col-md-4 col-lg-3">
         <!-- Model Selection and Parameters -->
-        <div class="card bg-dark mb-3">
-            <div class="card-header">
+        <div class="cyber-panel mb-3">
+            <div class="cyber-panel-header">
                 <i class="fas fa-sliders-h me-2"></i>Paramètres
             </div>
-            <div class="card-body model-params">
+            <div class="cyber-panel-body">
                 <div class="mb-3">
                     <label for="modelSelect" class="form-label">Modèle</label>
-                    <select class="form-select" id="modelSelect">
+                    <select class="cyber-input form-select" id="modelSelect">
                         <option value="" {% if not selected_model %}selected{% endif %}>Sélectionnez un modèle</option>
                         {% for model in models %}
                             <option value="{{ model.name }}" {% if selected_model == model.name %}selected{% endif %}>
@@ -167,27 +83,27 @@
                 
                 <div class="mb-3">
                     <label for="temperatureRange" class="form-label">Température: <span id="temperatureValue">0.7</span></label>
-                    <input type="range" class="form-range" min="0" max="2" step="0.1" value="0.7" id="temperatureRange">
+                    <input type="range" class="cyber-range" min="0" max="2" step="0.1" value="0.7" id="temperatureRange">
                 </div>
                 
                 <div class="mb-3">
                     <label for="maxTokens" class="form-label">Tokens max.</label>
-                    <input type="number" class="form-control" id="maxTokens" value="2048" min="1" max="4096">
+                    <input type="number" class="cyber-input form-control" id="maxTokens" value="2048" min="1" max="4096">
                 </div>
                 
                 <div class="mb-3">
                     <label for="topP" class="form-label">Top-P: <span id="topPValue">0.9</span></label>
-                    <input type="range" class="form-range" min="0" max="1" step="0.05" value="0.9" id="topP">
+                    <input type="range" class="cyber-range" min="0" max="1" step="0.05" value="0.9" id="topP">
                 </div>
                 
                 <div class="mb-3">
                     <label for="presencePenalty" class="form-label">Pénalité de présence: <span id="presencePenaltyValue">0</span></label>
-                    <input type="range" class="form-range" min="-2" max="2" step="0.1" value="0" id="presencePenalty">
+                    <input type="range" class="cyber-range" min="-2" max="2" step="0.1" value="0" id="presencePenalty">
                 </div>
                 
                 <div class="mb-3">
                     <label for="frequencyPenalty" class="form-label">Pénalité de fréquence: <span id="frequencyPenaltyValue">0</span></label>
-                    <input type="range" class="form-range" min="-2" max="2" step="0.1" value="0" id="frequencyPenalty">
+                    <input type="range" class="cyber-range" min="-2" max="2" step="0.1" value="0" id="frequencyPenalty">
                 </div>
                 
                 <div class="form-check mb-3">
@@ -199,18 +115,18 @@
             </div>
         </div>
         
-        <div class="card bg-dark">
-            <div class="card-header">
+        <div class="cyber-panel">
+            <div class="cyber-panel-header">
                 <i class="fas fa-server me-2"></i>Serveur actif
             </div>
-            <div class="card-body p-2">
+            <div class="cyber-panel-body p-2">
                 <div class="d-flex align-items-center">
-                    <span class="status-indicator online me-2"></span>
+                    <span class="cyber-dot online me-2"></span>
                     <span class="server-name">localhost:50051</span>
                 </div>
                 <div class="mt-2">
-                    <div class="progress" style="height: 8px;">
-                        <div class="progress-bar" role="progressbar" style="width: 25%;" aria-valuenow="25" aria-valuemin="0" aria-valuemax="100"></div>
+                    <div class="cyber-progress">
+                        <div class="cyber-progress-bar good" style="width: 25%"></div>
                     </div>
                     <div class="d-flex justify-content-between small mt-1">
                         <span>Charge: 25%</span>
@@ -225,28 +141,46 @@
 <!-- Popular Models Section -->
 <div class="row">
     <div class="col-12">
-        <h4 class="mb-3"><i class="fas fa-star me-2"></i>Modèles populaires</h4>
+        <h4 class="mb-3 cyber-heading-sm"><i class="fas fa-star me-2"></i>Modèles populaires</h4>
     </div>
     
     {% for model in models[:4] %}
     <div class="col-md-6 col-lg-3 mb-3">
-        <div class="card bg-dark model-card {% if selected_model == model.name %}active{% endif %}" 
+        <div class="cyber-model-card {% if selected_model == model.name %}active{% endif %}" 
              data-model-name="{{ model.name }}">
-            <div class="card-body">
-                <h5 class="card-title">{{ model.name }}</h5>
-                <p class="card-text small">
-                    <span class="badge bg-primary me-1">{{ model.servers|length }} serveur(s)</span>
-                    <span class="badge {% if model.available %}bg-success{% else %}bg-danger{% endif %} me-1">
-                        {{ 'Disponible'|yesno if model.available else 'Non disponible'|yesno }}
+            <div class="cyber-model-body">
+                <h5 class="cyber-model-name">{{ model.name }}</h5>
+                <div class="mb-2">
+                    <span class="cyber-badge">{{ model.servers|length }} serveur(s)</span>
+                    {% if model.available %}
+                    <span class="cyber-badge online">
+                        <span class="cyber-dot"></span> Disponible
                     </span>
-                </p>
-                <button class="btn btn-sm btn-outline-light" onclick="selectModel('{{ model.name }}')">
+                    {% else %}
+                    <span class="cyber-badge offline">
+                        <span class="cyber-dot"></span> Non disponible
+                    </span>
+                    {% endif %}
+                </div>
+                <button class="cyber-btn cyber-btn-sm" onclick="selectModel('{{ model.name }}')">
                     Sélectionner
                 </button>
             </div>
         </div>
     </div>
     {% endfor %}
+</div>
+
+<!-- Toast pour les notifications -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="notificationToast" class="cyber-toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="cyber-toast-header">
+            <strong class="me-auto" id="toastTitle">Notification</strong>
+            <small id="toastTime">À l'instant</small>
+            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="cyber-toast-body" id="toastMessage"></div>
+    </div>
 </div>
 {% endblock %}
 
@@ -268,7 +202,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const presencePenaltyValue = document.getElementById('presencePenaltyValue');
     const frequencyPenalty = document.getElementById('frequencyPenalty');
     const frequencyPenaltyValue = document.getElementById('frequencyPenaltyValue');
-    const modelCards = document.querySelectorAll('.model-card');
+    const modelCards = document.querySelectorAll('.cyber-model-card');
     
     // Update range values
     temperatureRange.addEventListener('input', function() {
@@ -301,7 +235,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Get selected model
         const selectedModel = modelSelect.value;
         if (!selectedModel) {
-            showToast('Erreur', 'Veuillez sélectionner un modèle', 'error');
+            showToast('Erreur', 'Veuillez sélectionner un modèle', 'danger');
             return;
         }
         
@@ -317,7 +251,7 @@ document.addEventListener('DOMContentLoaded', function() {
         };
         
         // Show typing indicator
-        const typingIndicator = document.querySelector('.typing-indicator');
+        const typingIndicator = document.querySelector('.cyber-typing-indicator');
         typingIndicator.classList.remove('d-none');
         
         // Simulate API call (replace with actual API call)
@@ -340,9 +274,9 @@ document.addEventListener('DOMContentLoaded', function() {
     clearChatBtn.addEventListener('click', function() {
         if (confirm('Voulez-vous vraiment effacer toute la conversation?')) {
             // Remove all messages except the first one (greeting) and the typing indicator
-            const messages = chatContainer.querySelectorAll('.message');
+            const messages = chatContainer.querySelectorAll('.cyber-message');
             for (let i = 1; i < messages.length; i++) {
-                if (!messages[i].classList.contains('typing-indicator')) {
+                if (!messages[i].classList.contains('cyber-typing-indicator')) {
                     messages[i].remove();
                 }
             }
@@ -352,11 +286,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Export chat
     exportChatBtn.addEventListener('click', function() {
         const messages = [];
-        const messageElements = chatContainer.querySelectorAll('.message');
+        const messageElements = chatContainer.querySelectorAll('.cyber-message');
         
         messageElements.forEach(el => {
-            if (!el.classList.contains('typing-indicator')) {
-                const type = el.classList.contains('user-message') ? 'user' : 'ai';
+            if (!el.classList.contains('cyber-typing-indicator')) {
+                const type = el.classList.contains('user') ? 'user' : 'ai';
                 const content = el.textContent.trim();
                 messages.push({ type, content });
             }
@@ -390,8 +324,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Helper functions
     function addMessage(type, content) {
         const message = document.createElement('div');
-        message.classList.add('message');
-        message.classList.add(type === 'user' ? 'user-message' : 'ai-message');
+        message.classList.add('cyber-message');
+        message.classList.add(type);
         
         const paragraph = document.createElement('p');
         paragraph.classList.add('mb-0');
@@ -400,7 +334,7 @@ document.addEventListener('DOMContentLoaded', function() {
         message.appendChild(paragraph);
         
         // Insert before typing indicator
-        const typingIndicator = document.querySelector('.typing-indicator');
+        const typingIndicator = document.querySelector('.cyber-typing-indicator');
         chatContainer.insertBefore(message, typingIndicator);
         
         // Scroll to bottom
@@ -418,20 +352,8 @@ document.addEventListener('DOMContentLoaded', function() {
         toastTime.textContent = 'À l\'instant';
         
         // Set toast color based on type
-        toastEl.classList.remove('bg-success', 'bg-danger', 'bg-warning', 'bg-info');
-        switch(type) {
-            case 'success': 
-                toastEl.classList.add('bg-success');
-                break;
-            case 'error':
-                toastEl.classList.add('bg-danger');
-                break;
-            case 'warning':
-                toastEl.classList.add('bg-warning');
-                break;
-            default:
-                toastEl.classList.add('bg-info');
-        }
+        toastEl.classList.remove('success', 'danger', 'warning', 'info');
+        toastEl.classList.add(type);
         
         const toast = new bootstrap.Toast(toastEl);
         toast.show();
@@ -444,7 +366,7 @@ function selectModel(modelName) {
     modelSelect.value = modelName;
     
     // Update model cards
-    document.querySelectorAll('.model-card').forEach(card => {
+    document.querySelectorAll('.cyber-model-card').forEach(card => {
         if (card.dataset.modelName === modelName) {
             card.classList.add('active');
         } else {
@@ -453,7 +375,7 @@ function selectModel(modelName) {
     });
     
     // Update chat header
-    const chatHeader = document.querySelector('.card-header .fw-bold');
+    const chatHeader = document.querySelector('.cyber-panel-header .fw-bold');
     chatHeader.innerHTML = `<i class="fas fa-comments me-2"></i>Chat avec ${modelName}`;
 }
 </script>

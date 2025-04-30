@@ -5,25 +5,25 @@
 {% block content %}
 <div class="row">
     <div class="col-lg-12">
-        <h2 class="mb-4">Gestion des Modèles</h2>
+        <h2 class="mb-4 cyber-heading">Gestion des Modèles</h2>
     </div>
 </div>
 
 <!-- Filtres et actions -->
 <div class="row mb-4">
     <div class="col-12">
-        <div class="card">
-            <div class="card-body">
+        <div class="cyber-panel">
+            <div class="cyber-panel-body">
                 <div class="d-flex flex-wrap gap-2 align-items-center">
-                    <div class="input-group" style="max-width: 300px;">
-                        <input type="text" class="form-control" id="modelSearchInput" placeholder="Rechercher un modèle...">
-                        <button class="btn btn-outline-secondary" type="button" id="modelSearchBtn">
+                    <div class="cyber-search">
+                        <input type="text" class="cyber-input" id="modelSearchInput" placeholder="Rechercher un modèle...">
+                        <button class="cyber-btn cyber-btn-sm" type="button" id="modelSearchBtn">
                             <i class="fas fa-search"></i>
                         </button>
                     </div>
                     
-                    <div class="btn-group ms-2">
-                        <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                    <div class="cyber-dropdown ms-2">
+                        <button type="button" class="cyber-btn dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
                             Filtrer par
                         </button>
                         <ul class="dropdown-menu">
@@ -37,11 +37,11 @@
                     </div>
                     
                     <div class="ms-auto d-flex gap-2">
-                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#pullModelModal">
-                            <i class="fas fa-download me-1"></i> Télécharger un modèle
+                        <button class="cyber-btn" data-bs-toggle="modal" data-bs-target="#pullModelModal">
+                            <i class="fas fa-download"></i> Télécharger un modèle
                         </button>
-                        <button class="btn btn-success auto-refresh-toggle" id="refreshModelsBtn" data-target="models-list" data-seconds="60">
-                            <i class="fas fa-sync-alt me-1"></i> 
+                        <button class="cyber-btn auto-refresh-toggle" id="refreshModelsBtn" data-target="models-list" data-seconds="60">
+                            <i class="fas fa-sync-alt"></i> 
                             <span class="status-text">Actualisation auto</span>
                         </button>
                     </div>
@@ -55,72 +55,80 @@
 <div class="row" id="modelsContainer">
     {% for model in models %}
     <div class="col-md-6 col-xl-4 mb-4 model-item" data-model-name="{{ model.name }}" data-available="{{ model.available|lower }}" id="{{ model.name|replace(':', '-') }}">
-        <div class="card h-100 model-card">
-            <div class="card-header d-flex justify-content-between">
-                <h5 class="card-title mb-0">{{ model.name }}</h5>
-                <span class="badge bg-{% if model.available %}success{% else %}danger{% endif %}">
-                    {{ model.available|yesno("Disponible,Non disponible") }}
+        <div class="cyber-model h-100">
+            <div class="cyber-model-header d-flex justify-content-between">
+                <h5 class="cyber-model-name">{{ model.name }}</h5>
+                {% if model.available %}
+                <span class="cyber-badge online">
+                    <span class="cyber-dot"></span> Disponible
                 </span>
+                {% else %}
+                <span class="cyber-badge offline">
+                    <span class="cyber-dot"></span> Non disponible
+                </span>
+                {% endif %}
             </div>
-            <div class="card-body">
+            <div class="cyber-model-body">
                 <div class="mb-3">
-                    <small class="text-muted d-block mb-1">Taille:</small>
+                    <small class="cyber-text-secondary d-block mb-1">Taille:</small>
                     <strong>{{ model.size|filesizeformat }}</strong>
                 </div>
                 
                 <div class="mb-3">
-                    <small class="text-muted d-block mb-1">Serveurs disponibles:</small>
+                    <small class="cyber-text-secondary d-block mb-1">Serveurs disponibles:</small>
                     <div>
                         {% if model.servers %}
                             {% for server in model.servers[:3] %}
-                                <span class="badge bg-primary mb-1">{{ server }}</span>
+                                <span class="cyber-badge">{{ server }}</span>
                             {% endfor %}
                             {% if model.servers|length > 3 %}
-                                <span class="badge bg-secondary">+{{ model.servers|length - 3 }}</span>
+                                <span class="cyber-badge servers">+{{ model.servers|length - 3 }}</span>
                             {% endif %}
                         {% else %}
-                            <span class="text-muted">Aucun serveur</span>
+                            <span class="cyber-text-secondary">Aucun serveur</span>
                         {% endif %}
                     </div>
                 </div>
                 
                 <div class="mb-3">
-                    <small class="text-muted d-block mb-1">Paramètres:</small>
+                    <small class="cyber-text-secondary d-block mb-1">Paramètres:</small>
                     <div class="d-flex flex-wrap gap-1">
-                        <span class="badge bg-light text-dark">{{ model.parameters|default('N/A') }} paramètres</span>
-                        <span class="badge bg-light text-dark">quantized: {{ model.quantized|yesno("oui,non") }}</span>
+                        <span class="cyber-badge">{{ model.parameters|default('N/A') }} paramètres</span>
+                        <span class="cyber-badge">quantized: {{ model.quantized|yesno("oui,non") }}</span>
                     </div>
                 </div>
                 
                 <div>
-                    <small class="text-muted d-block mb-1">Dernière mise à jour:</small>
+                    <small class="cyber-text-secondary d-block mb-1">Dernière mise à jour:</small>
                     <span>{{ model.modified_at|default('Inconnue') }}</span>
                 </div>
             </div>
-            <div class="card-footer">
+            <div class="cyber-model-footer">
                 <div class="d-flex justify-content-between">
-                    <a href="/playground?model={{ model.name }}" class="btn btn-sm btn-success">
-                        <i class="fas fa-play me-1"></i> Tester
+                    <a href="/playground?model={{ model.name }}" class="cyber-btn cyber-btn-sm cyber-btn-success">
+                        <i class="fas fa-play"></i> Tester
                     </a>
-                    <div class="btn-group">
-                        <button class="btn btn-sm btn-info model-info-btn" data-model="{{ model.name }}">
+                    <div class="d-flex gap-1">
+                        <button class="cyber-btn cyber-btn-sm cyber-btn-info model-info-btn" data-model="{{ model.name }}">
                             <i class="fas fa-info-circle"></i>
                         </button>
-                        <button class="btn btn-sm btn-primary" data-bs-toggle="dropdown">
-                            <i class="fas fa-ellipsis-v"></i>
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="#" onclick="copyModelPrompt('{{ model.name }}')">
-                                <i class="fas fa-copy me-1"></i> Copier le prompt
-                            </a></li>
-                            <li><a class="dropdown-item" href="#" onclick="distributeModel('{{ model.name }}')">
-                                <i class="fas fa-server me-1"></i> Distribuer sur les serveurs
-                            </a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item text-danger" href="#" onclick="deleteModel('{{ model.name }}')">
-                                <i class="fas fa-trash me-1"></i> Supprimer
-                            </a></li>
-                        </ul>
+                        <div class="cyber-dropdown">
+                            <button class="cyber-btn cyber-btn-sm" data-bs-toggle="dropdown">
+                                <i class="fas fa-ellipsis-v"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><a class="dropdown-item" href="#" onclick="copyModelPrompt('{{ model.name }}')">
+                                    <i class="fas fa-copy"></i> Copier le prompt
+                                </a></li>
+                                <li><a class="dropdown-item" href="#" onclick="distributeModel('{{ model.name }}')">
+                                    <i class="fas fa-server"></i> Distribuer sur les serveurs
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item text-danger" href="#" onclick="deleteModel('{{ model.name }}')">
+                                    <i class="fas fa-trash"></i> Supprimer
+                                </a></li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -128,8 +136,8 @@
     </div>
     {% else %}
     <div class="col-12">
-        <div class="alert alert-info">
-            <i class="fas fa-info-circle me-2"></i> Aucun modèle disponible. Utilisez le bouton "Télécharger un modèle" pour en ajouter.
+        <div class="cyber-alert">
+            <i class="fas fa-info-circle"></i> Aucun modèle disponible. Utilisez le bouton "Télécharger un modèle" pour en ajouter.
         </div>
     </div>
     {% endfor %}
@@ -159,23 +167,23 @@
 <!-- Modal pour télécharger un modèle -->
 <div class="modal fade" id="pullModelModal" tabindex="-1" aria-labelledby="pullModelModalLabel" aria-hidden="true">
     <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
+        <div class="modal-content cyber-modal">
+            <div class="cyber-modal-header">
                 <h5 class="modal-title" id="pullModelModalLabel">Télécharger un modèle</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
+            <div class="cyber-modal-body">
                 <form id="pullModelForm">
                     <div class="mb-3">
                         <label for="modelName" class="form-label">Nom du modèle</label>
-                        <input type="text" class="form-control" id="modelName" placeholder="ex: llama2, mistral, etc." required>
+                        <input type="text" class="cyber-input form-control" id="modelName" placeholder="ex: llama2, mistral, etc." required>
                         <div class="form-text">
                             Entrez le nom du modèle à télécharger depuis le catalogue Ollama.
                         </div>
                     </div>
                     <div class="mb-3">
                         <label for="serverSelect" class="form-label">Serveur cible</label>
-                        <select class="form-select" id="serverSelect" required>
+                        <select class="cyber-input form-select" id="serverSelect" required>
                             <option value="" selected disabled>Sélectionner un serveur</option>
                             <option value="all">Tous les serveurs</option>
                             {% for server in servers %}
@@ -192,9 +200,9 @@
                     </div>
                 </form>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                <button type="button" class="btn btn-primary" id="pullModelBtn">Télécharger</button>
+            <div class="cyber-modal-footer">
+                <button type="button" class="cyber-btn cyber-btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="cyber-btn" id="pullModelBtn">Télécharger</button>
             </div>
         </div>
     </div>
@@ -203,16 +211,16 @@
 <!-- Modal d'informations sur le modèle -->
 <div class="modal fade" id="modelInfoModal" tabindex="-1" aria-labelledby="modelInfoModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
+        <div class="modal-content cyber-modal">
+            <div class="cyber-modal-header">
                 <h5 class="modal-title" id="modelInfoModalLabel">Informations du modèle</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
+            <div class="cyber-modal-body">
                 <div class="row mb-4">
                     <div class="col-md-6">
                         <h6>Informations générales</h6>
-                        <table class="table table-sm">
+                        <table class="cyber-table cyber-table-sm">
                             <tr>
                                 <th>Nom</th>
                                 <td id="infoModelName"></td>
@@ -237,7 +245,7 @@
                     </div>
                     <div class="col-md-6">
                         <h6>Disponibilité</h6>
-                        <table class="table table-sm" id="infoServerTable">
+                        <table class="cyber-table cyber-table-sm" id="infoServerTable">
                             <thead>
                                 <tr>
                                     <th>Serveur</th>
@@ -252,13 +260,13 @@
                 </div>
                 
                 <h6>Template de prompt</h6>
-                <pre class="bg-light p-3 mb-4" id="infoModelTemplate"></pre>
+                <div class="cyber-code-block mb-4" id="infoModelTemplate"></div>
                 
                 <h6>Paramètres par défaut</h6>
-                <pre class="bg-light p-3" id="infoModelDefaultParams"></pre>
+                <div class="cyber-code-block" id="infoModelDefaultParams"></div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+            <div class="cyber-modal-footer">
+                <button type="button" class="cyber-btn cyber-btn-secondary" data-bs-dismiss="modal">Fermer</button>
             </div>
         </div>
     </div>
@@ -267,21 +275,21 @@
 <!-- Modal de confirmation de suppression -->
 <div class="modal fade" id="deleteModelModal" tabindex="-1" aria-labelledby="deleteModelModalLabel" aria-hidden="true">
     <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
+        <div class="modal-content cyber-modal">
+            <div class="cyber-modal-header">
                 <h5 class="modal-title" id="deleteModelModalLabel">Confirmer la suppression</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
+            <div class="cyber-modal-body">
                 <p>Êtes-vous sûr de vouloir supprimer le modèle <strong id="deleteModelName"></strong> ?</p>
-                <div class="alert alert-warning">
-                    <i class="fas fa-exclamation-triangle me-2"></i> 
+                <div class="cyber-alert">
+                    <i class="fas fa-exclamation-triangle"></i> 
                     Cette action supprimera le modèle de tous les serveurs où il est installé.
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                <button type="button" class="btn btn-danger" id="confirmDeleteModelBtn">Supprimer</button>
+            <div class="cyber-modal-footer">
+                <button type="button" class="cyber-btn cyber-btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="cyber-btn cyber-btn-danger" id="confirmDeleteModelBtn">Supprimer</button>
             </div>
         </div>
     </div>
@@ -289,13 +297,13 @@
 
 <!-- Toast pour les notifications -->
 <div class="toast-container position-fixed bottom-0 end-0 p-3">
-    <div id="modelToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
-        <div class="toast-header">
+    <div id="modelToast" class="cyber-toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="cyber-toast-header">
             <strong class="me-auto" id="toastTitle">Notification</strong>
             <small id="toastTime">À l'instant</small>
             <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
         </div>
-        <div class="toast-body" id="toastMessage"></div>
+        <div class="cyber-toast-body" id="toastMessage"></div>
     </div>
 </div>
 {% endblock %}
@@ -303,6 +311,17 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Ajout d'une classe pour les blocs de code
+    document.querySelectorAll('.cyber-code-block').forEach(block => {
+        block.style.backgroundColor = 'var(--cyber-surface-elevated)';
+        block.style.padding = '1rem';
+        block.style.borderRadius = '3px';
+        block.style.border = '1px solid var(--cyber-border)';
+        block.style.color = 'var(--cyber-text-primary)';
+        block.style.fontFamily = 'monospace';
+        block.style.whiteSpace = 'pre-wrap';
+    });
+
     // Recherche de modèles
     const modelSearchInput = document.getElementById('modelSearchInput');
     const modelSearchBtn = document.getElementById('modelSearchBtn');
@@ -406,10 +425,33 @@ document.addEventListener('DOMContentLoaded', function() {
         
         serverStatus.forEach(status => {
             const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${status.server}</td>
-                <td><span class="badge bg-${status.available ? 'success' : 'danger'}">${status.available ? 'Disponible' : 'Non disponible'}</span></td>
-            `;
+            
+            // Créer la cellule pour le serveur
+            const serverCell = document.createElement('td');
+            serverCell.textContent = status.server;
+            row.appendChild(serverCell);
+            
+            // Créer la cellule pour l'état
+            const statusCell = document.createElement('td');
+            const statusBadge = document.createElement('span');
+            
+            if (status.available) {
+                statusBadge.className = 'cyber-badge online';
+                const dotSpan = document.createElement('span');
+                dotSpan.className = 'cyber-dot';
+                statusBadge.appendChild(dotSpan);
+                statusBadge.appendChild(document.createTextNode(' Disponible'));
+            } else {
+                statusBadge.className = 'cyber-badge offline';
+                const dotSpan = document.createElement('span');
+                dotSpan.className = 'cyber-dot';
+                statusBadge.appendChild(dotSpan);
+                statusBadge.appendChild(document.createTextNode(' Non disponible'));
+            }
+            
+            statusCell.appendChild(statusBadge);
+            row.appendChild(statusCell);
+            
             serverTableBody.appendChild(row);
         });
         
@@ -427,7 +469,7 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(err => {
                 console.error('Erreur lors de la copie :', err);
-                showToast('Erreur', 'Impossible de copier le template', 'error');
+                showToast('Erreur', 'Impossible de copier le template', 'danger');
             });
     };
     
@@ -451,16 +493,22 @@ document.addEventListener('DOMContentLoaded', function() {
     // Gestion de la confirmation de suppression
     document.getElementById('confirmDeleteModelBtn').addEventListener('click', function() {
         const modelName = document.getElementById('deleteModelName').textContent;
+        const originalText = this.innerHTML;
         
         // Simuler la suppression
         const modal = bootstrap.Modal.getInstance(document.getElementById('deleteModelModal'));
         modal.hide();
         
         // Afficher un indicateur de chargement
+        this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Suppression...';
+        this.disabled = true;
         showToast('Suppression en cours', `Suppression de ${modelName}...`, 'info');
         
         // Simuler un appel API pour supprimer le modèle
         setTimeout(() => {
+            this.innerHTML = originalText;
+            this.disabled = false;
+            
             // Supprimer l'élément du DOM
             const modelElement = document.querySelector(`[data-model-name="${modelName}"]`);
             if (modelElement) {
@@ -476,11 +524,16 @@ document.addEventListener('DOMContentLoaded', function() {
         const modelName = document.getElementById('modelName').value;
         const server = document.getElementById('serverSelect').value;
         const insecure = document.getElementById('insecureCheckbox').checked;
+        const originalText = this.innerHTML;
         
         if (!modelName || !server) {
-            showToast('Erreur', 'Veuillez remplir tous les champs requis', 'error');
+            showToast('Erreur', 'Veuillez remplir tous les champs requis', 'danger');
             return;
         }
+        
+        // Afficher un indicateur de chargement
+        this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Téléchargement...';
+        this.disabled = true;
         
         // Fermer le modal
         const modal = bootstrap.Modal.getInstance(document.getElementById('pullModelModal'));
@@ -491,6 +544,8 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Dans un cas réel, on ferait un appel API ici
         setTimeout(() => {
+            this.innerHTML = originalText;
+            this.disabled = false;
             showToast('Téléchargement terminé', `${modelName} a été téléchargé avec succès`, 'success');
             
             // Recharger la page pour afficher le nouveau modèle
@@ -510,23 +565,8 @@ document.addEventListener('DOMContentLoaded', function() {
         toastTitle.textContent = title;
         toastMessage.textContent = message;
         
-        toast.classList.remove('bg-success', 'bg-danger', 'bg-warning', 'bg-info', 'text-white');
-        
-        switch(type) {
-            case 'success':
-                toast.classList.add('bg-success', 'text-white');
-                break;
-            case 'error':
-                toast.classList.add('bg-danger', 'text-white');
-                break;
-            case 'warning':
-                toast.classList.add('bg-warning');
-                break;
-            case 'info':
-            default:
-                toast.classList.add('bg-info', 'text-white');
-                break;
-        }
+        toast.classList.remove('success', 'danger', 'warning', 'info');
+        toast.classList.add(type);
         
         const bsToast = new bootstrap.Toast(toast);
         bsToast.show();

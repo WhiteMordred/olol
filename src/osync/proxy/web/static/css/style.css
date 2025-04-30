@@ -1685,3 +1685,455 @@ pre {
     color: var(--cyber-black);
     box-shadow: 0 0 10px var(--secondary-glow);
 }
+
+/* CSS pour le Playground cyberpunk */
+
+/* Conteneur de chat */
+.cyber-chat-container {
+    height: 60vh;
+    overflow-y: auto;
+    background-color: var(--cyber-surface);
+    border: 1px solid var(--cyber-border);
+    border-radius: 3px;
+    padding: 1rem;
+    margin-bottom: 0;
+    scrollbar-width: thin;
+}
+
+/* Messages */
+.cyber-message {
+    padding: 0.75rem 1rem;
+    margin: 0.75rem 0;
+    border-radius: 3px;
+    max-width: 80%;
+    position: relative;
+    transition: all 0.25s;
+}
+
+.cyber-message:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+}
+
+.cyber-message.user {
+    background-color: var(--cyber-surface-elevated);
+    border-right: 2px solid var(--primary-color);
+    align-self: flex-end;
+    margin-left: auto;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.cyber-message.ai {
+    background-color: var(--cyber-surface-elevated);
+    border-left: 2px solid var(--secondary-color);
+    align-self: flex-start;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* Indicateur de saisie */
+.cyber-typing-indicator {
+    padding: 0.5rem 1rem;
+}
+
+.cyber-typing-indicator span {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background-color: var(--cyber-text-secondary);
+    border-radius: 50%;
+    margin-right: 5px;
+    animation: cyber-typing 1s infinite;
+}
+
+.cyber-typing-indicator span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.cyber-typing-indicator span:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes cyber-typing {
+    0% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+    100% { transform: translateY(0); }
+}
+
+/* Groupe d'input cyberpunk */
+.cyber-input-group {
+    display: flex;
+    border-top: 1px solid var(--cyber-border);
+}
+
+.cyber-input-group .cyber-input {
+    flex: 1;
+    resize: none;
+    border-radius: 3px 0 0 3px;
+    border-right: none;
+}
+
+.cyber-input-group .cyber-btn {
+    border-radius: 0 3px 3px 0;
+}
+
+/* Sliders cyberpunk */
+.cyber-range {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 6px;
+    background-color: var(--cyber-surface-elevated);
+    border-radius: 3px;
+    outline: none;
+}
+
+.cyber-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background-color: var(--primary-color);
+    box-shadow: 0 0 5px var(--primary-glow);
+    cursor: pointer;
+    transition: all 0.25s;
+}
+
+.cyber-range::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background-color: var(--primary-color);
+    box-shadow: 0 0 5px var(--primary-glow);
+    cursor: pointer;
+    transition: all 0.25s;
+    border: none;
+}
+
+.cyber-range::-webkit-slider-thumb:hover,
+.cyber-range::-moz-range-thumb:hover {
+    transform: scale(1.2);
+    box-shadow: 0 0 10px var(--primary-glow);
+}
+
+/* Cartes de modèle */
+.cyber-model-card {
+    background-color: var(--cyber-surface);
+    border: 1px solid var(--cyber-border);
+    border-radius: 3px;
+    transition: all 0.25s;
+    cursor: pointer;
+    overflow: hidden;
+    position: relative;
+    padding: 1rem;
+    height: 100%;
+}
+
+.cyber-model-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 3px;
+    height: 100%;
+    background-color: var(--primary-color);
+    transform: scaleY(0);
+    transition: transform 0.25s;
+}
+
+.cyber-model-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.3);
+}
+
+.cyber-model-card:hover::before {
+    transform: scaleY(1);
+}
+
+.cyber-model-card.active {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 10px var(--primary-glow);
+}
+
+.cyber-model-card.active::before {
+    transform: scaleY(1);
+}
+
+.cyber-heading-sm {
+    color: var(--primary-color);
+    position: relative;
+    display: inline-block;
+    margin-bottom: 1rem;
+}
+
+.cyber-heading-sm::after {
+    content: '';
+    position: absolute;
+    bottom: -0.5rem;
+    left: 0;
+    width: 40px;
+    height: 2px;
+    background-color: var(--primary-color);
+}
+
+/* CSS pour intégrer Swagger UI au thème Cyberpunk */
+
+/* Conteneur global de Swagger */
+.cyber-swagger-ui .swagger-ui {
+    font-family: inherit;
+    background-color: transparent;
+}
+
+/* Masquer la topbar par défaut de Swagger */
+.cyber-swagger-ui .swagger-ui .topbar {
+    display: none;
+}
+
+/* Ajuster les éléments de base */
+.cyber-swagger-ui .swagger-ui,
+.cyber-swagger-ui .swagger-ui .opblock-tag,
+.cyber-swagger-ui .swagger-ui .opblock .opblock-summary-description {
+    color: var(--cyber-text-primary);
+}
+
+/* Conteneur des schémas */
+.cyber-swagger-ui .swagger-ui .scheme-container {
+    background-color: var(--cyber-surface);
+    box-shadow: none;
+    border-radius: 3px;
+    padding: 15px;
+    margin-bottom: 20px;
+    border: 1px solid var(--cyber-border);
+}
+
+/* Boutons */
+.cyber-swagger-ui .swagger-ui .btn {
+    background-color: var(--cyber-surface-elevated);
+    border: 1px solid var(--cyber-border);
+    border-radius: 3px;
+    box-shadow: none;
+    color: var(--cyber-text-primary);
+    transition: all 0.25s;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 0.85rem;
+}
+
+.cyber-swagger-ui .swagger-ui .btn:hover,
+.cyber-swagger-ui .swagger-ui .btn:focus {
+    background-color: var(--primary-color);
+    color: var(--cyber-black);
+    box-shadow: 0 0 10px var(--primary-glow);
+}
+
+/* Blocs d'opérations */
+.cyber-swagger-ui .swagger-ui .opblock {
+    border-radius: 3px;
+    box-shadow: none;
+    margin-bottom: 15px;
+    background-color: var(--cyber-surface);
+    border: 1px solid var(--cyber-border);
+    overflow: hidden;
+}
+
+/* En-têtes des blocs d'opérations */
+.cyber-swagger-ui .swagger-ui .opblock .opblock-summary {
+    padding: 8px;
+    border-bottom: 1px solid var(--cyber-border);
+}
+
+.cyber-swagger-ui .swagger-ui .opblock .opblock-summary-method {
+    border-radius: 3px;
+    font-weight: bold;
+    text-shadow: none;
+    box-shadow: none;
+}
+
+/* Styles des méthodes HTTP */
+.cyber-swagger-ui .swagger-ui .opblock.opblock-get {
+    border-color: var(--info-color);
+}
+
+.cyber-swagger-ui .swagger-ui .opblock.opblock-get .opblock-summary-method {
+    background-color: var(--info-color);
+}
+
+.cyber-swagger-ui .swagger-ui .opblock.opblock-post {
+    border-color: var(--success-color);
+}
+
+.cyber-swagger-ui .swagger-ui .opblock.opblock-post .opblock-summary-method {
+    background-color: var(--success-color);
+}
+
+.cyber-swagger-ui .swagger-ui .opblock.opblock-put {
+    border-color: var(--warning-color);
+}
+
+.cyber-swagger-ui .swagger-ui .opblock.opblock-put .opblock-summary-method {
+    background-color: var(--warning-color);
+}
+
+.cyber-swagger-ui .swagger-ui .opblock.opblock-delete {
+    border-color: var(--danger-color);
+}
+
+.cyber-swagger-ui .swagger-ui .opblock.opblock-delete .opblock-summary-method {
+    background-color: var(--danger-color);
+}
+
+/* Corps des blocs d'opérations */
+.cyber-swagger-ui .swagger-ui .opblock-body {
+    background-color: var(--cyber-surface-elevated);
+}
+
+/* Formulaires et champs */
+.cyber-swagger-ui .swagger-ui input[type=text],
+.cyber-swagger-ui .swagger-ui textarea,
+.cyber-swagger-ui .swagger-ui select {
+    background-color: var(--cyber-dark);
+    color: var(--cyber-text-primary);
+    border: 1px solid var(--cyber-border);
+    border-radius: 3px;
+    transition: all 0.25s;
+}
+
+.cyber-swagger-ui .swagger-ui input[type=text]:focus,
+.cyber-swagger-ui .swagger-ui textarea:focus,
+.cyber-swagger-ui .swagger-ui select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 8px var(--primary-glow);
+    outline: none;
+}
+
+/* Tableaux */
+.cyber-swagger-ui .swagger-ui table {
+    background-color: transparent;
+    color: var(--cyber-text-primary);
+}
+
+.cyber-swagger-ui .swagger-ui table thead tr td, 
+.cyber-swagger-ui .swagger-ui table thead tr th {
+    color: var(--cyber-text-secondary);
+    background-color: var(--cyber-dark);
+    padding: 10px;
+    border-bottom: 1px solid var(--cyber-border);
+}
+
+.cyber-swagger-ui .swagger-ui table tbody tr td {
+    padding: 10px;
+    border-bottom: 1px solid var(--cyber-border);
+}
+
+/* Coloration syntaxique */
+.cyber-swagger-ui .swagger-ui .opblock-body pre.microlight,
+.cyber-swagger-ui .swagger-ui .highlight-code {
+    background-color: var(--cyber-dark);
+    color: var(--cyber-text-primary);
+    border: 1px solid var(--cyber-border);
+    border-radius: 3px;
+}
+
+/* Modèles */
+.cyber-swagger-ui .swagger-ui .model-box {
+    background-color: var(--cyber-surface-elevated);
+    border-radius: 3px;
+    border: 1px solid var(--cyber-border);
+}
+
+.cyber-swagger-ui .swagger-ui .model {
+    color: var(--cyber-text-primary);
+}
+
+.cyber-swagger-ui .swagger-ui .model-title {
+    color: var(--primary-color);
+}
+
+/* Description */
+.cyber-swagger-ui .swagger-ui .opblock-description-wrapper,
+.cyber-swagger-ui .swagger-ui .opblock-external-docs-wrapper,
+.cyber-swagger-ui .swagger-ui .opblock-title_normal {
+    padding: 15px;
+    background-color: var(--cyber-surface-elevated);
+    color: var(--cyber-text-primary);
+}
+
+.cyber-swagger-ui .swagger-ui .opblock-description-wrapper p,
+.cyber-swagger-ui .swagger-ui .opblock-external-docs-wrapper p,
+.cyber-swagger-ui .swagger-ui .opblock-title_normal p {
+    color: var(--cyber-text-secondary);
+}
+
+/* Correction pour la mise en page */
+.cyber-swagger-ui .swagger-ui .response-col_links {
+    display: none;
+}
+
+/* Hides the default Swagger footer */
+.cyber-swagger-ui .swagger-ui .swagger-ui-wrap > div:last-child {
+    display: none;
+}
+
+/* Styles spécifiques pour les réponses */
+.cyber-swagger-ui .swagger-ui .responses-table {
+    background-color: var(--cyber-surface);
+}
+
+.cyber-swagger-ui .swagger-ui .responses-table .response-col_status {
+    color: var(--primary-color);
+    font-weight: bold;
+}
+
+/* Styles pour les exemples */
+.cyber-swagger-ui .swagger-ui .example {
+    border: 1px solid var(--cyber-border);
+    background-color: var(--cyber-dark);
+}
+
+/* Styles pour les info additionnelles */
+.cyber-swagger-ui .swagger-ui .info {
+    margin: 15px 0;
+}
+
+.cyber-swagger-ui .swagger-ui .info .title {
+    color: var(--primary-color);
+}
+
+.cyber-swagger-ui .swagger-ui .info li, 
+.cyber-swagger-ui .swagger-ui .info p, 
+.cyber-swagger-ui .swagger-ui .info table {
+    color: var(--cyber-text-primary);
+}
+
+/* Styles pour les tags */
+.cyber-swagger-ui .swagger-ui .opblock-tag {
+    border-bottom: 1px solid var(--cyber-border);
+    color: var(--primary-color);
+    font-size: 1.2rem;
+    margin-top: 20px;
+}
+
+.cyber-swagger-ui .swagger-ui .opblock-tag:hover {
+    background-color: var(--cyber-surface-elevated);
+}
+
+/* Bouton Execute */
+.cyber-swagger-ui .swagger-ui .btn.execute {
+    background-color: var(--primary-color);
+    color: var(--cyber-black);
+    border-color: var(--primary-color);
+}
+
+.cyber-swagger-ui .swagger-ui .btn.execute:hover {
+    box-shadow: 0 0 10px var(--primary-glow);
+}
+
+/* Bouton Authorize */
+.cyber-swagger-ui .swagger-ui .auth-wrapper .authorize {
+    color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.cyber-swagger-ui .swagger-ui .auth-wrapper .authorize:hover {
+    background-color: var(--primary-color);
+    color: var(--cyber-black);
+}
