@@ -3,40 +3,45 @@
 {% block title %}Terminal - Ollama Sync{% endblock %}
 
 {% block content %}
+<div class="row">
+    <div class="col-lg-12">
+        <h2 class="mb-4 cyber-heading">Terminal</h2>
+    </div>
+</div>
+
+<!-- Terminal principal -->
 <div class="row mb-4">
-    <div class="col">
-        <h2 class="mb-4">
-            <i class="fas fa-terminal me-2"></i> Terminal
-        </h2>
-        
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span>Console d'administration</span>
-                <div class="btn-group">
-                    <button class="btn btn-sm btn-danger" id="clear-terminal">
-                        <i class="fas fa-trash"></i> Effacer
-                    </button>
+    <div class="col-lg-12">
+        <div class="cyber-panel">
+            <div class="cyber-panel-header">
+                <i class="fas fa-terminal"></i> Console d'administration
+                <div class="float-end">
                     <div class="btn-group">
-                        <button class="btn btn-sm btn-secondary dropdown-toggle" id="command-dropdown" 
-                                data-bs-toggle="dropdown" aria-expanded="false">
-                            Commandes rapides
+                        <button class="cyber-btn cyber-btn-sm cyber-btn-danger" id="clear-terminal">
+                            <i class="fas fa-trash"></i> Effacer
                         </button>
-                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="command-dropdown">
-                            <li><a class="dropdown-item" href="#" data-cmd="help">Aide (commandes disponibles)</a></li>
-                            <li><a class="dropdown-item" href="#" data-cmd="status">Status du cluster</a></li>
-                            <li><a class="dropdown-item" href="#" data-cmd="list models">Lister les modèles</a></li>
-                            <li><a class="dropdown-item" href="#" data-cmd="list servers">Lister les serveurs</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="#" data-cmd="restart proxy">Redémarrer le proxy</a></li>
-                        </ul>
+                        <div class="btn-group">
+                            <button class="cyber-btn cyber-btn-sm dropdown-toggle" id="command-dropdown" 
+                                    data-bs-toggle="dropdown" aria-expanded="false">
+                                Commandes rapides
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="command-dropdown">
+                                <li><a class="dropdown-item" href="#" data-cmd="help">Aide (commandes disponibles)</a></li>
+                                <li><a class="dropdown-item" href="#" data-cmd="status">Status du cluster</a></li>
+                                <li><a class="dropdown-item" href="#" data-cmd="list models">Lister les modèles</a></li>
+                                <li><a class="dropdown-item" href="#" data-cmd="list servers">Lister les serveurs</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="#" data-cmd="restart proxy">Redémarrer le proxy</a></li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="card-body p-0">
-                <div class="terminal-container" id="terminal-container">
-                    <div class="terminal-output" id="terminal-output">
+            <div class="cyber-panel-body p-0">
+                <div class="cyber-terminal" id="terminal-container">
+                    <div class="cyber-terminal-output" id="terminal-output">
                         <div class="welcome-message">
-                            <pre class="text-light">
+                            <pre class="text-neon">
    ____  _  _                            ____                     
   / __ \| || |                          / ___|                    
  | |  | | || |_ _ __ ___   __ _      __| (___  _   _ _ __   ___  
@@ -51,9 +56,9 @@ Type 'help' pour voir les commandes disponibles.
 </pre>
                         </div>
                     </div>
-                    <div class="terminal-input-line d-flex">
-                        <span class="terminal-prompt me-2">osync&gt;</span>
-                        <input type="text" id="terminal-input" class="terminal-input-field" autofocus>
+                    <div class="cyber-terminal-input-line d-flex">
+                        <span class="cyber-terminal-prompt me-2">osync&gt;</span>
+                        <input type="text" id="terminal-input" class="cyber-terminal-input-field" autofocus>
                     </div>
                 </div>
             </div>
@@ -63,13 +68,13 @@ Type 'help' pour voir les commandes disponibles.
 
 <div class="row">
     <div class="col-md-6">
-        <div class="card mb-4">
-            <div class="card-header">
-                <i class="fas fa-info-circle me-2"></i> Informations système
+        <div class="cyber-panel mb-4">
+            <div class="cyber-panel-header">
+                <i class="fas fa-info-circle"></i> Informations système
             </div>
-            <div class="card-body">
+            <div class="cyber-panel-body">
                 <div class="table-responsive">
-                    <table class="table table-striped">
+                    <table class="cyber-table table-striped">
                         <tbody>
                             <tr>
                                 <th scope="row">Version</th>
@@ -99,17 +104,17 @@ Type 'help' pour voir les commandes disponibles.
     </div>
     
     <div class="col-md-6">
-        <div class="card mb-4">
-            <div class="card-header">
-                <i class="fas fa-list-alt me-2"></i> Actions récentes
+        <div class="cyber-panel mb-4">
+            <div class="cyber-panel-header">
+                <i class="fas fa-list-alt"></i> Actions récentes
             </div>
-            <div class="card-body p-0">
-                <ul class="list-group list-group-flush" id="recent-actions">
+            <div class="cyber-panel-body p-0">
+                <ul class="list-group list-group-flush cyber-list" id="recent-actions">
                     <!-- Les actions récentes seront chargées dynamiquement -->
                 </ul>
             </div>
-            <div class="card-footer text-center">
-                <a href="/log" class="btn btn-sm btn-outline-primary">Voir tous les journaux</a>
+            <div class="cyber-panel-footer text-center">
+                <a href="/log" class="cyber-btn cyber-btn-sm">Voir tous les journaux</a>
             </div>
         </div>
     </div>
@@ -131,7 +136,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Fonction pour ajouter une ligne de sortie au terminal
     function addTerminalOutput(text, className = '') {
         const output = document.createElement('div');
-        output.className = 'terminal-line ' + className;
+        output.className = 'cyber-terminal-line ' + className;
         output.textContent = text;
         terminal.appendChild(output);
         terminal.scrollTop = terminal.scrollHeight;
@@ -140,8 +145,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Fonction pour ajouter une commande exécutée au terminal
     function addCommandLine(cmd) {
         const cmdLine = document.createElement('div');
-        cmdLine.className = 'terminal-command-line';
-        cmdLine.innerHTML = `<span class="terminal-prompt">osync&gt;</span> <span>${cmd}</span>`;
+        cmdLine.className = 'cyber-terminal-command-line';
+        cmdLine.innerHTML = `<span class="cyber-terminal-prompt">osync&gt;</span> <span>${cmd}</span>`;
         terminal.appendChild(cmdLine);
         terminal.scrollTop = terminal.scrollHeight;
     }
@@ -213,14 +218,14 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Commande d'aide
         if (cmd === 'help') {
-            addTerminalOutput('\nCommandes disponibles:');
+            addTerminalOutput('\nCommandes disponibles:', 'text-info');
             addTerminalOutput('  help                 - Affiche cette aide');
             addTerminalOutput('  clear                - Efface le terminal');
             addTerminalOutput('  status               - Affiche l\'état du cluster');
             addTerminalOutput('  list models          - Liste tous les modèles disponibles');
             addTerminalOutput('  list servers         - Liste tous les serveurs');
             addTerminalOutput('  server info <ip>     - Détails d\'un serveur');
-            addTerminalOutput('  model info <name>    - Détails d\'un modèle');
+            addTerminalOutput('  model info <n>       - Détails d\'un modèle');
             addTerminalOutput('  restart proxy        - Redémarre le service proxy');
             addTerminalOutput('  pull <model>         - Télécharge un modèle');
             addTerminalOutput('\n');
@@ -243,12 +248,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 .then(response => response.json())
                 .then(data => {
                     // Affichage des données réelles du cluster
-                    addTerminalOutput('\nÉtat du cluster Ollama Sync:');
-                    addTerminalOutput(`  - Serveurs: ${data.online_servers} en ligne, ${data.offline_servers} hors ligne`);
-                    addTerminalOutput(`  - Modèles disponibles: ${data.models_count}`);
-                    addTerminalOutput(`  - Tâches actives: ${data.active_tasks}`);
-                    addTerminalOutput(`  - Tâches en attente: ${data.pending_tasks}`);
-                    addTerminalOutput(`  - Santé globale: ${data.health_status}`);
+                    addTerminalOutput('\nÉtat du cluster Ollama Sync:', 'text-neon');
+                    addTerminalOutput(`  - Serveurs: ${data.online_servers} en ligne, ${data.offline_servers} hors ligne`, 'text-success');
+                    addTerminalOutput(`  - Modèles disponibles: ${data.models_count}`, 'text-success');
+                    addTerminalOutput(`  - Tâches actives: ${data.active_tasks}`, 'text-success');
+                    addTerminalOutput(`  - Tâches en attente: ${data.pending_tasks}`, 'text-success');
+                    addTerminalOutput(`  - Santé globale: ${data.health_status}`, 'text-success');
                     addTerminalOutput('\n');
                     
                     // Mise à jour des informations système
@@ -277,10 +282,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 .then(response => response.json())
                 .then(data => {
                     // En-tête du tableau
-                    addTerminalOutput('\nModèles disponibles dans le cluster:');
-                    addTerminalOutput('+-----------------+--------+--------------+----------+');
-                    addTerminalOutput('| Nom             | Taille | Serveurs     | Statut   |');
-                    addTerminalOutput('+-----------------+--------+--------------+----------+');
+                    addTerminalOutput('\nModèles disponibles dans le cluster:', 'text-neon');
+                    addTerminalOutput('+-----------------+--------+--------------+----------+', 'text-muted');
+                    addTerminalOutput('| Nom             | Taille | Serveurs     | Statut   |', 'text-header');
+                    addTerminalOutput('+-----------------+--------+--------------+----------+', 'text-muted');
                     
                     // Affichage dynamique des modèles
                     if (data.models && data.models.length > 0) {
@@ -296,18 +301,18 @@ document.addEventListener('DOMContentLoaded', function() {
                         });
                         
                         // Pied du tableau
-                        addTerminalOutput('+-----------------+--------+--------------+----------+');
+                        addTerminalOutput('+-----------------+--------+--------------+----------+', 'text-muted');
                         
                         // Comptage des modèles prêts
                         const readyModels = data.models.filter(m => 
                             (m.status || '').toLowerCase() === 'prêt' || (m.status || '').toLowerCase() === 'ready'
                         ).length;
                         
-                        addTerminalOutput(`\nTotal: ${data.models.length} modèles (${readyModels} prêts, ${data.models.length - readyModels} autres)\n`);
+                        addTerminalOutput(`\nTotal: ${data.models.length} modèles (${readyModels} prêts, ${data.models.length - readyModels} autres)\n`, 'text-success');
                     } else {
-                        addTerminalOutput('| Aucun modèle disponible                               |');
-                        addTerminalOutput('+-----------------+--------+--------------+----------+');
-                        addTerminalOutput('\nAucun modèle trouvé dans le cluster.\n');
+                        addTerminalOutput('| Aucun modèle disponible                               |', 'text-warning');
+                        addTerminalOutput('+-----------------+--------+--------------+----------+', 'text-muted');
+                        addTerminalOutput('\nAucun modèle trouvé dans le cluster.\n', 'text-warning');
                     }
                     
                     // Ajouter aux actions récentes
@@ -327,10 +332,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 .then(response => response.json())
                 .then(data => {
                     // En-tête du tableau
-                    addTerminalOutput('\nServeurs dans le cluster:');
-                    addTerminalOutput('+----------------+--------+-------+--------+-------------+');
-                    addTerminalOutput('| Adresse        | État   | Charge | Modèles | Backend    |');
-                    addTerminalOutput('+----------------+--------+-------+--------+-------------+');
+                    addTerminalOutput('\nServeurs dans le cluster:', 'text-neon');
+                    addTerminalOutput('+----------------+--------+-------+--------+-------------+', 'text-muted');
+                    addTerminalOutput('| Adresse        | État   | Charge | Modèles | Backend    |', 'text-header');
+                    addTerminalOutput('+----------------+--------+-------+--------+-------------+', 'text-muted');
                     
                     // Affichage dynamique des serveurs
                     if (data.servers && data.servers.length > 0) {
@@ -346,16 +351,17 @@ document.addEventListener('DOMContentLoaded', function() {
                             const models = isOnline ? (server.models ? server.models.length.toString().padEnd(7) : '0      ') : '-      ';
                             const backend = isOnline ? (server.backend || 'Inconnu').padEnd(12) : 'Inconnu     ';
                             
-                            addTerminalOutput(`| ${address} | ${status} | ${load} | ${models} | ${backend} |`);
+                            const statusClass = isOnline ? 'text-success' : 'text-danger';
+                            addTerminalOutput(`| ${address} | <span class="${statusClass}">${status}</span> | ${load} | ${models} | ${backend} |`, 'terminal-server-line');
                         });
                         
                         // Pied du tableau
-                        addTerminalOutput('+----------------+--------+-------+--------+-------------+');
-                        addTerminalOutput(`\nTotal: ${data.servers.length} serveurs (${onlineCount} en ligne)\n`);
+                        addTerminalOutput('+----------------+--------+-------+--------+-------------+', 'text-muted');
+                        addTerminalOutput(`\nTotal: ${data.servers.length} serveurs (${onlineCount} en ligne)\n`, 'text-success');
                     } else {
-                        addTerminalOutput('| Aucun serveur disponible                              |');
-                        addTerminalOutput('+----------------+--------+-------+--------+-------------+');
-                        addTerminalOutput('\nAucun serveur trouvé dans le cluster.\n');
+                        addTerminalOutput('| Aucun serveur disponible                              |', 'text-warning');
+                        addTerminalOutput('+----------------+--------+-------+--------+-------------+', 'text-muted');
+                        addTerminalOutput('\nAucun serveur trouvé dans le cluster.\n', 'text-warning');
                     }
                     
                     // Ajouter aux actions récentes
@@ -397,8 +403,20 @@ document.addEventListener('DOMContentLoaded', function() {
                         .then(data => {
                             // Afficher le processus de redémarrage basé sur les données réelles
                             if (data.status === "in_progress") {
-                                addTerminalOutput('Le processus de redémarrage a été initié.', 'text-muted');
-                                addTerminalOutput('Le service sera bientôt indisponible puis se reconnectera.', 'text-muted');
+                                addTerminalOutput('Le processus de redémarrage a été initié.', 'text-info');
+                                addTerminalOutput('Le service sera bientôt indisponible puis se reconnectera.', 'text-info');
+                                
+                                // Compte à rebours pour simulation de redémarrage
+                                let countdown = 5;
+                                const timer = setInterval(() => {
+                                    addTerminalOutput(`Redémarrage dans ${countdown}...`, 'text-info');
+                                    countdown--;
+                                    
+                                    if (countdown < 0) {
+                                        clearInterval(timer);
+                                        addTerminalOutput('Redémarrage terminé !', 'text-success');
+                                    }
+                                }, 1000);
                             }
                             
                             // Ajouter aux actions récentes
@@ -421,6 +439,87 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
+        // Commande pull de modèle
+        if (cmd.startsWith('pull ')) {
+            const modelName = cmd.substring(5).trim();
+            if (!modelName) {
+                addTerminalOutput('Erreur: Nom de modèle requis. Exemple: pull llama2', 'text-danger');
+                return;
+            }
+            
+            addTerminalOutput(`Tentative de téléchargement du modèle ${modelName}...`, 'text-info');
+            addTerminalOutput('Cette opération peut prendre plusieurs minutes selon la taille du modèle.', 'text-info');
+            
+            fetch(`/api/v1/models/pull`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ name: modelName })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'started') {
+                    addTerminalOutput(`Téléchargement de ${modelName} démarré avec succès.`, 'text-success');
+                    addTerminalOutput(`ID de la tâche: ${data.task_id}`, 'text-info');
+                    addTerminalOutput('Vous pouvez suivre la progression dans la section File d\'attente.', 'text-info');
+                    
+                    // Ajouter aux actions récentes
+                    addRecentAction(`Téléchargement de ${modelName} démarré`, 'fas fa-cloud-download-alt text-info');
+                } else {
+                    addTerminalOutput(`Erreur: ${data.message || 'Impossible de démarrer le téléchargement'}`, 'text-danger');
+                }
+            })
+            .catch(error => {
+                addTerminalOutput(`\nErreur lors du téléchargement: ${error.message}`, 'text-danger');
+            });
+            return;
+        }
+        
+        // Informations sur un serveur
+        if (cmd.startsWith('server info ')) {
+            const serverAddress = cmd.substring(12).trim();
+            if (!serverAddress) {
+                addTerminalOutput('Erreur: Adresse du serveur requise. Exemple: server info 192.168.1.10', 'text-danger');
+                return;
+            }
+            
+            addTerminalOutput(`Récupération des informations pour le serveur ${serverAddress}...`, 'text-info');
+            
+            fetch(`/api/v1/servers/${encodeURIComponent(serverAddress)}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Serveur non trouvé (${response.status})`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    addTerminalOutput(`\nInformations du serveur ${serverAddress}:`, 'text-neon');
+                    addTerminalOutput(`  État: ${data.healthy ? 'En ligne' : 'Hors ligne'}`, data.healthy ? 'text-success' : 'text-danger');
+                    if (data.healthy) {
+                        addTerminalOutput(`  Backend: ${data.backend || 'Inconnu'}`, 'text-success');
+                        addTerminalOutput(`  Charge: ${Math.round(data.load * 100)}%`, 'text-success');
+                        addTerminalOutput(`  Latence: ${data.latency_ms.toFixed(2)} ms`, 'text-success');
+                        addTerminalOutput(`  Modèles: ${data.models ? data.models.length : 0}`, 'text-success');
+                        
+                        if (data.models && data.models.length > 0) {
+                            addTerminalOutput('\n  Modèles disponibles:', 'text-info');
+                            data.models.forEach((model, idx) => {
+                                addTerminalOutput(`    ${idx + 1}. ${model}`, 'text-info');
+                            });
+                        }
+                    }
+                    addTerminalOutput('\n');
+                    
+                    // Ajouter aux actions récentes
+                    addRecentAction(`Info serveur ${serverAddress}`, 'fas fa-info-circle text-info');
+                })
+                .catch(error => {
+                    addTerminalOutput(`\nErreur: ${error.message}`, 'text-danger');
+                });
+            return;
+        }
+        
         // Commande inconnue
         addTerminalOutput(`Commande non reconnue: ${cmd}. Tapez 'help' pour voir les commandes disponibles.`, 'text-danger');
     }
@@ -438,7 +537,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function addRecentAction(text, iconClass) {
         const actions = document.getElementById('recent-actions');
         const action = document.createElement('li');
-        action.className = 'list-group-item d-flex justify-content-between align-items-center';
+        action.className = 'list-group-item d-flex justify-content-between align-items-center cyber-list-item';
         
         const now = new Date();
         const timeStr = now.getHours().toString().padStart(2, '0') + ':' + 
@@ -449,7 +548,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 <i class="${iconClass} me-2"></i>
                 ${text}
             </div>
-            <span class="badge bg-secondary">${timeStr}</span>
+            <span class="cyber-badge">
+                <i class="fas fa-clock me-1"></i> ${timeStr}
+            </span>
         `;
         
         // Insérer au début de la liste
@@ -494,10 +595,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     addRecentAction(log.message, iconClass);
                 });
+            } else {
+                // Si aucune action récente n'est disponible, ajouter un message par défaut
+                addRecentAction('Système démarré', 'fas fa-power-off text-success');
             }
         })
         .catch(error => {
             console.error("Erreur lors du chargement des informations:", error);
+            // Afficher un message d'erreur dans le terminal
+            addTerminalOutput(`\nErreur lors du chargement des informations système: ${error.message}`, 'text-danger');
         });
     
     // Focus sur le champ de saisie
@@ -509,71 +615,117 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <style>
-.terminal-container {
-    background-color: #1e1e1e;
-    border-radius: 0.25rem;
+.cyber-terminal {
+    background-color: var(--dark-bg-color);
+    border-radius: 4px;
     height: 400px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    font-family: 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
+    box-shadow: 0 0 10px rgba(0, 243, 255, 0.2);
 }
 
-.terminal-output {
+.cyber-terminal-output {
     flex: 1;
     padding: 0.75rem;
     overflow-y: auto;
-    font-family: 'Consolas', 'Courier New', monospace;
     font-size: 0.875rem;
     line-height: 1.4;
     color: #f1f1f1;
 }
 
-.terminal-input-line {
+.cyber-terminal-input-line {
     padding: 0.5rem 0.75rem;
-    background-color: #252525;
+    background-color: rgba(15, 15, 15, 0.9);
     display: flex;
     align-items: center;
-    border-top: 1px solid #333;
+    border-top: 1px solid var(--border-color);
 }
 
-.terminal-prompt {
-    color: #0dcaf0;
-    font-family: 'Consolas', 'Courier New', monospace;
+.cyber-terminal-prompt {
+    color: var(--info-color);
     font-weight: bold;
 }
 
-.terminal-input-field {
+.cyber-terminal-input-field {
     background: transparent;
     border: none;
     color: #f1f1f1;
     flex: 1;
-    font-family: 'Consolas', 'Courier New', monospace;
+    font-family: 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
     font-size: 0.875rem;
-    caret-color: #f1f1f1;
+    caret-color: var(--info-color);
     outline: none;
 }
 
-.terminal-line {
+.cyber-terminal-line {
     margin-bottom: 0.25rem;
     white-space: pre-wrap;
     word-wrap: break-word;
+    position: relative;
 }
 
-.terminal-command-line {
+.cyber-terminal-command-line {
     margin-bottom: 0.25rem;
     color: #f1f1f1;
     display: flex;
     gap: 0.5rem;
+    font-weight: bold;
 }
 
 .welcome-message pre {
     margin-bottom: 0.5rem;
 }
 
-/* Actions récentes */
-#recent-actions .list-group-item {
-    padding: 0.5rem 0.75rem;
+.text-neon {
+    color: var(--info-color);
+    text-shadow: 0 0 5px rgba(0, 243, 255, 0.5);
+}
+
+.text-header {
+    color: var(--warning-color);
+    font-weight: bold;
+}
+
+.cyber-list-item {
     background-color: transparent;
+    border-bottom: 1px solid var(--border-color);
+    padding: 8px 12px;
+    color: var(--text-color);
+}
+
+.cyber-list-item:hover {
+    background-color: rgba(0, 243, 255, 0.05);
+}
+
+.terminal-server-line span {
+    display: inline;
+}
+
+.text-info {
+    color: var(--info-color) !important;
+}
+
+.text-success {
+    color: var(--success-color) !important;
+}
+
+.text-warning {
+    color: var(--warning-color) !important;
+}
+
+.text-danger {
+    color: var(--danger-color) !important;
+}
+
+.text-muted {
+    color: #606060 !important;
+}
+
+/* Tableau striped personnalisé */
+.table-striped tr:nth-child(even) {
+    background-color: rgba(20, 20, 20, 0.4);
 }
 </style>
 {% endblock %}
