@@ -151,18 +151,21 @@ def queue():
         for request_id, request in queue_manager._requests_cache.items():
             status = request.get("status", "")
             
+            # Créer une version formatée de la tâche pour l'affichage
+            formatted_task = format_task_for_display(request)
+            
             if status == queue_manager.STATUS_PROCESSING:
                 if len(tasks['active']) < 20:  # Limiter à 20 tâches actives
-                    tasks['active'].append(request)
+                    tasks['active'].append(formatted_task)
             elif status == queue_manager.STATUS_PENDING:
                 if len(tasks['pending']) < 20:  # Limiter à 20 tâches en attente
-                    tasks['pending'].append(request)
+                    tasks['pending'].append(formatted_task)
             elif status == queue_manager.STATUS_COMPLETED:
                 if len(tasks['completed']) < 12:  # Limiter à 12 tâches complétées
-                    tasks['completed'].append(request)
-            elif status == queue_manager.STATUS_FAILED or status == queue_manager.STATUS_CANCELED:
+                    tasks['completed'].append(formatted_task)
+            elif status in [queue_manager.STATUS_FAILED, queue_manager.STATUS_CANCELED]:
                 if len(tasks['failed']) < 5:  # Limiter à 5 tâches échouées
-                    tasks['failed'].append(request)
+                    tasks['failed'].append(formatted_task)
     
     # Trier les collections par date de création ou mise à jour
     tasks['active'].sort(key=lambda x: x.get('started_at', ''), reverse=True)
@@ -170,7 +173,196 @@ def queue():
     tasks['completed'].sort(key=lambda x: x.get('completed_at', ''), reverse=True)
     tasks['failed'].sort(key=lambda x: x.get('completed_at', ''), reverse=True)
     
-    return render_template('queue.html', stats=queue_stats, tasks=tasks)
+    # Ajouter le nombre total de tâches pour l'affichage dans le footer
+    tasks['total'] = len(tasks['active']) + len(tasks['pending']) + len(tasks['completed']) + len(tasks['failed'])
+    
+    # Préparer les données pour les graphiques
+    queue_data = {
+        'active': queue_stats.get('processing', 0),
+        'pending': queue_stats.get('pending', 0),
+        'completed': queue_stats.get('completed', 0),
+        'failed': queue_stats.get('failed', 0) + queue_stats.get('canceled', 0)
+    }
+    
+    # Données pour le graphique de performance (générées pour l'exemple)
+    performance_data = generate_performance_data()
+    
+    # Récupérer la liste des modèles et serveurs disponibles pour le modal "Nouvelle tâche"
+    available_models = get_models_list()
+    available_servers = get_servers_list()
+    
+    return render_template('queue.html', 
+                          stats=queue_stats, 
+                          tasks=tasks,
+                          queue_data=queue_data,
+                          performance_data=performance_data,
+                          available_models=available_models,
+                          available_servers=available_servers)
+
+def format_task_for_display(task):
+    """
+    Formate une tâche pour l'affichage dans l'interface utilisateur.
+    """
+    formatted = task.copy()
+    
+    # Formater les dates relatives
+    created_at = task.get('created_at')
+    started_at = task.get('started_at')
+    completed_at = task.get('completed_at')
+    
+    if created_at:
+        try:
+            created_time = datetime.fromisoformat(created_at)
+            formatted['created_relative'] = format_relative_time(created_time)
+        except (ValueError, TypeError):
+            formatted['created_relative'] = "Inconnu"
+    
+    if started_at:
+        try:
+            started_time = datetime.fromisoformat(started_at)
+            formatted['started_relative'] = format_relative_time(started_time)
+        except (ValueError, TypeError):
+            formatted['started_relative'] = "Inconnu"
+    
+    if completed_at:
+        try:
+            completed_time = datetime.fromisoformat(completed_at)
+            formatted['completed_relative'] = format_relative_time(completed_time)
+            
+            if started_at:
+                try:
+                    started_time = datetime.fromisoformat(started_at)
+                    duration_seconds = (completed_time - started_time).total_seconds()
+                    formatted['duration'] = format_duration(duration_seconds)
+                except (ValueError, TypeError):
+                    formatted['duration'] = "Inconnu"
+        except (ValueError, TypeError):
+            formatted['completed_relative'] = "Inconnu"
+    
+    # Formater l'état avec la classe CSS appropriée
+    status = task.get('status', '').lower()
+    if status == 'processing':
+        formatted['status'] = "En cours"
+        formatted['status_class'] = "info"
+    elif status == 'pending':
+        formatted['status'] = "En attente"
+        formatted['status_class'] = "secondary"
+    elif status == 'completed':
+        formatted['status'] = "Terminée"
+        formatted['status_class'] = "success"
+    elif status == 'failed':
+        formatted['status'] = "Échouée"
+        formatted['status_class'] = "danger"
+        formatted['error'] = task.get('failed_reason', 'Erreur inconnue')
+    elif status == 'canceled':
+        formatted['status'] = "Annulée"
+        formatted['status_class'] = "warning"
+        formatted['error'] = task.get('canceled_reason', 'Annulation')
+    
+    # Formater la priorité
+    priority = task.get('priority', 10)
+    if priority > 15:
+        formatted['priority'] = "Haute"
+        formatted['priority_class'] = "danger"
+    elif priority > 5:
+        formatted['priority'] = "Normale"
+        formatted['priority_class'] = "secondary"
+    else:
+        formatted['priority'] = "Basse"
+        formatted['priority_class'] = "info"
+    
+    # Formater la progression (simulée pour l'exemple)
+    if status == 'processing':
+        # Calculer une progression basée sur le temps écoulé (simulé)
+        if started_at:
+            try:
+                started_time = datetime.fromisoformat(started_at)
+                elapsed = (datetime.now() - started_time).total_seconds()
+                # Supposer que les tâches prennent en moyenne 60 secondes
+                progress = min(int(elapsed / 60.0 * 100), 95)
+                formatted['progress'] = progress
+            except (ValueError, TypeError):
+                formatted['progress'] = 50  # Valeur par défaut
+        else:
+            formatted['progress'] = 10  # Valeur par défaut si pas de temps de démarrage
+    
+    # Server assignment
+    formatted['server'] = task.get('server_assigned', 'Auto')
+    
+    # Position in queue (for pending tasks)
+    if status == 'pending':
+        formatted['position'] = task.get('queue_position', 1)
+    
+    return formatted
+
+def format_relative_time(dt):
+    """
+    Formate un datetime en temps relatif (ex: "il y a 5 min").
+    """
+    now = datetime.now()
+    diff = now - dt
+    
+    seconds = diff.total_seconds()
+    if seconds < 60:
+        return "À l'instant"
+    elif seconds < 3600:
+        minutes = int(seconds / 60)
+        return f"Il y a {minutes} min"
+    elif seconds < 86400:
+        hours = int(seconds / 3600)
+        return f"Il y a {hours}h"
+    else:
+        days = int(seconds / 86400)
+        return f"Il y a {days}j"
+
+def format_duration(seconds):
+    """
+    Formate une durée en secondes en format lisible (ex: "45s", "2m 30s").
+    """
+    if seconds < 60:
+        return f"{int(seconds)}s"
+    elif seconds < 3600:
+        minutes = int(seconds / 60)
+        remaining_seconds = int(seconds % 60)
+        return f"{minutes}m {remaining_seconds}s"
+    else:
+        hours = int(seconds / 3600)
+        remaining_minutes = int((seconds % 3600) / 60)
+        return f"{hours}h {remaining_minutes}m"
+
+def generate_performance_data():
+    """
+    Génère des données de performance simulées pour le graphique.
+    """
+    # Labels pour les dernières heures
+    labels = []
+    for i in range(8, 0, -1):
+        if i == 1:
+            labels.append("Il y a 1h")
+        else:
+            labels.append(f"Il y a {i}h")
+    labels.append("Maintenant")
+    
+    # Générer des données simulées de temps d'attente
+    import random
+    base_waiting_time = 15  # secondes
+    waiting_times = []
+    for _ in range(len(labels)):
+        variation = random.uniform(-5, 10)
+        waiting_times.append(max(0, base_waiting_time + variation))
+    
+    # Générer des données simulées de tâches par heure
+    base_tasks_per_hour = 8
+    tasks_per_hour = []
+    for _ in range(len(labels)):
+        variation = random.uniform(-3, 5)
+        tasks_per_hour.append(max(1, round(base_tasks_per_hour + variation)))
+    
+    return {
+        'labels': labels,
+        'waiting_times': waiting_times,
+        'tasks_per_hour': tasks_per_hour
+    }
 
 @app.route('/log')
 def logs():
