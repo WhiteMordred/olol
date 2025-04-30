@@ -6,12 +6,12 @@
 <div class="row mb-4">
     <div class="col">
         <h2 class="mb-4">
-            <i class="fas fa-tasks me-2"></i> Gestionnaire de file d'attente
+            <i class="fas fa-tasks me-2"></i> File d'attente
         </h2>
-
+        
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <span>Tâches en cours et en attente</span>
+                <span>Tâches en attente et en cours</span>
                 <div class="btn-group">
                     <button class="btn btn-sm btn-primary" id="refresh-queue">
                         <i class="fas fa-sync-alt"></i> Rafraîchir
@@ -22,322 +22,219 @@
                 </div>
             </div>
             <div class="card-body">
-                <div class="alert alert-info mb-4">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-shrink-0">
-                            <i class="fas fa-info-circle fa-2x me-3"></i>
-                        </div>
-                        <div class="flex-grow-1">
-                            <h5 class="alert-heading">État de la file d'attente</h5>
-                            <p class="mb-0">
-                                <strong>Tâches en cours:</strong> <span class="badge rounded-pill bg-primary" id="running-tasks">2</span>
-                                <strong class="ms-3">En attente:</strong> <span class="badge rounded-pill bg-secondary" id="pending-tasks">5</span>
-                                <strong class="ms-3">Capacité maximale:</strong> <span class="badge rounded-pill bg-dark" id="max-capacity">10</span>
-                            </p>
-                        </div>
-                        <div class="flex-shrink-0">
-                            <div class="progress" style="width: 100px; height: 30px;">
-                                <div class="progress-bar" role="progressbar" style="width: 70%;" aria-valuenow="7" 
-                                     aria-valuemin="0" aria-valuemax="10" id="queue-progress">7/10</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Filtres pour la file d'attente -->
-                <div class="row mb-3">
-                    <div class="col-md-4">
-                        <div class="input-group">
-                            <span class="input-group-text"><i class="fas fa-search"></i></span>
-                            <input type="text" class="form-control" id="queue-search" placeholder="Rechercher une tâche...">
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <select class="form-select" id="status-filter">
-                            <option value="all">Tous les statuts</option>
-                            <option value="running">En cours</option>
-                            <option value="pending">En attente</option>
-                            <option value="completed">Terminé</option>
-                            <option value="failed">Échoué</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <select class="form-select" id="type-filter">
-                            <option value="all">Tous les types</option>
-                            <option value="inference">Inférence</option>
-                            <option value="embeddings">Embeddings</option>
-                            <option value="chat">Chat</option>
-                            <option value="pull">Pull modèle</option>
-                            <option value="sync">Synchronisation</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2">
-                        <button class="btn btn-outline-secondary w-100" id="reset-filters">
-                            <i class="fas fa-eraser"></i> Réinitialiser
+                <ul class="nav nav-tabs mb-3" id="queueTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="active-tab" data-bs-toggle="tab" data-bs-target="#active-queue" 
+                                type="button" role="tab" aria-controls="active-queue" aria-selected="true">
+                            En cours <span class="badge bg-primary ms-2">{{ tasks.active|length }}</span>
                         </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending-queue" 
+                                type="button" role="tab" aria-controls="pending-queue" aria-selected="false">
+                            En attente <span class="badge bg-secondary ms-2">{{ tasks.pending|length }}</span>
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="completed-tab" data-bs-toggle="tab" data-bs-target="#completed-queue" 
+                                type="button" role="tab" aria-controls="completed-queue" aria-selected="false">
+                            Terminées <span class="badge bg-success ms-2">{{ tasks.completed|length }}</span>
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="failed-tab" data-bs-toggle="tab" data-bs-target="#failed-queue" 
+                                type="button" role="tab" aria-controls="failed-queue" aria-selected="false">
+                            Échouées <span class="badge bg-danger ms-2">{{ tasks.failed|length }}</span>
+                        </button>
+                    </li>
+                </ul>
+                
+                <div class="tab-content" id="queueTabContent">
+                    <!-- Tâches actives -->
+                    <div class="tab-pane fade show active" id="active-queue" role="tabpanel" aria-labelledby="active-tab">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Modèle</th>
+                                        <th>Serveur</th>
+                                        <th>État</th>
+                                        <th>Progression</th>
+                                        <th>Démarré</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for task in tasks.active %}
+                                    <tr>
+                                        <td><code>{{ task.id }}</code></td>
+                                        <td>{{ task.model }}</td>
+                                        <td>{{ task.server }}</td>
+                                        <td><span class="badge bg-{{ task.status_class }}">{{ task.status }}</span></td>
+                                        <td>
+                                            <div class="progress" style="height: 6px;">
+                                                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                                     role="progressbar" style="width: {{ task.progress }}%"></div>
+                                            </div>
+                                        </td>
+                                        <td>{{ task.started_relative }}</td>
+                                        <td>
+                                            <button class="btn btn-sm btn-danger stop-task" data-task-id="{{ task.id }}">
+                                                <i class="fas fa-stop"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="7" class="text-center">Aucune tâche en cours</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                </div>
-
-                <!-- Tableau des tâches -->
-                <div class="table-responsive">
-                    <table class="table table-hover" id="queue-table">
-                        <thead>
-                            <tr>
-                                <th style="width: 50px;">#</th>
-                                <th style="width: 180px;">
-                                    <a href="#" class="sort-header" data-sort="timestamp">
-                                        Heure <i class="fas fa-sort-down"></i>
-                                    </a>
-                                </th>
-                                <th>
-                                    <a href="#" class="sort-header" data-sort="type">
-                                        Type <i class="fas fa-sort"></i>
-                                    </a>
-                                </th>
-                                <th>Détails</th>
-                                <th style="width: 120px;">
-                                    <a href="#" class="sort-header" data-sort="priority">
-                                        Priorité <i class="fas fa-sort"></i>
-                                    </a>
-                                </th>
-                                <th style="width: 150px;">
-                                    <a href="#" class="sort-header" data-sort="status">
-                                        Statut <i class="fas fa-sort"></i>
-                                    </a>
-                                </th>
-                                <th style="width: 150px;">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr class="table-primary">
-                                <td>1</td>
-                                <td><small>2025-04-30 09:15:23</small></td>
-                                <td><span class="badge bg-info">chat</span></td>
-                                <td>
-                                    <div class="text-truncate" style="max-width: 300px;">
-                                        <strong>llama2:latest</strong> - Session: 41a8c7e2
-                                    </div>
-                                    <div class="progress mt-1" style="height: 5px;">
-                                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                                             role="progressbar" style="width: 75%" aria-valuenow="75" 
-                                             aria-valuemin="0" aria-valuemax="100"></div>
-                                    </div>
-                                </td>
-                                <td>
-                                    <span class="badge bg-danger">Urgent</span>
-                                </td>
-                                <td>
-                                    <span class="badge bg-success">
-                                        <i class="fas fa-play me-1"></i> En cours
-                                    </span>
-                                </td>
-                                <td>
-                                    <div class="btn-group btn-group-sm">
-                                        <button class="btn btn-outline-secondary" title="Détails">
-                                            <i class="fas fa-eye"></i>
-                                        </button>
-                                        <button class="btn btn-outline-danger" title="Arrêter">
-                                            <i class="fas fa-stop"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr class="table-primary">
-                                <td>2</td>
-                                <td><small>2025-04-30 09:17:45</small></td>
-                                <td><span class="badge bg-warning text-dark">embeddings</span></td>
-                                <td>
-                                    <div class="text-truncate" style="max-width: 300px;">
-                                        <strong>nomic-embed-text</strong> - Documents: 215
-                                    </div>
-                                    <div class="progress mt-1" style="height: 5px;">
-                                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                                             role="progressbar" style="width: 40%" aria-valuenow="40" 
-                                             aria-valuemin="0" aria-valuemax="100"></div>
-                                    </div>
-                                </td>
-                                <td>
-                                    <span class="badge bg-warning text-dark">Élevée</span>
-                                </td>
-                                <td>
-                                    <span class="badge bg-success">
-                                        <i class="fas fa-play me-1"></i> En cours
-                                    </span>
-                                </td>
-                                <td>
-                                    <div class="btn-group btn-group-sm">
-                                        <button class="btn btn-outline-secondary" title="Détails">
-                                            <i class="fas fa-eye"></i>
-                                        </button>
-                                        <button class="btn btn-outline-danger" title="Arrêter">
-                                            <i class="fas fa-stop"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>3</td>
-                                <td><small>2025-04-30 09:18:03</small></td>
-                                <td><span class="badge bg-info">chat</span></td>
-                                <td>
-                                    <div class="text-truncate" style="max-width: 300px;">
-                                        <strong>mistral:7b</strong> - Session: b3f5e120
-                                    </div>
-                                </td>
-                                <td>
-                                    <span class="badge bg-secondary">Normale</span>
-                                </td>
-                                <td>
-                                    <span class="badge bg-secondary">
-                                        <i class="fas fa-clock me-1"></i> En attente
-                                    </span>
-                                </td>
-                                <td>
-                                    <div class="btn-group btn-group-sm">
-                                        <button class="btn btn-outline-secondary" title="Détails">
-                                            <i class="fas fa-eye"></i>
-                                        </button>
-                                        <button class="btn btn-outline-primary" title="Promotion">
-                                            <i class="fas fa-arrow-up"></i>
-                                        </button>
-                                        <button class="btn btn-outline-danger" title="Annuler">
-                                            <i class="fas fa-times"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>4</td>
-                                <td><small>2025-04-30 09:20:12</small></td>
-                                <td><span class="badge bg-primary">pull</span></td>
-                                <td>
-                                    <div class="text-truncate" style="max-width: 300px;">
-                                        <strong>codellama:13b</strong> - Téléchargement du modèle
-                                    </div>
-                                </td>
-                                <td>
-                                    <span class="badge bg-secondary">Normale</span>
-                                </td>
-                                <td>
-                                    <span class="badge bg-secondary">
-                                        <i class="fas fa-clock me-1"></i> En attente
-                                    </span>
-                                </td>
-                                <td>
-                                    <div class="btn-group btn-group-sm">
-                                        <button class="btn btn-outline-secondary" title="Détails">
-                                            <i class="fas fa-eye"></i>
-                                        </button>
-                                        <button class="btn btn-outline-primary" title="Promotion">
-                                            <i class="fas fa-arrow-up"></i>
-                                        </button>
-                                        <button class="btn btn-outline-danger" title="Annuler">
-                                            <i class="fas fa-times"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>5</td>
-                                <td><small>2025-04-30 09:22:35</small></td>
-                                <td><span class="badge bg-success">inference</span></td>
-                                <td>
-                                    <div class="text-truncate" style="max-width: 300px;">
-                                        <strong>llama2:13b</strong> - Batch de 3 requêtes
-                                    </div>
-                                </td>
-                                <td>
-                                    <span class="badge bg-info">Basse</span>
-                                </td>
-                                <td>
-                                    <span class="badge bg-secondary">
-                                        <i class="fas fa-clock me-1"></i> En attente
-                                    </span>
-                                </td>
-                                <td>
-                                    <div class="btn-group btn-group-sm">
-                                        <button class="btn btn-outline-secondary" title="Détails">
-                                            <i class="fas fa-eye"></i>
-                                        </button>
-                                        <button class="btn btn-outline-primary" title="Promotion">
-                                            <i class="fas fa-arrow-up"></i>
-                                        </button>
-                                        <button class="btn btn-outline-danger" title="Annuler">
-                                            <i class="fas fa-times"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr class="bg-light text-muted">
-                                <td>6</td>
-                                <td><small>2025-04-30 09:05:17</small></td>
-                                <td><span class="badge bg-light text-dark">chat</span></td>
-                                <td>
-                                    <div class="text-truncate" style="max-width: 300px;">
-                                        <strong>llama2:7b</strong> - Session: 74e9ab12
-                                    </div>
-                                </td>
-                                <td>
-                                    <span class="badge bg-light text-dark">Normale</span>
-                                </td>
-                                <td>
-                                    <span class="badge bg-success">
-                                        <i class="fas fa-check me-1"></i> Terminée
-                                    </span>
-                                </td>
-                                <td>
-                                    <div class="btn-group btn-group-sm">
-                                        <button class="btn btn-outline-secondary" title="Détails">
-                                            <i class="fas fa-eye"></i>
-                                        </button>
-                                        <button class="btn btn-outline-primary" title="Relancer">
-                                            <i class="fas fa-redo"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr class="bg-light text-muted">
-                                <td>7</td>
-                                <td><small>2025-04-30 09:00:03</small></td>
-                                <td><span class="badge bg-light text-dark">sync</span></td>
-                                <td>
-                                    <div class="text-truncate" style="max-width: 300px;">
-                                        <strong>Synchronisation</strong> - mistral:7b sur 3 serveurs
-                                    </div>
-                                </td>
-                                <td>
-                                    <span class="badge bg-light text-dark">Élevée</span>
-                                </td>
-                                <td>
-                                    <span class="badge bg-success">
-                                        <i class="fas fa-check me-1"></i> Terminée
-                                    </span>
-                                </td>
-                                <td>
-                                    <div class="btn-group btn-group-sm">
-                                        <button class="btn btn-outline-secondary" title="Détails">
-                                            <i class="fas fa-eye"></i>
-                                        </button>
-                                        <button class="btn btn-outline-primary" title="Relancer">
-                                            <i class="fas fa-redo"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    
+                    <!-- Tâches en attente -->
+                    <div class="tab-pane fade" id="pending-queue" role="tabpanel" aria-labelledby="pending-tab">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Modèle</th>
+                                        <th>Priorité</th>
+                                        <th>Créé</th>
+                                        <th>Position</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for task in tasks.pending %}
+                                    <tr>
+                                        <td><code>{{ task.id }}</code></td>
+                                        <td>{{ task.model }}</td>
+                                        <td><span class="badge bg-{{ task.priority_class }}">{{ task.priority }}</span></td>
+                                        <td>{{ task.created_relative }}</td>
+                                        <td>{{ task.position }}</td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <button class="btn btn-primary run-now" title="Exécuter maintenant" data-task-id="{{ task.id }}">
+                                                    <i class="fas fa-play"></i>
+                                                </button>
+                                                <button class="btn btn-warning change-priority" title="Modifier la priorité" data-task-id="{{ task.id }}">
+                                                    <i class="fas fa-arrow-up"></i>
+                                                </button>
+                                                <button class="btn btn-danger cancel-task" title="Annuler" data-task-id="{{ task.id }}">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="6" class="text-center">Aucune tâche en attente</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Tâches terminées -->
+                    <div class="tab-pane fade" id="completed-queue" role="tabpanel" aria-labelledby="completed-tab">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Modèle</th>
+                                        <th>Serveur</th>
+                                        <th>Durée</th>
+                                        <th>Terminé</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for task in tasks.completed %}
+                                    <tr>
+                                        <td><code>{{ task.id }}</code></td>
+                                        <td>{{ task.model }}</td>
+                                        <td>{{ task.server }}</td>
+                                        <td>{{ task.duration }}</td>
+                                        <td>{{ task.completed_relative }}</td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <button class="btn btn-info view-results" title="Voir les résultats" data-task-id="{{ task.id }}">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                                <button class="btn btn-secondary retry-task" title="Relancer" data-task-id="{{ task.id }}">
+                                                    <i class="fas fa-redo"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="6" class="text-center">Aucune tâche terminée</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Tâches échouées -->
+                    <div class="tab-pane fade" id="failed-queue" role="tabpanel" aria-labelledby="failed-tab">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Modèle</th>
+                                        <th>Serveur</th>
+                                        <th>Erreur</th>
+                                        <th>Échoué</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for task in tasks.failed %}
+                                    <tr>
+                                        <td><code>{{ task.id }}</code></td>
+                                        <td>{{ task.model }}</td>
+                                        <td>{{ task.server }}</td>
+                                        <td><span class="text-danger">{{ task.error }}</span></td>
+                                        <td>{{ task.failed_relative }}</td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <button class="btn btn-secondary retry-task" title="Réessayer" data-task-id="{{ task.id }}">
+                                                    <i class="fas fa-redo"></i>
+                                                </button>
+                                                <button class="btn btn-info view-logs" title="Logs d'erreur" data-task-id="{{ task.id }}">
+                                                    <i class="fas fa-exclamation-circle"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="6" class="text-center">Aucune tâche échouée</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div class="card-footer d-flex justify-content-between">
+            <div class="card-footer text-muted d-flex justify-content-between">
                 <div>
-                    <span class="text-muted">Affichage des tâches 1-7 sur 7</span>
+                    Total des tâches: <strong>{{ tasks.total }}</strong>
                 </div>
                 <div>
-                    <button class="btn btn-outline-danger btn-sm" id="clear-completed">
-                        <i class="fas fa-trash"></i> Effacer l'historique
-                    </button>
-                    <button class="btn btn-outline-warning btn-sm" id="reset-queue">
-                        <i class="fas fa-ban"></i> Réinitialiser la file
+                    <button class="btn btn-outline-danger btn-sm" id="clear-history">
+                        <i class="fas fa-trash"></i> Vider l'historique
                     </button>
                 </div>
             </div>
@@ -345,24 +242,28 @@
     </div>
 </div>
 
-<div class="row mt-4">
-    <div class="col-md-6">
-        <div class="card">
+<!-- Statistiques de la file d'attente -->
+<div class="row">
+    <!-- Graphique de distribution -->
+    <div class="col-lg-6">
+        <div class="card mb-4">
             <div class="card-header">
-                <i class="fas fa-chart-line me-2"></i> Activité de la file d'attente
+                <i class="fas fa-chart-pie me-2"></i> Distribution des tâches
             </div>
             <div class="card-body">
-                <canvas id="queue-activity-chart" height="250"></canvas>
+                <canvas id="queueDistributionChart" height="240"></canvas>
             </div>
         </div>
     </div>
-    <div class="col-md-6">
-        <div class="card">
+    
+    <!-- Graphique de performance -->
+    <div class="col-lg-6">
+        <div class="card mb-4">
             <div class="card-header">
-                <i class="fas fa-th-large me-2"></i> Répartition par type de tâche
+                <i class="fas fa-chart-line me-2"></i> Performance et temps d'attente
             </div>
             <div class="card-body">
-                <canvas id="task-types-chart" height="250"></canvas>
+                <canvas id="queuePerformanceChart" height="240"></canvas>
             </div>
         </div>
     </div>
@@ -374,126 +275,57 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="newTaskModalLabel">Créer une nouvelle tâche</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <div class="mb-3">
-                    <label for="task-type" class="form-label">Type de tâche</label>
-                    <select class="form-select" id="task-type">
-                        <option value="inference">Inférence</option>
-                        <option value="embeddings">Embeddings</option>
-                        <option value="chat">Chat</option>
-                        <option value="pull">Pull modèle</option>
-                        <option value="sync">Synchronisation</option>
-                    </select>
-                </div>
-                
-                <div class="mb-3">
-                    <label for="task-model" class="form-label">Modèle</label>
-                    <div class="input-group">
-                        <span class="input-group-text"><i class="fas fa-brain"></i></span>
-                        <select class="form-select" id="task-model">
-                            <option value="llama2:7b">llama2:7b</option>
-                            <option value="llama2:13b">llama2:13b</option>
-                            <option value="mistral:7b">mistral:7b</option>
-                            <option value="codellama:13b">codellama:13b</option>
-                            <option value="nomic-embed-text">nomic-embed-text</option>
+                <form id="newTaskForm">
+                    <div class="mb-3">
+                        <label for="taskModel" class="form-label">Modèle</label>
+                        <select class="form-select" id="taskModel" required>
+                            <option value="" selected disabled>Sélectionner un modèle...</option>
+                            {% for model in available_models %}
+                            <option value="{{ model.id }}">{{ model.name }}</option>
+                            {% endfor %}
                         </select>
                     </div>
-                </div>
-                
-                <div class="mb-3">
-                    <label for="task-priority" class="form-label">Priorité</label>
-                    <div class="input-group">
-                        <span class="input-group-text"><i class="fas fa-flag"></i></span>
-                        <select class="form-select" id="task-priority">
-                            <option value="low">Basse</option>
-                            <option value="normal" selected>Normale</option>
-                            <option value="high">Élevée</option>
-                            <option value="urgent">Urgent</option>
+                    <div class="mb-3">
+                        <label for="taskPrompt" class="form-label">Prompt</label>
+                        <textarea class="form-control" id="taskPrompt" rows="5" required></textarea>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="taskTemperature" class="form-label">Température</label>
+                            <input type="range" class="form-range" id="taskTemperature" min="0" max="1" step="0.1" value="0.7">
+                            <div class="d-flex justify-content-between">
+                                <small>0.0 (Déterministe)</small>
+                                <small id="tempValue">0.7</small>
+                                <small>1.0 (Créatif)</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="taskPriority" class="form-label">Priorité</label>
+                            <select class="form-select" id="taskPriority">
+                                <option value="low">Basse</option>
+                                <option value="normal" selected>Normale</option>
+                                <option value="high">Haute</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="taskServer" class="form-label">Serveur (optionnel)</label>
+                        <select class="form-select" id="taskServer">
+                            <option value="" selected>Auto-sélection</option>
+                            {% for server in available_servers %}
+                            <option value="{{ server.address }}">{{ server.address }} ({{ server.backend }}{% if server.load %}, charge: {{ server.load }}%{% endif %})</option>
+                            {% endfor %}
                         </select>
+                        <div class="form-text">Laissez vide pour que le système choisisse le serveur le moins chargé.</div>
                     </div>
-                </div>
-                
-                <div class="mb-3" id="input-prompt-container">
-                    <label for="task-prompt" class="form-label">Prompt</label>
-                    <textarea class="form-control" id="task-prompt" rows="5" 
-                              placeholder="Entrez votre prompt ici..."></textarea>
-                </div>
-
-                <div class="mb-3" id="model-params-container">
-                    <label class="form-label">Paramètres d'inférence</label>
-                    <div class="row g-2">
-                        <div class="col-md-3">
-                            <div class="input-group input-group-sm">
-                                <span class="input-group-text">Temp</span>
-                                <input type="number" class="form-control" value="0.7" step="0.1" min="0" max="2">
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="input-group input-group-sm">
-                                <span class="input-group-text">Top P</span>
-                                <input type="number" class="form-control" value="0.9" step="0.01" min="0" max="1">
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="input-group input-group-sm">
-                                <span class="input-group-text">Top K</span>
-                                <input type="number" class="form-control" value="40" step="1" min="1">
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="input-group input-group-sm">
-                                <span class="input-group-text">Tokens</span>
-                                <input type="number" class="form-control" value="2048" step="128" min="128">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="mb-3" id="server-selection-container">
-                    <label class="form-label">Serveur(s) cible(s)</label>
-                    <div>
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input" type="checkbox" value="auto" id="server-auto" checked>
-                            <label class="form-check-label" for="server-auto">Auto (équilibrage)</label>
-                        </div>
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input" type="checkbox" value="server1" id="server1">
-                            <label class="form-check-label" for="server1">10.0.9.245</label>
-                        </div>
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input" type="checkbox" value="server2" id="server2">
-                            <label class="form-check-label" for="server2">10.0.9.248</label>
-                        </div>
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input" type="checkbox" value="server3" id="server3">
-                            <label class="form-check-label" for="server3">10.0.9.249</label>
-                        </div>
-                    </div>
-                </div>
+                </form>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                <button type="button" class="btn btn-primary" id="submit-task">Soumettre la tâche</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal pour détails de tâche -->
-<div class="modal fade" id="taskDetailsModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Détails de la tâche #1</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
-            </div>
-            <div class="modal-body">
-                <!-- Contenu dynamique -->
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+                <button type="submit" form="newTaskForm" class="btn btn-primary">Créer la tâche</button>
             </div>
         </div>
     </div>
@@ -503,71 +335,28 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Graphique d'activité
-    const activityCtx = document.getElementById('queue-activity-chart').getContext('2d');
-    const activityChart = new Chart(activityCtx, {
-        type: 'line',
-        data: {
-            labels: ['09:00', '09:05', '09:10', '09:15', '09:20', '09:25', '09:30'],
-            datasets: [
-                {
-                    label: 'Tâches actives',
-                    data: [1, 1, 2, 3, 2, 2, 2],
-                    borderColor: '#20c997',
-                    backgroundColor: 'rgba(32, 201, 151, 0.2)',
-                    tension: 0.4,
-                    fill: true
-                },
-                {
-                    label: 'Tâches en attente',
-                    data: [0, 1, 2, 3, 4, 5, 3],
-                    borderColor: '#6c757d',
-                    backgroundColor: 'rgba(108, 117, 125, 0.2)',
-                    tension: 0.4,
-                    fill: true
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'top',
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: 'Nombre de tâches'
-                    }
-                },
-                x: {
-                    title: {
-                        display: true,
-                        text: 'Heure'
-                    }
-                }
-            }
-        }
-    });
+    // Récupérer les données depuis le backend
+    const queueData = {{ queue_data|tojson }};
+    const performanceData = {{ performance_data|tojson }};
     
-    // Graphique de types de tâches
-    const typesCtx = document.getElementById('task-types-chart').getContext('2d');
-    const typesChart = new Chart(typesCtx, {
+    // Graphique de distribution des tâches
+    const distributionCtx = document.getElementById('queueDistributionChart').getContext('2d');
+    const distributionChart = new Chart(distributionCtx, {
         type: 'doughnut',
         data: {
-            labels: ['Chat', 'Inférence', 'Embeddings', 'Pull', 'Sync'],
+            labels: ['En cours', 'En attente', 'Terminées', 'Échouées'],
             datasets: [{
-                data: [3, 1, 1, 1, 1],
+                data: [
+                    queueData.active, 
+                    queueData.pending, 
+                    queueData.completed, 
+                    queueData.failed
+                ],
                 backgroundColor: [
-                    '#0dcaf0',  // Chat - info
-                    '#20c997',  // Inférence - success
-                    '#ffc107',  // Embeddings - warning
-                    '#0d6efd',  // Pull - primary
-                    '#6f42c1'   // Sync - purple
+                    '#0d6efd',  // En cours - primary
+                    '#6c757d',  // En attente - secondary
+                    '#198754',  // Terminées - success
+                    '#dc3545'   // Échouées - danger
                 ],
                 borderWidth: 1
             }]
@@ -583,124 +372,362 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Fonctionnalités interactives pour la file d'attente
-    const refreshQueueBtn = document.getElementById('refresh-queue');
-    const taskTypeSelect = document.getElementById('task-type');
-    const submitTaskBtn = document.getElementById('submit-task');
-    
-    refreshQueueBtn.addEventListener('click', function() {
-        // Simulation d'actualisation de la file d'attente
-        const loadingToast = showToast('Actualisation...', 'Mise à jour de la file d\'attente');
-        
-        setTimeout(() => {
-            // Mettre à jour le compteur de tâches
-            document.getElementById('pending-tasks').textContent = '6';
-            
-            // Mettre à jour les graphiques
-            activityChart.data.datasets[0].data = [1, 1, 2, 3, 2, 2, 3];
-            activityChart.data.datasets[1].data = [0, 1, 2, 3, 4, 5, 6];
-            activityChart.update();
-            
-            typesChart.data.datasets[0].data = [4, 1, 1, 1, 1];
-            typesChart.update();
-            
-            // Mettre à jour la barre de progression
-            const queueProgress = document.getElementById('queue-progress');
-            queueProgress.style.width = '80%';
-            queueProgress.textContent = '8/10';
-            queueProgress.setAttribute('aria-valuenow', '8');
-            
-            // Fermer le toast de chargement
-            loadingToast.hide();
-            
-            // Afficher un toast de succès
-            showToast('File d\'attente actualisée', 'Les données ont été mises à jour avec succès');
-        }, 1000);
-    });
-    
-    taskTypeSelect.addEventListener('change', function() {
-        // Ajuster les champs du formulaire en fonction du type de tâche
-        const type = this.value;
-        const promptContainer = document.getElementById('input-prompt-container');
-        const paramsContainer = document.getElementById('model-params-container');
-        
-        if (type === 'pull' || type === 'sync') {
-            promptContainer.style.display = 'none';
-            paramsContainer.style.display = 'none';
-        } else {
-            promptContainer.style.display = 'block';
-            paramsContainer.style.display = 'block';
+    // Graphique de performance de la file d'attente
+    const performanceCtx = document.getElementById('queuePerformanceChart').getContext('2d');
+    const performanceChart = new Chart(performanceCtx, {
+        type: 'line',
+        data: {
+            labels: performanceData.labels,
+            datasets: [{
+                label: 'Temps d\'attente moyen (s)',
+                data: performanceData.waiting_times,
+                borderColor: '#6f42c1',
+                backgroundColor: 'rgba(111, 66, 193, 0.2)',
+                tension: 0.4,
+                fill: true
+            }, {
+                label: 'Tâches par heure',
+                data: performanceData.tasks_per_hour,
+                borderColor: '#0dcaf0',
+                backgroundColor: 'transparent',
+                tension: 0.4,
+                yAxisID: 'y1'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Temps d\'attente (s)'
+                    }
+                },
+                y1: {
+                    beginAtZero: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Tâches par heure'
+                    },
+                    grid: {
+                        drawOnChartArea: false
+                    }
+                }
+            }
         }
     });
     
-    submitTaskBtn.addEventListener('click', function() {
-        // Simulation d'ajout d'une tâche
-        const loadingToast = showToast('Traitement...', 'Ajout de la tâche à la file d\'attente');
-        
-        setTimeout(() => {
-            // Cacher le modal
-            const modal = bootstrap.Modal.getInstance(document.getElementById('newTaskModal'));
-            modal.hide();
+    // Gestion de la valeur du slider de température
+    const tempSlider = document.getElementById('taskTemperature');
+    const tempValue = document.getElementById('tempValue');
+    
+    if (tempSlider && tempValue) {
+        tempSlider.addEventListener('input', function() {
+            tempValue.textContent = this.value;
+        });
+    }
+    
+    // Gestion du refresh des données
+    const refreshBtn = document.getElementById('refresh-queue');
+    
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', function() {
+            // Simuler un chargement avec un spinner
+            this.disabled = true;
+            this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Actualisation...';
             
-            // Mettre à jour les compteurs et graphiques
-            document.getElementById('pending-tasks').textContent = '6';
-            document.getElementById('queue-progress').textContent = '8/10';
-            
-            // Fermer le toast de chargement
-            loadingToast.hide();
-            
-            // Afficher un toast de succès
-            showToast('Tâche ajoutée', 'La tâche a été ajoutée avec succès à la file d\'attente');
-        }, 1500);
-    });
+            // Faire une requête AJAX pour actualiser les données
+            fetch('/api/queue/refresh', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Mettre à jour l'interface avec les nouvelles données
+                updateQueueInterface(data);
+                
+                // Réinitialiser le bouton après chargement
+                this.disabled = false;
+                this.innerHTML = '<i class="fas fa-sync-alt"></i> Rafraîchir';
+                
+                // Afficher un toast de succès
+                showToast('File d\'attente', 'La file d\'attente a été actualisée avec succès.');
+            })
+            .catch(error => {
+                console.error('Erreur lors de l\'actualisation:', error);
+                
+                // Réinitialiser le bouton
+                this.disabled = false;
+                this.innerHTML = '<i class="fas fa-sync-alt"></i> Rafraîchir';
+                
+                // Afficher un toast d'erreur
+                showToast('Erreur', 'Impossible d\'actualiser la file d\'attente.', 'danger');
+            });
+        });
+    }
     
     // Fonction pour afficher un toast
-    function showToast(title, message) {
-        const toast = document.getElementById('notificationToast');
-        const toastTitle = document.getElementById('toastTitle');
-        const toastMessage = document.getElementById('toastMessage');
-        const toastTime = document.getElementById('toastTime');
+    function showToast(title, message, type = 'success') {
+        const toastContainer = document.querySelector('.toast-container');
+        if (!toastContainer) {
+            // Créer un conteneur de toast s'il n'existe pas
+            const container = document.createElement('div');
+            container.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+            document.body.appendChild(container);
+        }
         
-        toastTitle.textContent = title;
-        toastMessage.textContent = message;
-        toastTime.textContent = 'À l\'instant';
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.setAttribute('role', 'alert');
+        toast.setAttribute('aria-live', 'assertive');
+        toast.setAttribute('aria-atomic', 'true');
         
+        const iconClass = type === 'success' ? 'fas fa-check-circle text-success' : 'fas fa-exclamation-circle text-danger';
+        
+        toast.innerHTML = `
+            <div class="toast-header">
+                <i class="${iconClass} me-2"></i>
+                <strong class="me-auto">${title}</strong>
+                <small>À l'instant</small>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body">
+                ${message}
+            </div>
+        `;
+        
+        document.querySelector('.toast-container').appendChild(toast);
         const bsToast = new bootstrap.Toast(toast);
         bsToast.show();
         
-        return bsToast;
+        // Supprimer le toast après qu'il soit caché
+        toast.addEventListener('hidden.bs.toast', function() {
+            this.remove();
+        });
     }
     
-    // Gestion du tri des colonnes du tableau
-    const sortHeaders = document.querySelectorAll('.sort-header');
+    // Fonction pour mettre à jour l'interface avec de nouvelles données
+    function updateQueueInterface(data) {
+        // Mettre à jour les compteurs dans les onglets
+        document.querySelector('#active-tab .badge').textContent = data.counts.active;
+        document.querySelector('#pending-tab .badge').textContent = data.counts.pending;
+        document.querySelector('#completed-tab .badge').textContent = data.counts.completed;
+        document.querySelector('#failed-tab .badge').textContent = data.counts.failed;
+        
+        // Mettre à jour les tableaux avec les nouvelles données
+        updateTaskTable('active-queue', data.tasks.active);
+        updateTaskTable('pending-queue', data.tasks.pending);
+        updateTaskTable('completed-queue', data.tasks.completed);
+        updateTaskTable('failed-queue', data.tasks.failed);
+        
+        // Mettre à jour le total des tâches
+        document.querySelector('.card-footer strong').textContent = data.counts.total;
+        
+        // Mettre à jour les graphiques
+        updateCharts(data);
+    }
     
-    sortHeaders.forEach(header => {
-        header.addEventListener('click', function(e) {
+    // Fonction pour mettre à jour un tableau de tâches
+    function updateTaskTable(tableId, tasks) {
+        // Cette fonction devrait être implémentée pour remplacer le contenu des tableaux
+        // avec les nouvelles données de tâches
+        console.log(`Mise à jour du tableau ${tableId} avec ${tasks.length} tâches`);
+    }
+    
+    // Fonction pour mettre à jour les graphiques
+    function updateCharts(data) {
+        // Mettre à jour le graphique de distribution
+        distributionChart.data.datasets[0].data = [
+            data.counts.active,
+            data.counts.pending,
+            data.counts.completed,
+            data.counts.failed
+        ];
+        distributionChart.update();
+        
+        // Mettre à jour le graphique de performance
+        performanceChart.data.labels = data.performance.labels;
+        performanceChart.data.datasets[0].data = data.performance.waiting_times;
+        performanceChart.data.datasets[1].data = data.performance.tasks_per_hour;
+        performanceChart.update();
+    }
+    
+    // Gestionnaire pour le formulaire de nouvelle tâche
+    const newTaskForm = document.getElementById('newTaskForm');
+    
+    if (newTaskForm) {
+        newTaskForm.addEventListener('submit', function(e) {
             e.preventDefault();
             
-            // Réinitialiser toutes les icônes de tri
-            sortHeaders.forEach(h => {
-                const icon = h.querySelector('i');
-                icon.className = 'fas fa-sort';
+            // Récupérer les données du formulaire
+            const model = document.getElementById('taskModel').value;
+            const prompt = document.getElementById('taskPrompt').value;
+            const temperature = document.getElementById('taskTemperature').value;
+            const priority = document.getElementById('taskPriority').value;
+            const server = document.getElementById('taskServer').value;
+            
+            // Envoyer les données au serveur
+            fetch('/api/queue/task', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model,
+                    prompt,
+                    temperature: parseFloat(temperature),
+                    priority,
+                    server: server || null
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Fermer le modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('newTaskModal'));
+                modal.hide();
+                
+                // Afficher un toast de succès
+                showToast('Tâche créée', `La tâche a été ajoutée à la file d'attente avec l'ID <code>${data.task_id}</code>.`);
+                
+                // Actualiser la liste des tâches
+                if (refreshBtn) {
+                    refreshBtn.click();
+                }
+                
+                // Réinitialiser le formulaire
+                this.reset();
+            })
+            .catch(error => {
+                console.error('Erreur lors de la création de la tâche:', error);
+                showToast('Erreur', 'Impossible de créer la tâche.', 'danger');
             });
-            
-            // Mettre à jour l'icône de tri pour l'en-tête cliqué
-            const icon = this.querySelector('i');
-            if (icon.classList.contains('fa-sort')) {
-                icon.className = 'fas fa-sort-up';
-            } else if (icon.classList.contains('fa-sort-up')) {
-                icon.className = 'fas fa-sort-down';
-            } else {
-                icon.className = 'fas fa-sort-up';
-            }
-            
-            // Simulation de tri (dans une implémentation réelle, cela appellerait une API)
-            const column = this.getAttribute('data-sort');
-            const direction = icon.classList.contains('fa-sort-up') ? 'asc' : 'desc';
-            
-            // Afficher un toast pour indiquer le tri
-            showToast('Tableau trié', `Tri par ${column} en ordre ${direction === 'asc' ? 'croissant' : 'décroissant'}`);
         });
+    }
+    
+    // Gestionnaire pour le bouton de nettoyage de l'historique
+    const clearHistoryBtn = document.getElementById('clear-history');
+    
+    if (clearHistoryBtn) {
+        clearHistoryBtn.addEventListener('click', function() {
+            if (confirm('Voulez-vous vraiment vider l\'historique des tâches terminées et échouées ?')) {
+                fetch('/api/queue/clear-history', {
+                    method: 'POST'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    showToast('Historique nettoyé', `${data.removed} tâches ont été supprimées de l'historique.`);
+                    
+                    // Actualiser la liste des tâches
+                    if (refreshBtn) {
+                        refreshBtn.click();
+                    }
+                })
+                .catch(error => {
+                    console.error('Erreur lors du nettoyage de l\'historique:', error);
+                    showToast('Erreur', 'Impossible de nettoyer l\'historique.', 'danger');
+                });
+            }
+        });
+    }
+    
+    // Ajouter des gestionnaires d'événements pour les actions des tâches
+    document.addEventListener('click', function(e) {
+        // Arrêt d'une tâche en cours
+        if (e.target.closest('.stop-task')) {
+            const button = e.target.closest('.stop-task');
+            const taskId = button.dataset.taskId;
+            
+            fetch(`/api/queue/task/${taskId}/stop`, {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                showToast('Tâche arrêtée', `La tâche ${taskId} a été arrêtée.`);
+                if (refreshBtn) refreshBtn.click();
+            })
+            .catch(error => {
+                console.error('Erreur lors de l\'arrêt de la tâche:', error);
+                showToast('Erreur', 'Impossible d\'arrêter la tâche.', 'danger');
+            });
+        }
+        
+        // Exécuter une tâche immédiatement
+        if (e.target.closest('.run-now')) {
+            const button = e.target.closest('.run-now');
+            const taskId = button.dataset.taskId;
+            
+            fetch(`/api/queue/task/${taskId}/run-now`, {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                showToast('Tâche démarrée', `La tâche ${taskId} a été démarrée immédiatement.`);
+                if (refreshBtn) refreshBtn.click();
+            })
+            .catch(error => {
+                console.error('Erreur lors du démarrage de la tâche:', error);
+                showToast('Erreur', 'Impossible de démarrer la tâche.', 'danger');
+            });
+        }
+        
+        // Annuler une tâche en attente
+        if (e.target.closest('.cancel-task')) {
+            const button = e.target.closest('.cancel-task');
+            const taskId = button.dataset.taskId;
+            
+            fetch(`/api/queue/task/${taskId}/cancel`, {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                showToast('Tâche annulée', `La tâche ${taskId} a été annulée.`);
+                if (refreshBtn) refreshBtn.click();
+            })
+            .catch(error => {
+                console.error('Erreur lors de l\'annulation de la tâche:', error);
+                showToast('Erreur', 'Impossible d\'annuler la tâche.', 'danger');
+            });
+        }
+        
+        // Voir les résultats d'une tâche terminée
+        if (e.target.closest('.view-results')) {
+            const button = e.target.closest('.view-results');
+            const taskId = button.dataset.taskId;
+            
+            window.location.href = `/task/${taskId}/results`;
+        }
+        
+        // Relancer une tâche
+        if (e.target.closest('.retry-task')) {
+            const button = e.target.closest('.retry-task');
+            const taskId = button.dataset.taskId;
+            
+            fetch(`/api/queue/task/${taskId}/retry`, {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                showToast('Tâche relancée', `La tâche ${taskId} a été relancée. Nouvelle ID: ${data.new_task_id}`);
+                if (refreshBtn) refreshBtn.click();
+            })
+            .catch(error => {
+                console.error('Erreur lors du relancement de la tâche:', error);
+                showToast('Erreur', 'Impossible de relancer la tâche.', 'danger');
+            });
+        }
+        
+        // Voir les logs d'erreur
+        if (e.target.closest('.view-logs')) {
+            const button = e.target.closest('.view-logs');
+            const taskId = button.dataset.taskId;
+            
+            window.location.href = `/task/${taskId}/logs`;
+        }
     });
 });
 </script>

@@ -238,31 +238,39 @@ class RichUI:
             
             if not servers:
                 return Panel("Aucun serveur trouvé.\nVérifiez que vos serveurs Ollama sont bien accessibles.", 
-                            title="Servers", border_style="yellow")
+                            title="Serveurs", border_style="yellow")
                 
             # Création du tableau des serveurs
             table = Table(box=box.SIMPLE, expand=True)
-            table.add_column("Serveur", style="dim")
+            table.add_column("Adresse", style="dim")
             table.add_column("État", justify="center")
             table.add_column("Charge", justify="right")
+            table.add_column("Modèles", justify="right")
+            table.add_column("Backend", justify="right")
             
             # Afficher chaque serveur
             for server in servers:
                 address = server.get("address", "Unknown")
                 is_healthy = server.get("healthy", False)
                 load = server.get("load", 0.0)
+                models_count = len(server.get("models", []))
+                backend = server.get("backend", "Inconnu")
                 
                 # Formater la charge
-                load_str = f"{load:.2f}"
+                load_str = f"{int(load * 100)}%" if load <= 1.0 else f"{load:.2f}"
                 load_color = "green" if load < 0.7 else "yellow" if load < 0.9 else "red"
                 
                 table.add_row(
                     address, 
-                    "[green]✓ Disponible[/green]" if is_healthy else "[red]✗ Indisponible[/red]",
-                    f"[{load_color}]{load_str}[/{load_color}]"
+                    "[green]En ligne[/green]" if is_healthy else "[red]Hors ligne[/red]",
+                    f"[{load_color}]{load_str}[/{load_color}]",
+                    str(models_count) if is_healthy else "-",
+                    str(backend) if is_healthy else "Inconnu"
                 )
-                
-            return Panel(table, title=f"[bold]Serveurs[/bold] ({len(servers)} détectés)", 
+            
+            # Calculer le nombre de serveurs en ligne
+            healthy_servers = sum(1 for server in servers if server.get("healthy", False))
+            return Panel(table, title=f"[bold]Serveurs[/bold] ({healthy_servers}/{len(servers)} en ligne)", 
                         border_style="blue", box=box.ROUNDED)
         except Exception as e:
             logger.exception("Erreur lors de la création du panneau des serveurs")
@@ -271,11 +279,11 @@ class RichUI:
     def _create_models_panel(self) -> Panel:
         """Create models panel with model availability from registry."""
         try:
-            # Utiliser le registre de modèles pour obtenir les informations
+            # Utiliser le registre de modèles pour obtenir les informations à jour
             models_status = self.model_registry.get_model_status()
             
             models_list = []
-            if "models" in models_status:
+            if isinstance(models_status, dict) and "models" in models_status:
                 models_list = models_status["models"]
             elif not isinstance(models_status, dict) or "error" in models_status:
                 # En cas d'erreur spécifique du registre
@@ -296,32 +304,43 @@ class RichUI:
             
             # Créer le tableau des modèles
             table = Table(box=box.SIMPLE, expand=True)
-            table.add_column("Modèle", style="cyan")
+            table.add_column("Nom", style="cyan")
+            table.add_column("Taille", justify="right")
             table.add_column("Serveurs", justify="right")
-            table.add_column("Utilisations", justify="right")
+            table.add_column("Statut", justify="right")
                 
             # Afficher les modèles (limité pour éviter un tableau trop grand)
             for model_info in models_list[:10]:
                 model_name = model_info.get("name", "Unknown")
+                model_size = model_info.get("size", "?")
                 servers = model_info.get("servers", [])
-                usage_count = model_info.get("usage_count", 0)
+                status = model_info.get("status", "Prêt")
                 
-                # Formater le nombre de serveurs
-                servers_str = str(len(servers))
-                if len(servers) > 0:
-                    servers_str = f"[green]{servers_str}[/green]"
+                # Formater la taille du modèle
+                size_str = f"{model_size} GB" if isinstance(model_size, (int, float)) else str(model_size)
+                
+                # Formater le statut avec couleur
+                if status.lower() in ["prêt", "ready"]:
+                    status_str = f"[green]{status}[/green]"
+                elif status.lower() in ["en cours", "loading", "downloading"]:
+                    status_str = f"[yellow]{status}[/yellow]"
+                else:
+                    status_str = status
                 
                 table.add_row(
                     model_name, 
-                    servers_str,
-                    str(usage_count)
+                    size_str,
+                    f"{len(servers)} serveur{'s' if len(servers) > 1 else ''}",
+                    status_str
                 )
                 
             # Indiquer s'il y a plus de modèles que ceux affichés
             if len(models_list) > 10:
-                table.add_row(f"...et {len(models_list) - 10} autres", "", "")
+                table.add_row(f"...et {len(models_list) - 10} autres", "", "", "")
                 
-            return Panel(table, title=f"[bold]Modèles disponibles[/bold] ({len(models_list)})", 
+            # Compter les modèles prêts vs en cours de chargement
+            ready_models = sum(1 for m in models_list if m.get("status", "").lower() in ["prêt", "ready"])
+            return Panel(table, title=f"[bold]Modèles disponibles[/bold] ({ready_models}/{len(models_list)} prêts)", 
                         border_style="cyan", box=box.ROUNDED)
                 
         except Exception as e:
