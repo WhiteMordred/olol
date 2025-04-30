@@ -5,26 +5,26 @@
 {% block content %}
 <div class="row">
     <div class="col-lg-12">
-        <h2 class="mb-4">Gestion des Serveurs</h2>
+        <h2 class="mb-4 cyber-heading">Gestion des Serveurs</h2>
     </div>
 </div>
 
 <!-- Actions principales -->
 <div class="row mb-4">
     <div class="col-lg-12">
-        <div class="card">
-            <div class="card-body">
+        <div class="cyber-panel">
+            <div class="cyber-panel-body">
                 <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addServerModal">
+                    <button type="button" class="cyber-btn" data-bs-toggle="modal" data-bs-target="#addServerModal">
                         <i class="fas fa-plus"></i> Ajouter un serveur
                     </button>
-                    <button type="button" class="btn btn-success" id="refreshServersBtn">
+                    <button type="button" class="cyber-btn cyber-btn-success" id="refreshServersBtn">
                         <i class="fas fa-sync-alt"></i> Rafraîchir
                     </button>
                     <div class="ms-auto">
-                        <div class="input-group">
-                            <input type="text" class="form-control" id="serverSearch" placeholder="Rechercher...">
-                            <button class="btn btn-outline-secondary" type="button" id="searchBtn">
+                        <div class="cyber-search">
+                            <input type="text" class="cyber-input" id="serverSearch" placeholder="Rechercher...">
+                            <button class="cyber-btn cyber-btn-sm" type="button" id="searchBtn">
                                 <i class="fas fa-search"></i>
                             </button>
                         </div>
@@ -37,63 +37,43 @@
 
 <!-- Vue d'ensemble -->
 <div class="row mb-4">
-    <div class="col-lg-3 col-md-6">
-        <div class="card bg-primary text-white mb-4">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h5 class="card-title">Total</h5>
-                        <h2 id="total-servers">{{ stats.total }}</h2>
-                    </div>
-                    <div>
-                        <i class="fas fa-server fa-3x"></i>
-                    </div>
-                </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="cyber-card server-card mb-4">
+            <div class="cyber-card-header">
+                <i class="fas fa-server"></i> Total
+            </div>
+            <div class="cyber-card-body">
+                <div class="cyber-value" id="total-servers">{{ stats.total }}</div>
             </div>
         </div>
     </div>
-    <div class="col-lg-3 col-md-6">
-        <div class="card bg-success text-white mb-4">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h5 class="card-title">En ligne</h5>
-                        <h2 id="online-servers">{{ stats.online }}</h2>
-                    </div>
-                    <div>
-                        <i class="fas fa-check-circle fa-3x"></i>
-                    </div>
-                </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="cyber-card mb-4" style="border-left-color: var(--success-color);">
+            <div class="cyber-card-header">
+                <i class="fas fa-check-circle"></i> En ligne
+            </div>
+            <div class="cyber-card-body">
+                <div class="cyber-value" style="color: var(--success-color);" id="online-servers">{{ stats.online }}</div>
             </div>
         </div>
     </div>
-    <div class="col-lg-3 col-md-6">
-        <div class="card bg-danger text-white mb-4">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h5 class="card-title">Hors ligne</h5>
-                        <h2 id="offline-servers">{{ stats.offline }}</h2>
-                    </div>
-                    <div>
-                        <i class="fas fa-times-circle fa-3x"></i>
-                    </div>
-                </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="cyber-card mb-4" style="border-left-color: var(--danger-color);">
+            <div class="cyber-card-header">
+                <i class="fas fa-times-circle"></i> Hors ligne
+            </div>
+            <div class="cyber-card-body">
+                <div class="cyber-value" style="color: var(--danger-color);" id="offline-servers">{{ stats.offline }}</div>
             </div>
         </div>
     </div>
-    <div class="col-lg-3 col-md-6">
-        <div class="card bg-info text-white mb-4">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h5 class="card-title">Capacité totale</h5>
-                        <h2 id="capacity">{{ stats.capacity }}</h2>
-                    </div>
-                    <div>
-                        <i class="fas fa-microchip fa-3x"></i>
-                    </div>
-                </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="cyber-card mb-4" style="border-left-color: var(--info-color);">
+            <div class="cyber-card-header">
+                <i class="fas fa-microchip"></i> Capacité totale
+            </div>
+            <div class="cyber-card-body">
+                <div class="cyber-value" style="color: var(--info-color);" id="capacity">{{ stats.capacity }}</div>
             </div>
         </div>
     </div>
@@ -102,14 +82,13 @@
 <!-- Liste des serveurs -->
 <div class="row">
     <div class="col-lg-12">
-        <div class="card">
-            <div class="card-header">
-                <i class="fas fa-server me-1"></i>
-                Serveurs du cluster
+        <div class="cyber-panel">
+            <div class="cyber-panel-header">
+                <i class="fas fa-server"></i> Serveurs du cluster
             </div>
-            <div class="card-body">
+            <div class="cyber-panel-body">
                 <div class="table-responsive">
-                    <table class="table table-striped table-hover" id="serversTable">
+                    <table class="cyber-table" id="serversTable">
                         <thead>
                             <tr>
                                 <th>Adresse</th>
@@ -126,41 +105,43 @@
                                 <td>{{ server.address }}</td>
                                 <td>
                                     {% if server.healthy %}
-                                    <span class="badge bg-success">En ligne</span>
+                                    <span class="cyber-badge online">
+                                        <span class="cyber-dot"></span> En ligne
+                                    </span>
                                     {% else %}
-                                    <span class="badge bg-danger">Hors ligne</span>
+                                    <span class="cyber-badge offline">
+                                        <span class="cyber-dot"></span> Hors ligne
+                                    </span>
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <div class="progress">
-                                        <div class="progress-bar 
-                                        {% if server.load < 0.5 %}bg-success
-                                        {% elif server.load < 0.8 %}bg-warning
-                                        {% else %}bg-danger{% endif %}" 
-                                        role="progressbar" style="width: {{ server.load * 100 }}%" 
-                                        aria-valuenow="{{ server.load * 100 }}" aria-valuemin="0" aria-valuemax="100">
-                                            {{ "%.0f"|format(server.load * 100) }}%
-                                        </div>
+                                    <div class="cyber-progress">
+                                        <div class="cyber-progress-bar 
+                                        {% if server.load < 0.5 %}good
+                                        {% elif server.load < 0.8 %}warning
+                                        {% else %}danger{% endif %}" 
+                                        style="width: {{ server.load * 100 }}%"></div>
                                     </div>
+                                    <small>{{ "%.0f"|format(server.load * 100) }}%</small>
                                 </td>
                                 <td>{{ "%.1f"|format(server.latency_ms) }} ms</td>
                                 <td>
                                     {% for model in server.models[:3] %}
-                                    <span class="badge bg-primary">{{ model }}</span>
+                                    <span class="cyber-badge">{{ model }}</span>
                                     {% endfor %}
                                     {% if server.models|length > 3 %}
-                                    <span class="badge bg-secondary">+{{ server.models|length - 3 }}</span>
+                                    <span class="cyber-badge servers">+{{ server.models|length - 3 }}</span>
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <div class="btn-group btn-group-sm">
-                                        <button type="button" class="btn btn-primary view-server-btn" data-server="{{ server.address }}">
+                                    <div class="d-flex gap-1">
+                                        <button type="button" class="cyber-btn cyber-btn-sm view-server-btn" data-server="{{ server.address }}">
                                             <i class="fas fa-eye"></i>
                                         </button>
-                                        <button type="button" class="btn btn-warning edit-server-btn" data-server="{{ server.address }}">
+                                        <button type="button" class="cyber-btn cyber-btn-sm cyber-btn-warning edit-server-btn" data-server="{{ server.address }}">
                                             <i class="fas fa-edit"></i>
                                         </button>
-                                        <button type="button" class="btn btn-danger remove-server-btn" data-server="{{ server.address }}">
+                                        <button type="button" class="cyber-btn cyber-btn-sm cyber-btn-danger remove-server-btn" data-server="{{ server.address }}">
                                             <i class="fas fa-trash"></i>
                                         </button>
                                     </div>
@@ -182,20 +163,20 @@
 <!-- Modal d'ajout de serveur -->
 <div class="modal fade" id="addServerModal" tabindex="-1">
     <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
+        <div class="modal-content cyber-modal">
+            <div class="cyber-modal-header">
                 <h5 class="modal-title">Ajouter un nouveau serveur</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
+            <div class="cyber-modal-body">
                 <form id="addServerForm">
                     <div class="mb-3">
                         <label for="serverHost" class="form-label">Hôte</label>
-                        <input type="text" class="form-control" id="serverHost" placeholder="localhost ou adresse IP" required>
+                        <input type="text" class="cyber-input form-control" id="serverHost" placeholder="localhost ou adresse IP" required>
                     </div>
                     <div class="mb-3">
                         <label for="serverPort" class="form-label">Port</label>
-                        <input type="number" class="form-control" id="serverPort" value="11434" min="1" max="65535" required>
+                        <input type="number" class="cyber-input form-control" id="serverPort" value="11434" min="1" max="65535" required>
                     </div>
                     <div class="mb-3 form-check">
                         <input type="checkbox" class="form-check-input" id="serverVerifyHealth">
@@ -203,9 +184,9 @@
                     </div>
                 </form>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                <button type="button" class="btn btn-primary" id="addServerBtn">Ajouter</button>
+            <div class="cyber-modal-footer">
+                <button type="button" class="cyber-btn cyber-btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="cyber-btn" id="addServerBtn">Ajouter</button>
             </div>
         </div>
     </div>
@@ -214,12 +195,12 @@
 <!-- Modal de détails du serveur -->
 <div class="modal fade" id="serverDetailsModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
+        <div class="modal-content cyber-modal">
+            <div class="cyber-modal-header">
                 <h5 class="modal-title">Détails du serveur <span id="modalServerAddress"></span></h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
+            <div class="cyber-modal-body">
                 <ul class="nav nav-tabs" id="serverDetailTabs">
                     <li class="nav-item">
                         <a class="nav-link active" data-bs-toggle="tab" href="#infoTab">Informations</a>
@@ -236,13 +217,13 @@
                     <div class="tab-pane fade show active" id="infoTab">
                         <div class="row">
                             <div class="col-md-6">
-                                <div class="card mb-3">
-                                    <div class="card-header">Informations générales</div>
-                                    <div class="card-body">
+                                <div class="cyber-panel mb-3">
+                                    <div class="cyber-panel-header">Informations générales</div>
+                                    <div class="cyber-panel-body">
                                         <ul class="list-group list-group-flush" id="serverGeneralInfo">
                                             <li class="list-group-item d-flex justify-content-between">
                                                 <span>État:</span>
-                                                <span id="serverStatus" class="badge"></span>
+                                                <span id="serverStatus" class="cyber-badge"></span>
                                             </li>
                                             <li class="list-group-item d-flex justify-content-between">
                                                 <span>Charge:</span>
@@ -261,9 +242,9 @@
                                 </div>
                             </div>
                             <div class="col-md-6">
-                                <div class="card">
-                                    <div class="card-header">Capacités du serveur</div>
-                                    <div class="card-body">
+                                <div class="cyber-panel">
+                                    <div class="cyber-panel-header">Capacités du serveur</div>
+                                    <div class="cyber-panel-body">
                                         <ul class="list-group list-group-flush" id="serverCapabilities">
                                             <!-- Rempli dynamiquement -->
                                         </ul>
@@ -276,7 +257,7 @@
                     <!-- Onglet Modèles -->
                     <div class="tab-pane fade" id="modelsTab">
                         <div class="table-responsive">
-                            <table class="table table-striped" id="serverModelsTable">
+                            <table class="cyber-table" id="serverModelsTable">
                                 <thead>
                                     <tr>
                                         <th>Nom</th>
@@ -294,24 +275,24 @@
                     
                     <!-- Onglet Santé -->
                     <div class="tab-pane fade" id="healthTab">
-                        <div class="card mb-3">
-                            <div class="card-header">Historique de santé (24h)</div>
-                            <div class="card-body">
+                        <div class="cyber-panel mb-3">
+                            <div class="cyber-panel-header">Historique de santé (24h)</div>
+                            <div class="cyber-panel-body">
                                 <canvas id="serverHealthHistoryChart"></canvas>
                             </div>
                         </div>
-                        <div class="card">
-                            <div class="card-header">Historique de charge (24h)</div>
-                            <div class="card-body">
+                        <div class="cyber-panel">
+                            <div class="cyber-panel-header">Historique de charge (24h)</div>
+                            <div class="cyber-panel-body">
                                 <canvas id="serverLoadHistoryChart"></canvas>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-warning" id="checkHealthBtn">Vérifier la santé</button>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+            <div class="cyber-modal-footer">
+                <button type="button" class="cyber-btn cyber-btn-warning" id="checkHealthBtn">Vérifier la santé</button>
+                <button type="button" class="cyber-btn cyber-btn-secondary" data-bs-dismiss="modal">Fermer</button>
             </div>
         </div>
     </div>
@@ -320,21 +301,21 @@
 <!-- Modal de confirmation de suppression -->
 <div class="modal fade" id="deleteServerModal" tabindex="-1">
     <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
+        <div class="modal-content cyber-modal">
+            <div class="cyber-modal-header">
                 <h5 class="modal-title">Confirmer la suppression</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
+            <div class="cyber-modal-body">
                 <p>Êtes-vous sûr de vouloir supprimer le serveur <strong id="deleteServerAddress"></strong> du cluster?</p>
-                <div class="alert alert-warning">
+                <div class="cyber-alert">
                     <i class="fas fa-exclamation-triangle"></i> 
                     Cette action ne supprime pas le serveur physique, mais seulement sa référence dans le cluster.
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Supprimer</button>
+            <div class="cyber-modal-footer">
+                <button type="button" class="cyber-btn cyber-btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="cyber-btn cyber-btn-danger" id="confirmDeleteBtn">Supprimer</button>
             </div>
         </div>
     </div>
@@ -344,6 +325,10 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Configuration graphique pour correspondre au style cyberpunk
+    Chart.defaults.color = '#808080';
+    Chart.defaults.borderColor = '#2A2A2A';
+    
     // Gestionnaires pour les boutons d'action
     document.querySelectorAll('.view-server-btn').forEach(btn => {
         btn.addEventListener('click', function() {
@@ -385,12 +370,16 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Rafraîchir la liste des serveurs
     document.getElementById('refreshServersBtn').addEventListener('click', function() {
+        this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Rafraîchissement...';
+        this.disabled = true;
         refreshServersList();
     });
     
     // Vérifier la santé d'un serveur spécifique
     document.getElementById('checkHealthBtn').addEventListener('click', function() {
         const server = document.getElementById('modalServerAddress').textContent;
+        this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Vérification...';
+        this.disabled = true;
         checkServerHealth(server);
     });
     
@@ -404,8 +393,13 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(response => response.json())
             .then(data => {
                 // Mettre à jour les informations générales
-                document.getElementById('serverStatus').textContent = data.healthy ? 'En ligne' : 'Hors ligne';
-                document.getElementById('serverStatus').className = data.healthy ? 'badge bg-success' : 'badge bg-danger';
+                if (data.healthy) {
+                    document.getElementById('serverStatus').className = 'cyber-badge online';
+                    document.getElementById('serverStatus').innerHTML = '<span class="cyber-dot"></span> En ligne';
+                } else {
+                    document.getElementById('serverStatus').className = 'cyber-badge offline';
+                    document.getElementById('serverStatus').innerHTML = '<span class="cyber-dot"></span> Hors ligne';
+                }
                 document.getElementById('serverLoad').textContent = `${(data.load * 100).toFixed(1)}%`;
                 document.getElementById('serverLatency').textContent = `${data.latency_ms.toFixed(1)} ms`;
                 document.getElementById('serverCapacity').textContent = data.capacity || 'N/A';
@@ -479,9 +473,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const datasets = [{
             label: 'État',
             data: healthData.map(item => item.healthy ? 1 : 0),
-            backgroundColor: 'rgba(40, 167, 69, 0.2)',
-            borderColor: 'rgb(40, 167, 69)',
-            borderWidth: 1,
+            backgroundColor: 'rgba(0, 204, 102, 0.1)',
+            borderColor: '#00CC66',
+            borderWidth: 2,
             stepped: true
         }];
         
@@ -498,12 +492,27 @@ document.addEventListener('DOMContentLoaded', function() {
                     y: {
                         min: 0,
                         max: 1,
+                        grid: {
+                            color: 'rgba(42, 42, 42, 0.4)',
+                        },
                         ticks: {
                             stepSize: 1,
                             callback: function(value) {
                                 return value === 0 ? 'Hors ligne' : 'En ligne';
                             }
                         }
+                    },
+                    x: {
+                        grid: {
+                            color: 'rgba(42, 42, 42, 0.4)',
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        backgroundColor: 'rgba(10, 10, 10, 0.8)',
+                        bodyColor: '#F0F0F0',
+                        borderColor: '#2A2A2A'
                     }
                 }
             }
@@ -524,9 +533,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const datasets = [{
             label: 'Charge',
             data: loadData.map(item => item.load),
-            backgroundColor: 'rgba(255, 193, 7, 0.2)',
-            borderColor: 'rgb(255, 193, 7)',
-            borderWidth: 1
+            backgroundColor: 'rgba(0, 243, 255, 0.1)',
+            borderColor: '#00F3FF',
+            borderWidth: 2
         }];
         
         // Créer le graphique
@@ -541,7 +550,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 scales: {
                     y: {
                         beginAtZero: true,
-                        suggestedMax: 1.0
+                        suggestedMax: 1.0,
+                        grid: {
+                            color: 'rgba(42, 42, 42, 0.4)',
+                        }
+                    },
+                    x: {
+                        grid: {
+                            color: 'rgba(42, 42, 42, 0.4)',
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        backgroundColor: 'rgba(10, 10, 10, 0.8)',
+                        bodyColor: '#F0F0F0',
+                        borderColor: '#2A2A2A'
                     }
                 }
             }
@@ -550,6 +574,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function addServer(host, port, verifyHealth) {
         const serverAddress = `${host}:${port}`;
+        const addBtn = document.getElementById('addServerBtn');
+        const originalText = addBtn.innerHTML;
+        
+        addBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Ajout...';
+        addBtn.disabled = true;
         
         fetch('/api/servers', {
             method: 'POST',
@@ -563,6 +592,9 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(response => response.json())
         .then(data => {
+            addBtn.innerHTML = originalText;
+            addBtn.disabled = false;
+            
             if (data.error) {
                 alert(`Erreur: ${data.error}`);
             } else {
@@ -572,17 +604,28 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         })
         .catch(error => {
+            addBtn.innerHTML = originalText;
+            addBtn.disabled = false;
             console.error('Erreur lors de l\'ajout du serveur:', error);
             alert('Erreur lors de l\'ajout du serveur.');
         });
     }
     
     function deleteServer(server) {
+        const deleteBtn = document.getElementById('confirmDeleteBtn');
+        const originalText = deleteBtn.innerHTML;
+        
+        deleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Suppression...';
+        deleteBtn.disabled = true;
+        
         fetch(`/api/servers/${encodeURIComponent(server)}`, {
             method: 'DELETE'
         })
         .then(response => response.json())
         .then(data => {
+            deleteBtn.innerHTML = originalText;
+            deleteBtn.disabled = false;
+            
             if (data.error) {
                 alert(`Erreur: ${data.error}`);
             } else {
@@ -592,25 +635,39 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         })
         .catch(error => {
+            deleteBtn.innerHTML = originalText;
+            deleteBtn.disabled = false;
             console.error('Erreur lors de la suppression du serveur:', error);
             alert('Erreur lors de la suppression du serveur.');
         });
     }
     
     function checkServerHealth(server) {
+        const checkBtn = document.getElementById('checkHealthBtn');
+        
         fetch(`/api/servers/${encodeURIComponent(server)}/check_health`, {
             method: 'POST'
         })
         .then(response => response.json())
         .then(data => {
+            checkBtn.innerHTML = 'Vérifier la santé';
+            checkBtn.disabled = false;
+            
             // Mettre à jour l'état affiché
-            document.getElementById('serverStatus').textContent = data.healthy ? 'En ligne' : 'Hors ligne';
-            document.getElementById('serverStatus').className = data.healthy ? 'badge bg-success' : 'badge bg-danger';
+            if (data.healthy) {
+                document.getElementById('serverStatus').className = 'cyber-badge online';
+                document.getElementById('serverStatus').innerHTML = '<span class="cyber-dot"></span> En ligne';
+            } else {
+                document.getElementById('serverStatus').className = 'cyber-badge offline';
+                document.getElementById('serverStatus').innerHTML = '<span class="cyber-dot"></span> Hors ligne';
+            }
             
             // Afficher un message
             alert(`Vérification terminée. État du serveur: ${data.healthy ? 'En ligne' : 'Hors ligne'}`);
         })
         .catch(error => {
+            checkBtn.innerHTML = 'Vérifier la santé';
+            checkBtn.disabled = false;
             console.error('Erreur lors de la vérification de santé:', error);
             alert('Erreur lors de la vérification de santé du serveur.');
         });
@@ -618,7 +675,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function refreshServersList() {
         // Recharger la page pour rafraîchir les données
-        window.location.reload();
+        setTimeout(() => {
+            window.location.reload();
+        }, 500);
     }
     
     // Utilitaires
