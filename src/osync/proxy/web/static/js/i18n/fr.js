@@ -1,112 +1,159 @@
 /**
- * Traductions françaises pour Ollama Sync
+ * Ollama Sync - Traductions françaises
  */
-(function() {
-    // Dictionnaire des traductions françaises
-    const translations = {
-        // Navigation et interface générale
-        "dashboard": "Tableau de bord",
-        "servers": "Serveurs",
-        "models": "Modèles",
-        "queue": "File d'attente",
-        "playground": "Playground",
-        "health": "Santé",
-        "logs": "Journaux",
-        "terminal": "Terminal",
-        "settings": "Paramètres",
-        "api_docs": "Documentation API",
-        "collapse": "Replier",
-        "expand": "Déplier",
-        "language": "Langue",
-        "copyright": "Ollama Sync © 2025",
-        
-        // Notifications
-        "notifications": "Notifications",
-        "see_all_notifications": "Voir toutes les notifications",
-        "new_server_detected": "Nouveau serveur détecté",
-        "high_load": "Charge élevée",
-        "server_offline": "Serveur hors ligne",
-        
-        // État des serveurs
-        "cluster_status": "État du cluster",
-        "active_servers": "Serveurs actifs",
-        "manage_servers": "Gérer les serveurs",
-        "proxy_active": "Proxy actif",
-        
-        // Page serveurs
-        "add_server": "Ajouter un serveur",
-        "remove_server": "Supprimer un serveur",
-        "server_address": "Adresse du serveur",
-        "server_port": "Port",
-        "server_status": "Statut",
-        "server_load": "Charge",
-        "server_models": "Modèles",
-        "server_actions": "Actions",
-        
-        // Page modèles
-        "model_name": "Nom du modèle",
-        "model_size": "Taille",
-        "model_version": "Version",
-        "model_family": "Famille",
-        "model_servers": "Serveurs",
-        "pull_model": "Télécharger le modèle",
-        "delete_model": "Supprimer le modèle",
-        
-        // File d'attente
-        "request_id": "ID de la requête",
-        "request_type": "Type",
-        "request_status": "Statut",
-        "request_server": "Serveur",
-        "request_model": "Modèle",
-        "request_priority": "Priorité",
-        "request_time": "Heure",
-        "clear_queue": "Vider la file",
-        
-        // Page santé
-        "system_health": "Santé du système",
-        "resource_usage": "Utilisation des ressources",
-        "memory_usage": "Mémoire",
-        "cpu_usage": "CPU",
-        "disk_usage": "Disque",
-        "network_traffic": "Trafic réseau",
-        "last_updated": "Dernière mise à jour",
-        
-        // Paramètres
-        "general_settings": "Paramètres généraux",
-        "network_settings": "Paramètres réseau",
-        "security_settings": "Paramètres de sécurité",
-        "advanced_settings": "Paramètres avancés",
-        "save_settings": "Enregistrer",
-        "reset_settings": "Réinitialiser",
-        
-        // Messages
-        "confirm_delete": "Êtes-vous sûr de vouloir supprimer cet élément ?",
-        "operation_success": "Opération réussie",
-        "operation_failed": "Échec de l'opération",
-        "loading": "Chargement...",
-        "no_data": "Aucune donnée disponible",
-        
-        // Boutons et actions
-        "refresh": "Actualiser",
-        "cancel": "Annuler",
-        "confirm": "Confirmer",
-        "edit": "Modifier",
-        "delete": "Supprimer",
-        "view": "Voir",
-        "search": "Rechercher",
-        "apply": "Appliquer",
-        "reset": "Réinitialiser"
-    };
+
+// Enregistrer les traductions dans le système I18n
+window.I18n.translations.fr = {
+    // Éléments communs
+    "app.name": "Ollama Sync",
+    "app.description": "Équilibrage de charge et synchronisation pour Ollama",
+    "nav.dashboard": "Tableau de bord",
+    "nav.models": "Modèles",
+    "nav.servers": "Serveurs",
+    "nav.health": "Santé",
+    "nav.queue": "File d'attente",
+    "nav.settings": "Paramètres",
+    "nav.terminal": "Terminal",
+    "nav.swagger": "Docs API",
+    "nav.playground": "Playground",
     
-    // Enregistrer les traductions
-    if (window.OllamaI18n) {
-        window.OllamaI18n.registerTranslations('fr', translations);
-    } else {
-        // Si le système i18n n'est pas encore chargé, attendre un peu
-        window.addEventListener('DOMContentLoaded', function() {
-            if (window.OllamaI18n) {
-                window.OllamaI18n.registerTranslations('fr', translations);
-            }
-        });
-    }
-})();
+    // Boutons et actions
+    "action.save": "Enregistrer",
+    "action.cancel": "Annuler",
+    "action.add": "Ajouter",
+    "action.remove": "Supprimer",
+    "action.edit": "Modifier",
+    "action.delete": "Supprimer",
+    "action.refresh": "Actualiser",
+    "action.search": "Rechercher",
+    "action.confirm": "Confirmer",
+    "action.loading": "Chargement...",
+    "action.send": "Envoyer",
+    "action.clear": "Effacer",
+    "action.retry": "Réessayer",
+    "action.start": "Démarrer",
+    "action.stop": "Arrêter",
+    "action.restart": "Redémarrer",
+    
+    // Tableau de bord
+    "dashboard.title": "Tableau de bord",
+    "dashboard.models.count": "Modèles au total",
+    "dashboard.servers.count": "Serveurs actifs",
+    "dashboard.servers.load": "Charge des serveurs",
+    "dashboard.queue.length": "Longueur de la file",
+    "dashboard.status.title": "État du système",
+    "dashboard.status.healthy": "Opérationnel",
+    "dashboard.status.degraded": "Dégradé",
+    "dashboard.status.error": "Erreur",
+    "dashboard.models.recent": "Modèles récents",
+    
+    // Page des modèles
+    "models.title": "Gestion des modèles",
+    "models.table.name": "Nom",
+    "models.table.size": "Taille",
+    "models.table.modified": "Modifié",
+    "models.table.servers": "Disponible sur",
+    "models.table.actions": "Actions",
+    "models.filter.placeholder": "Filtrer les modèles...",
+    "models.add.title": "Ajouter un nouveau modèle",
+    "models.add.name": "Nom du modèle",
+    "models.add.server": "Serveur cible",
+    "models.add.file": "Fichier du modèle",
+    "models.add.submit": "Ajouter le modèle",
+    "models.pull.title": "Télécharger le modèle",
+    "models.delete.confirm": "Êtes-vous sûr de vouloir supprimer ce modèle ?",
+    "models.delete.warning": "Cela supprimera le modèle de tous les serveurs.",
+    
+    // Page des serveurs
+    "servers.title": "Gestion des serveurs",
+    "servers.table.name": "Nom",
+    "servers.table.url": "URL",
+    "servers.table.status": "Statut",
+    "servers.table.load": "Charge",
+    "servers.table.models": "Nombre de modèles",
+    "servers.table.actions": "Actions",
+    "servers.status.online": "En ligne",
+    "servers.status.offline": "Hors ligne",
+    "servers.status.degraded": "Dégradé",
+    "servers.add.title": "Ajouter un nouveau serveur",
+    "servers.add.name": "Nom du serveur",
+    "servers.add.url": "URL du serveur",
+    "servers.add.submit": "Ajouter le serveur",
+    "servers.edit.title": "Modifier le serveur",
+    "servers.delete.confirm": "Êtes-vous sûr de vouloir supprimer ce serveur ?",
+    
+    // Page de santé
+    "health.title": "Santé du système",
+    "health.system.title": "État du système",
+    "health.system.cpu": "Utilisation CPU",
+    "health.system.memory": "Utilisation mémoire",
+    "health.system.disk": "Utilisation disque",
+    "health.servers.title": "Santé des serveurs",
+    "health.servers.response": "Temps de réponse",
+    "health.servers.status": "Code de statut",
+    "health.history.title": "Historique de santé",
+    "health.refresh.auto": "Actualisation auto",
+    
+    // Page de file d'attente
+    "queue.title": "File d'attente d'inférence",
+    "queue.table.id": "ID",
+    "queue.table.model": "Modèle",
+    "queue.table.status": "Statut",
+    "queue.table.created": "Créé le",
+    "queue.table.server": "Serveur",
+    "queue.table.actions": "Actions",
+    "queue.status.pending": "En attente",
+    "queue.status.running": "En cours",
+    "queue.status.completed": "Terminé",
+    "queue.status.failed": "Échoué",
+    "queue.clear.title": "Vider la file",
+    "queue.clear.confirm": "Êtes-vous sûr de vouloir effacer toutes les tâches en attente ?",
+    
+    // Page de paramètres
+    "settings.title": "Paramètres du système",
+    "settings.language.title": "Langue",
+    "settings.language.choose": "Choisir la langue",
+    "settings.theme.title": "Thème",
+    "settings.theme.light": "Clair",
+    "settings.theme.dark": "Sombre",
+    "settings.theme.system": "Système par défaut",
+    "settings.backup.title": "Sauvegarde de la base de données",
+    "settings.backup.create": "Créer une sauvegarde",
+    "settings.backup.restore": "Restaurer une sauvegarde",
+    "settings.backup.success": "Sauvegarde créée avec succès",
+    "settings.backup.error": "Échec de la création de la sauvegarde",
+    "settings.sync.title": "Paramètres de synchronisation",
+    "settings.sync.interval": "Intervalle d'auto-synchronisation (secondes)",
+    "settings.sync.save": "Enregistrer les paramètres",
+    "settings.sync.force": "Forcer la synchronisation maintenant",
+    
+    // Page terminal
+    "terminal.title": "Console Terminal",
+    "terminal.placeholder": "Entrer une commande...",
+    "terminal.history": "Historique des commandes",
+    "terminal.clear": "Effacer le terminal",
+    
+    // Playground
+    "playground.title": "LLM Playground",
+    "playground.model": "Sélectionner un modèle",
+    "playground.temperature": "Température",
+    "playground.max_tokens": "Tokens max",
+    "playground.system_prompt": "Prompt système",
+    "playground.user_prompt": "Entrez votre message...",
+    "playground.response": "Réponse du modèle",
+    "playground.save": "Enregistrer la conversation",
+    "playground.reset": "Réinitialiser",
+    
+    // Erreurs et notifications
+    "error.generic": "Une erreur s'est produite",
+    "error.connection": "Erreur de connexion",
+    "error.server_unreachable": "Serveur injoignable",
+    "error.invalid_input": "Saisie invalide",
+    "error.required_field": "Ce champ est requis",
+    "error.invalid_url": "Format d'URL invalide",
+    "error.load_failed": "Échec du chargement des données",
+    "error.save_failed": "Échec de l'enregistrement des modifications",
+    "success.saved": "Modifications enregistrées avec succès",
+    "success.added": "Ajouté avec succès",
+    "success.deleted": "Supprimé avec succès"
+};

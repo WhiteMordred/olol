@@ -1,12 +1,12 @@
 <!-- DASHBOARD HTML -->
 {% extends "base.html" %}
 
-{% block title %}Dashboard - Ollama Sync{% endblock %}
+{% block title %}<title data-i18n="dashboard.title">Dashboard - Ollama Sync</title>{% endblock %}
 
 {% block content %}
 <div class="row">
     <div class="col-lg-12">
-        <h2 class="mb-4 cyber-heading">Dashboard</h2>
+        <h2 class="mb-4 cyber-heading" data-i18n="dashboard.title">Dashboard</h2>
     </div>
 </div>
 
@@ -15,21 +15,21 @@
     <div class="col-xl-3 col-md-6">
         <div class="cyber-card server-card mb-4">
             <div class="cyber-card-header">
-                <i class="fas fa-server"></i> Serveurs
+                <i class="fas fa-server"></i> <span data-i18n="nav.servers">Serveurs</span>
             </div>
             <div class="cyber-card-body">
                 <div class="cyber-value">{{ stats.servers.total }}</div>
                 <div class="cyber-stats">
                     <span class="cyber-stat online">
-                        <i class="fas fa-check-circle"></i> {{ stats.servers.healthy }} en ligne
+                        <i class="fas fa-check-circle"></i> {{ stats.servers.healthy }} <span data-i18n="servers.status.online">en ligne</span>
                     </span>
                     <span class="cyber-stat offline">
-                        <i class="fas fa-times-circle"></i> {{ stats.servers.total - stats.servers.healthy }} hors ligne
+                        <i class="fas fa-times-circle"></i> {{ stats.servers.total - stats.servers.healthy }} <span data-i18n="servers.status.offline">hors ligne</span>
                     </span>
                 </div>
             </div>
             <div class="cyber-card-footer">
-                <a href="/servers">Voir les détails</a>
+                <a href="/servers" data-i18n="dashboard.view.details">Voir les détails</a>
                 <i class="fas fa-angle-right"></i>
             </div>
         </div>
@@ -38,18 +38,18 @@
     <div class="col-xl-3 col-md-6">
         <div class="cyber-card model-card mb-4">
             <div class="cyber-card-header">
-                <i class="fas fa-brain"></i> Modèles
+                <i class="fas fa-brain"></i> <span data-i18n="nav.models">Modèles</span>
             </div>
             <div class="cyber-card-body">
                 <div class="cyber-value">{{ stats.models.total }}</div>
                 <div class="cyber-stats">
                     <span class="cyber-stat">
-                        <i class="fas fa-check-circle"></i> {{ stats.models.available }} disponibles
+                        <i class="fas fa-check-circle"></i> {{ stats.models.available }} <span data-i18n="models.status.available">disponibles</span>
                     </span>
                 </div>
             </div>
             <div class="cyber-card-footer">
-                <a href="/models">Voir les modèles</a>
+                <a href="/models" data-i18n="dashboard.view.models">Voir les modèles</a>
                 <i class="fas fa-angle-right"></i>
             </div>
         </div>
@@ -58,18 +58,18 @@
     <div class="col-xl-3 col-md-6">
         <div class="cyber-card load-card mb-4">
             <div class="cyber-card-header">
-                <i class="fas fa-tachometer-alt"></i> Charge moyenne
+                <i class="fas fa-tachometer-alt"></i> <span data-i18n="dashboard.servers.load">Charge moyenne</span>
             </div>
             <div class="cyber-card-body">
                 <div class="cyber-value">{{ "%.1f"|format(stats.load.average * 100) }}%</div>
                 <div class="cyber-stats">
                     <span class="cyber-stat">
-                        <i class="fas fa-arrow-up"></i> Max: {{ "%.1f"|format(stats.load.max * 100) }}%
+                        <i class="fas fa-arrow-up"></i> <span data-i18n="health.system.max">Max</span>: {{ "%.1f"|format(stats.load.max * 100) }}%
                     </span>
                 </div>
             </div>
             <div class="cyber-card-footer">
-                <a href="/health">Voir les performances</a>
+                <a href="/health" data-i18n="dashboard.view.performance">Voir les performances</a>
                 <i class="fas fa-angle-right"></i>
             </div>
         </div>
@@ -78,18 +78,18 @@
     <div class="col-xl-3 col-md-6">
         <div class="cyber-card uptime-card mb-4">
             <div class="cyber-card-header">
-                <i class="fas fa-clock"></i> Disponibilité
+                <i class="fas fa-clock"></i> <span data-i18n="dashboard.uptime">Disponibilité</span>
             </div>
             <div class="cyber-card-body">
                 <div class="cyber-value">{{ stats.uptime }}</div>
                 <div class="cyber-stats">
                     <span class="cyber-stat">
-                        <i class="fas fa-code-branch"></i> Version {{ stats.version }}
+                        <i class="fas fa-code-branch"></i> <span data-i18n="dashboard.version">Version</span> {{ stats.version }}
                     </span>
                 </div>
             </div>
             <div class="cyber-card-footer">
-                <a href="/settings">Paramètres</a>
+                <a href="/settings" data-i18n="nav.settings">Paramètres</a>
                 <i class="fas fa-angle-right"></i>
             </div>
         </div>
@@ -103,12 +103,12 @@
         <div class="cyber-panel mb-4">
             <div class="cyber-panel-header">
                 <div>
-                    <i class="fas fa-chart-bar"></i> Historique de charge de serveurs
+                    <i class="fas fa-chart-bar"></i> <span data-i18n="dashboard.servers.history">Historique de charge de serveurs</span>
                 </div>
                 <div>
                     <button type="button" class="cyber-btn auto-refresh-toggle" data-target="load-chart" data-seconds="30">
                         <i class="fas fa-sync-alt"></i>
-                        <span class="status-text">Actualisation auto</span>
+                        <span class="status-text" data-i18n="health.refresh.auto">Actualisation auto</span>
                     </button>
                 </div>
             </div>
@@ -123,12 +123,12 @@
         <div class="cyber-panel mb-4">
             <div class="cyber-panel-header">
                 <div>
-                    <i class="fas fa-server"></i> État des serveurs
+                    <i class="fas fa-server"></i> <span data-i18n="dashboard.servers.status">État des serveurs</span>
                 </div>
                 <div>
                     <button type="button" class="cyber-btn auto-refresh-toggle" data-target="servers-status" data-seconds="30">
                         <i class="fas fa-sync-alt"></i>
-                        <span class="status-text">Actualisation auto</span>
+                        <span class="status-text" data-i18n="health.refresh.auto">Actualisation auto</span>
                     </button>
                 </div>
             </div>
@@ -137,9 +137,9 @@
                     <table class="cyber-table">
                         <thead>
                             <tr>
-                                <th>Serveur</th>
-                                <th>État</th>
-                                <th>Charge</th>
+                                <th data-i18n="servers.table.name">Serveur</th>
+                                <th data-i18n="servers.table.status">État</th>
+                                <th data-i18n="servers.table.load">Charge</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -149,11 +149,11 @@
                                 <td>
                                     {% if server.healthy %}
                                     <span class="cyber-badge online">
-                                        <span class="cyber-dot"></span> En ligne
+                                        <span class="cyber-dot"></span> <span data-i18n="servers.status.online">En ligne</span>
                                     </span>
                                     {% else %}
                                     <span class="cyber-badge offline">
-                                        <span class="cyber-dot"></span> Hors ligne
+                                        <span class="cyber-dot"></span> <span data-i18n="servers.status.offline">Hors ligne</span>
                                     </span>
                                     {% endif %}
                                 </td>
@@ -170,7 +170,7 @@
                             </tr>
                             {% else %}
                             <tr>
-                                <td colspan="3" class="text-center">Aucun serveur disponible</td>
+                                <td colspan="3" class="text-center" data-i18n="servers.none_available">Aucun serveur disponible</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -178,7 +178,7 @@
                 </div>
                 {% if servers|length > 5 %}
                 <div class="text-center mt-3">
-                    <a href="/servers" class="cyber-btn cyber-btn-sm">Voir tous ({{ servers|length }})</a>
+                    <a href="/servers" class="cyber-btn cyber-btn-sm"><span data-i18n="dashboard.view.all">Voir tous</span> ({{ servers|length }})</a>
                 </div>
                 {% endif %}
             </div>
@@ -191,7 +191,7 @@
     <div class="col-lg-7">
         <div class="cyber-panel mb-4">
             <div class="cyber-panel-header">
-                <i class="fas fa-brain"></i> Modèles populaires
+                <i class="fas fa-brain"></i> <span data-i18n="dashboard.models.popular">Modèles populaires</span>
             </div>
             <div class="cyber-panel-body">
                 <div class="row">
@@ -202,20 +202,20 @@
                             <div class="cyber-model-info">
                                 {% if model.available %}
                                 <span class="cyber-badge online">
-                                    <span class="cyber-dot"></span> Disponible
+                                    <span class="cyber-dot"></span> <span data-i18n="models.status.available">Disponible</span>
                                 </span>
                                 {% else %}
                                 <span class="cyber-badge offline">
-                                    <span class="cyber-dot"></span> Non disponible
+                                    <span class="cyber-dot"></span> <span data-i18n="models.status.unavailable">Non disponible</span>
                                 </span>
                                 {% endif %}
-                                <span class="cyber-badge servers">{{ model.servers|length }} serveur(s)</span>
+                                <span class="cyber-badge servers">{{ model.servers|length }} <span data-i18n="models.servers.count">serveur(s)</span></span>
                             </div>
                             <div class="cyber-model-actions">
-                                <a href="/playground?model={{ model.name }}" class="cyber-btn cyber-btn-sm cyber-btn-success">
+                                <a href="/playground?model={{ model.name }}" class="cyber-btn cyber-btn-sm cyber-btn-success" data-i18n-attr-title="playground.launch">
                                     <i class="fas fa-play"></i>
                                 </a>
-                                <a href="/models#{{ model.name }}" class="cyber-btn cyber-btn-sm">
+                                <a href="/models#{{ model.name }}" class="cyber-btn cyber-btn-sm" data-i18n-attr-title="models.details">
                                     <i class="fas fa-info-circle"></i>
                                 </a>
                             </div>
@@ -223,12 +223,12 @@
                     </div>
                     {% else %}
                     <div class="col-12">
-                        <div class="cyber-alert">Aucun modèle disponible</div>
+                        <div class="cyber-alert" data-i18n="models.none_available">Aucun modèle disponible</div>
                     </div>
                     {% endfor %}
                 </div>
                 <div class="text-center mt-3">
-                    <a href="/models" class="cyber-btn">Voir tous les modèles</a>
+                    <a href="/models" class="cyber-btn" data-i18n="dashboard.view.all_models">Voir tous les modèles</a>
                 </div>
             </div>
         </div>
@@ -237,7 +237,7 @@
     <div class="col-lg-5">
         <div class="cyber-panel mb-4">
             <div class="cyber-panel-header">
-                <i class="fas fa-info-circle"></i> Conseils pour le proxy OLOL
+                <i class="fas fa-info-circle"></i> <span data-i18n="dashboard.tips.title">Conseils pour le proxy OLOL</span>
             </div>
             <div class="cyber-panel-body">
                 <div class="cyber-info">
@@ -245,13 +245,13 @@
                         <i class="fas fa-info-circle"></i>
                     </div>
                     <div class="cyber-info-content">
-                        <p>
+                        <p data-i18n="dashboard.tips.content">
                             Pour optimiser les performances de votre cluster, assurez-vous que les serveurs ont des ressources équilibrées
                             et que les modèles les plus utilisés sont répliqués sur plusieurs serveurs.
                         </p>
                         <p class="mb-0">
                             <a href="/settings" class="cyber-btn cyber-btn-sm">
-                                <i class="fas fa-cogs"></i> Configurer les paramètres avancés
+                                <i class="fas fa-cogs"></i> <span data-i18n="dashboard.tips.settings">Configurer les paramètres avancés</span>
                             </a>
                         </p>
                     </div>
@@ -341,7 +341,15 @@ document.addEventListener('DOMContentLoaded', function() {
             this.classList.toggle('active');
             const isActive = this.classList.contains('active');
             const statusText = this.querySelector('.status-text');
-            statusText.textContent = isActive ? 'Actif' : 'Actualisation auto';
+            
+            // Traduction en utilisant le système i18n
+            if (window.I18n) {
+                statusText.textContent = isActive 
+                    ? window.I18n.t('action.active') 
+                    : window.I18n.t('health.refresh.auto');
+            } else {
+                statusText.textContent = isActive ? 'Actif' : 'Actualisation auto';
+            }
             
             // Logique d'actualisation
             const target = this.getAttribute('data-target');
@@ -379,6 +387,13 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+    
+    // Initialiser le système de traduction si disponible
+    if (window.I18n && typeof window.I18n.init === 'function') {
+        window.I18n.init().then(() => {
+            console.log('Système de traduction initialisé sur la page dashboard');
+        });
+    }
 });
 </script>
 {% endblock %}
