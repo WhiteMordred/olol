@@ -130,6 +130,43 @@ def settings():
     """Render the settings page."""
     return render_template('settings.html')
 
+@app.route('/queue')
+def queue():
+    """Render the task queue page."""
+    # Récupérer les données de la file d'attente via le gestionnaire de queue
+    queue_manager = get_queue_manager()
+    queue_stats = queue_manager.get_queue_stats()
+    queue_tasks = {
+        'active': queue_manager.get_active_tasks(),
+        'pending': queue_manager.get_pending_tasks(),
+        'completed': queue_manager.get_completed_tasks(limit=12),
+        'failed': queue_manager.get_failed_tasks(limit=5)
+    }
+    
+    return render_template('queue.html', stats=queue_stats, tasks=queue_tasks)
+
+@app.route('/log')
+def logs():
+    """Render the logs page."""
+    # Récupérer les données de journalisation
+    page = request.args.get('page', 1, type=int)
+    limit = request.args.get('limit', 50, type=int)
+    level = request.args.get('level', None)
+    
+    # Simuler la pagination des logs
+    # Dans une implémentation réelle, cela viendrait d'une base de données
+    cm = get_cluster_manager()
+    log_entries = cm.get_system_logs(level=level, page=page, limit=limit) if cm else []
+    
+    return render_template('log.html', logs=log_entries, current_page=page, 
+                          pages_total=max(1, len(log_entries) // limit + (1 if len(log_entries) % limit else 0)),
+                          selected_level=level)
+
+@app.route('/terminal')
+def terminal():
+    """Render the terminal page."""
+    return render_template('terminal.html')
+
 @app.route('/swagger')
 def swagger_ui():
     """Render the Swagger UI integrated page."""
