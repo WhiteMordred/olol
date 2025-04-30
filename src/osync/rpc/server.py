@@ -809,3 +809,116 @@ def ensure_ollama_running(ollama_host: str = "http://localhost:11434",
     except Exception as e:
         logger.error(f"Error starting Ollama server: {str(e)}")
         return False
+
+def serve(host: str = "0.0.0.0", 
+         port: int = 50052, 
+         device_type: str = "cpu", 
+         device_id: int = 0, 
+         ollama_host: str = "http://localhost:11434",
+         ollama_env: dict = None,
+         health_check_interval: int = 30,
+         enable_discovery: bool = True,
+         preferred_interface: str = None) -> None:
+    """Démarrer le serveur RPC pour l'inférence distribuée.
+    
+    Args:
+        host: Adresse hôte du serveur
+        port: Port du serveur
+        device_type: Type de périphérique (cpu, cuda, rocm, metal)
+        device_id: ID du périphérique
+        ollama_host: URL de l'API Ollama
+        ollama_env: Variables d'environnement pour Ollama
+        health_check_interval: Intervalle pour les vérifications de santé (en secondes)
+        enable_discovery: Activer la découverte automatique
+        preferred_interface: Interface réseau préférée pour les connexions
+    """
+    import os
+    import signal
+    import time
+    from concurrent import futures
+    
+    # Configurer l'environnement Ollama si spécifié
+    if ollama_env:
+        for key, value in ollama_env.items():
+            os.environ[key] = value
+            
+    # S'assurer qu'Ollama est en cours d'exécution si nécessaire
+    if not check_ollama_running(ollama_host):
+        logger.info(f"Ollama n'est pas en cours d'exécution sur {ollama_host}, tentative de démarrage")
+        ensure_ollama_running(ollama_host)
+        
+    # Créer le serveur RPC
+    server = RPCServer(
+        ollama_host=ollama_host,
+        device_type=device_type,
+        device_id=device_id
+    )
+    
+    # Obtenir l'adresse IP si aucune n'est spécifiée
+    if host == "0.0.0.0" or host == "::":
+        from ..utils.discovery import get_local_ip
+        actual_host = get_local_ip(preferred_interface)
+        if actual_host:
+            logger.info(f"Utilisation de l'adresse IP locale: {actual_host}")
+        else:
+            actual_host = host
+    else:
+        actual_host = host
+    
+    # Créer le serveur gRPC
+    try:
+        # Importer les modules protobuf nécessaires
+        from ..proto import ollama_pb2_grpc
+        
+        grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+        ollama_pb2_grpc.add_DistributedOllamaServiceServicer_to_server(server, grpc_server)
+        server_address = f"{host}:{port}"
+        grpc_server.add_insecure_port(server_address)
+        
+        # Démarrer le serveur
+        grpc_server.start()
+        logger.info(f"Serveur RPC démarré sur {server_address} avec périphérique {device_type}:{device_id}")
+        logger.info(f"Utilisation du serveur Ollama à {ollama_host}")
+        
+        # Configurer la découverte si activée
+        if enable_discovery:
+            try:
+                from ..utils.discovery import register_server
+                
+                # Enregistrer ce serveur pour la découverte
+                discovery_info = {
+                    "type": "rpc",
+                    "host": actual_host,
+                    "port": port,
+                    "device_type": device_type,
+                    "device_id": device_id,
+                    "capabilities": server.device_capabilities
+                }
+                
+                register_server(discovery_info)
+                logger.info("Serveur enregistré pour la découverte")
+            except Exception as e:
+                logger.warning(f"Échec de l'enregistrement pour la découverte: {e}")
+        
+        # Configurer les gestionnaires de signal pour un arrêt propre
+        def handle_signal(signum, frame):
+            logger.info("Signal reçu, arrêt du serveur...")
+            grpc_server.stop(0)
+            
+        signal.signal(signal.SIGINT, handle_signal)
+        signal.signal(signal.SIGTERM, handle_signal)
+        
+        # Vérifications périodiques de santé d'Ollama
+        try:
+            while True:
+                time.sleep(health_check_interval)
+                if not check_ollama_running(ollama_host):
+                    logger.warning(f"Ollama n'est pas en cours d'exécution sur {ollama_host}, tentative de redémarrage")
+                    ensure_ollama_running(ollama_host)
+        except KeyboardInterrupt:
+            grpc_server.stop(0)
+            logger.info("Serveur arrêté")
+            
+    except Exception as e:
+        logger.error(f"Erreur lors du démarrage du serveur RPC: {e}")
+        raise
