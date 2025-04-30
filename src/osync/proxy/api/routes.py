@@ -1,274 +1,357 @@
 """
-Module contenant les routes API pour le proxy Ollama.
-Ce module redirige les routes API vers le service OllamaAPIService.
+Routes API pour le proxy Ollama.
+
+Ce module définit les routes HTTP pour interagir avec les serveurs Ollama.
 """
 
 import json
 import logging
-from typing import Any, Dict, Optional
+import os
+from typing import Dict, Any
+
 from flask import Blueprint, request, jsonify, Response, stream_with_context
-from .models import dict_to_generate_request, dict_to_chat_request, dict_to_embeddings_request
-from dataclasses import asdict
+
+from .models import (
+    GenerateRequest, GenerateResponse, 
+    ChatRequest, ChatResponse, ChatMessage,
+    EmbeddingsRequest, EmbeddingsResponse,
+    ModelInfo, ServerInfo, StatusResponse, ModelsResponse, ServersResponse
+)
+from .services import OllamaProxyService
 
 # Configuration du logging
 logger = logging.getLogger(__name__)
 
-class ValidationError(Exception):
-    """Exception levée lorsqu'une validation des données échoue."""
-    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
-        super().__init__(message)
-        self.message = message
-        self.details = details or {}
-        
+# Création du blueprint
+api_bp = Blueprint('api', __name__)
 
-def register_api_routes(app, api_service):
+
+@api_bp.route('/v1/generate', methods=['POST'])
+def generate():
     """
-    Enregistre toutes les routes API avec l'application Flask.
+    Point de terminaison pour générer du texte.
+    """
+    service = request.app.ollamaproxy_service
+    
+    # Analyser la requête
+    req_json = request.get_json() if request.is_json else {}
+    model = req_json.get('model', '')
+    
+    logger.debug(f"Requête generate pour le modèle: {model}")
+    
+    # Créer un objet GenerateRequest
+    req = GenerateRequest.from_dict(req_json)
+    
+    # Obtenir une réponse en streaming
+    resp = service.generate(req)
+    
+    def generate_stream():
+        """Produit un flux de réponses."""
+        for chunk in resp:
+            yield chunk
+    
+    # Retourner la réponse en streaming
+    return Response(generate_stream(), content_type='application/x-ndjson')
+
+
+@api_bp.route('/v1/chat', methods=['POST'])
+def chat():
+    """
+    Point de terminaison pour le chat.
+    """
+    service = request.app.ollamaproxy_service
+    
+    # Analyser la requête
+    req_json = request.get_json() if request.is_json else {}
+    model = req_json.get('model', '')
+    
+    logger.debug(f"Requête chat pour le modèle: {model}")
+    
+    # Créer un objet ChatRequest
+    req = ChatRequest.from_dict(req_json)
+    
+    # Obtenir une réponse en streaming
+    resp = service.chat(req)
+    
+    def generate_stream():
+        """Produit un flux de réponses."""
+        for chunk in resp:
+            yield chunk
+    
+    # Retourner la réponse en streaming
+    return Response(generate_stream(), content_type='application/x-ndjson')
+
+
+@api_bp.route('/v1/embeddings', methods=['POST'])
+def embeddings():
+    """
+    Point de terminaison pour obtenir des embeddings.
+    """
+    service = request.app.ollamaproxy_service
+    
+    # Analyser la requête
+    req_json = request.get_json() if request.is_json else {}
+    model = req_json.get('model', '')
+    
+    logger.debug(f"Requête embeddings pour le modèle: {model}")
+    
+    # Créer un objet EmbeddingsRequest
+    req = EmbeddingsRequest.from_dict(req_json)
+    
+    # Obtenir une réponse
+    resp_dict = service.embeddings(req)
+    
+    # Retourner la réponse
+    return jsonify(resp_dict)
+
+
+@api_bp.route('/v1/models', methods=['GET'])
+def models():
+    """
+    Point de terminaison pour lister les modèles disponibles.
+    """
+    service = request.app.ollamaproxy_service
+    
+    logger.debug("Requête pour lister les modèles")
+    
+    # Obtenir les modèles
+    resp = service.models()
+    
+    # Retourner la réponse
+    return jsonify(resp)
+
+
+@api_bp.route('/v1/status', methods=['GET'])
+def status():
+    """
+    Point de terminaison pour vérifier le statut du proxy.
+    """
+    service = request.app.ollamaproxy_service
+    
+    logger.debug("Requête pour le statut")
+    
+    # Obtenir le statut
+    resp = service.status()
+    
+    # Retourner la réponse
+    return jsonify(resp)
+
+
+@api_bp.route('/v1/servers', methods=['GET'])
+def servers():
+    """
+    Point de terminaison pour lister les serveurs disponibles.
+    """
+    service = request.app.ollamaproxy_service
+    
+    logger.debug("Requête pour lister les serveurs")
+    
+    # Obtenir les serveurs
+    resp = service.servers()
+    
+    # Retourner la réponse
+    return jsonify(resp)
+
+# Nouvelles routes pour les statistiques persistantes
+
+@api_bp.route('/v1/stats/history', methods=['GET'])
+def stats_history():
+    """
+    Point de terminaison pour obtenir l'historique des statistiques de requêtes.
     
     Args:
-        app: L'application Flask
-        api_service: Le service OllamaAPIService pour gérer les requêtes API
+        period: La période d'agrégation ('hourly', 'daily', 'weekly')
+        days: Le nombre de jours d'historique à récupérer
+    
+    Returns:
+        Un JSON contenant l'historique des statistiques
     """
+    service = request.app.ollamaproxy_service
     
-    # Route API de génération
-    @app.route('/api/v1/generate', methods=['POST'])
-    def generate():
-        """Générer du texte à partir d'un prompt"""
-        try:
-            data = request.json
-            # Convertir les données JSON en objet GenerateRequest
-            generate_request = dict_to_generate_request(data)
-            
-            # Si generate_request.stream est vrai, utiliser le streaming
-            if generate_request.stream:
-                def generate_stream():
-                    try:
-                        for chunk in api_service.generate_stream(generate_request):
-                            yield f"data: {json.dumps(chunk)}\n\n"
-                    except Exception as e:
-                        logger.error(f"Erreur lors du streaming: {str(e)}")
-                        yield f"data: {json.dumps({'error': str(e), 'done': True})}\n\n"
-                
-                return Response(
-                    generate_stream(),
-                    mimetype='text/event-stream',
-                    headers={'Cache-Control': 'no-cache'}
-                )
-            else:
-                # Génération standard (non-streaming)
-                response = api_service.generate(generate_request)
-                return jsonify(response)
-                
-        except Exception as e:
-            logger.error(f"Erreur lors de la génération: {str(e)}")
-            return jsonify({'error': f"Erreur de génération: {str(e)}"}), 500
+    period = request.args.get('period', 'daily')
+    days = int(request.args.get('days', 7))
     
-    # Route API de chat
-    @app.route('/api/v1/chat', methods=['POST'])
-    def chat():
-        """Échanger avec un modèle en format conversation"""
-        try:
-            data = request.json
-            # Convertir les données JSON en objet ChatRequest
-            chat_request = dict_to_chat_request(data)
-            response = api_service.chat(chat_request)
-            # Convertir l'objet ChatResponse en dictionnaire si nécessaire
-            if hasattr(response, '__dict__') and not isinstance(response, dict):
-                return jsonify(asdict(response))
-            return jsonify(response)
-        except Exception as e:
-            logger.error(f"Erreur lors du chat: {str(e)}")
-            return jsonify({'error': f"Erreur de chat: {str(e)}"}), 500
+    logger.debug(f"Requête pour l'historique des statistiques: période={period}, jours={days}")
     
-    # Route API d'embeddings
-    @app.route('/api/v1/embeddings', methods=['POST'])
-    def embeddings():
-        """Générer des embeddings à partir d'un texte"""
-        try:
-            data = request.json
-            # Convertir les données JSON en objet EmbeddingsRequest
-            embeddings_request = dict_to_embeddings_request(data)
-            response = api_service.embeddings(embeddings_request)
-            # Convertir l'objet EmbeddingsResponse en dictionnaire si nécessaire
-            if hasattr(response, '__dict__') and not isinstance(response, dict):
-                return jsonify(asdict(response))
-            return jsonify(response)
-        except Exception as e:
-            logger.error(f"Erreur lors de la génération d'embeddings: {str(e)}")
-            return jsonify({'error': f"Erreur d'embeddings: {str(e)}"}), 500
+    # Obtenir l'historique des statistiques
+    resp = service.get_request_stats_history(period=period, days=days)
     
-    # Route API pour lister les modèles
-    @app.route('/api/v1/models', methods=['GET'])
-    def list_models():
-        """Lister tous les modèles disponibles"""
-        try:
-            models_response = api_service.list_models()
-            # Convertir l'objet ModelsResponse en dictionnaire
-            if hasattr(models_response, '__dict__') and not isinstance(models_response, dict):
-                return jsonify(asdict(models_response))
-            return jsonify(models_response)
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération des modèles: {str(e)}")
-            return jsonify({'error': f"Erreur de récupération des modèles: {str(e)}"}), 500
+    # Retourner la réponse
+    return jsonify(resp)
+
+
+@api_bp.route('/v1/stats/aggregate', methods=['GET'])
+def stats_aggregate():
+    """
+    Point de terminaison pour obtenir des statistiques agrégées.
     
-    # Route API pour obtenir le status du proxy
-    @app.route('/api/v1/status', methods=['GET'])
-    def status():
-        """Obtenir le status actuel du proxy"""
-        try:
-            # Convertir l'objet StatusResponse en dictionnaire avant de le retourner
-            status_response = api_service.get_status()
-            return asdict(status_response)
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération du status: {str(e)}")
-            return {'error': f"Erreur de status: {str(e)}"}, 500
+    Args:
+        period: La période d'agrégation ('hourly', 'daily', 'weekly')
+        days: Le nombre de jours d'historique à récupérer
     
-    # Route API pour lister les serveurs
-    @app.route('/api/v1/servers', methods=['GET'])
-    def list_servers():
-        """Lister tous les serveurs du cluster"""
-        try:
-            servers_response = api_service.list_servers()
-            # Convertir l'objet ServersResponse en dictionnaire
-            if hasattr(servers_response, '__dict__') and not isinstance(servers_response, dict):
-                return jsonify(asdict(servers_response))
-            return jsonify(servers_response)
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération des serveurs: {str(e)}")
-            return jsonify({'error': f"Erreur de récupération des serveurs: {str(e)}"}), 500
+    Returns:
+        Un JSON contenant les statistiques agrégées
+    """
+    service = request.app.ollamaproxy_service
     
-    # Route API pour ajouter un serveur
-    @app.route('/api/v1/servers', methods=['POST'])
-    def add_server():
-        """Ajouter un nouveau serveur au cluster"""
-        try:
-            data = request.json
-            response = api_service.add_server(
-                address=data.get('address'),
-                verify_health=data.get('verify_health', True)
-            )
-            # Convertir la réponse en dictionnaire si nécessaire
-            if hasattr(response, '__dict__') and not isinstance(response, dict):
-                return jsonify(asdict(response))
-            return jsonify(response)
-        except Exception as e:
-            logger.error(f"Erreur lors de l'ajout du serveur: {str(e)}")
-            return jsonify({'error': f"Erreur d'ajout de serveur: {str(e)}"}), 500
+    period = request.args.get('period', 'daily')
+    days = int(request.args.get('days', 30))
     
-    # Route API pour supprimer un serveur
-    @app.route('/api/v1/servers/<server>', methods=['DELETE'])
-    def remove_server(server):
-        """Supprimer un serveur du cluster"""
-        try:
-            response = api_service.remove_server(server)
-            # Convertir la réponse en dictionnaire si nécessaire
-            if hasattr(response, '__dict__') and not isinstance(response, dict):
-                return jsonify(asdict(response))
-            return jsonify(response)
-        except Exception as e:
-            logger.error(f"Erreur lors de la suppression du serveur: {str(e)}")
-            return jsonify({'error': f"Erreur de suppression de serveur: {str(e)}"}), 500
+    logger.debug(f"Requête pour les statistiques agrégées: période={period}, jours={days}")
     
-    # Route API pour obtenir les détails d'un serveur
-    @app.route('/api/v1/servers/<server>', methods=['GET'])
-    def get_server(server):
-        """Obtenir les détails d'un serveur"""
-        try:
-            response = api_service.get_server_details(server)
-            # Convertir la réponse en dictionnaire si nécessaire
-            if hasattr(response, '__dict__') and not isinstance(response, dict):
-                return jsonify(asdict(response))
-            return jsonify(response)
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération des détails du serveur: {str(e)}")
-            return jsonify({'error': f"Erreur de récupération des détails: {str(e)}"}), 500
+    # Obtenir les statistiques agrégées
+    resp = service.get_aggregated_stats(period=period, days=days)
     
-    # Route API pour vérifier la santé d'un serveur
-    @app.route('/api/v1/servers/<server>/check_health', methods=['POST'])
-    def check_server_health(server):
-        """Vérifier la santé d'un serveur"""
-        try:
-            response = api_service.check_server_health(server)
-            # Convertir la réponse en dictionnaire si nécessaire
-            if hasattr(response, '__dict__') and not isinstance(response, dict):
-                return jsonify(asdict(response))
-            return jsonify(response)
-        except Exception as e:
-            logger.error(f"Erreur lors de la vérification de santé du serveur: {str(e)}")
-            return jsonify({'error': f"Erreur de vérification de santé: {str(e)}"}), 500
+    # Retourner la réponse
+    return jsonify(resp)
+
+
+@api_bp.route('/v1/models/history', methods=['GET'])
+def models_history():
+    """
+    Point de terminaison pour obtenir l'historique d'utilisation des modèles.
     
-    # Route API pour obtenir le rapport de santé global
-    @app.route('/api/v1/health', methods=['GET'])
-    def get_health():
-        """Obtenir le rapport de santé du cluster"""
-        try:
-            response = api_service.get_health_report()
-            # Convertir la réponse en dictionnaire si nécessaire
-            if hasattr(response, '__dict__') and not isinstance(response, dict):
-                return jsonify(asdict(response))
-            return jsonify(response)
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération du rapport de santé: {str(e)}")
-            return jsonify({'error': f"Erreur de rapport de santé: {str(e)}"}), 500
+    Args:
+        days: Le nombre de jours d'historique à récupérer
     
-    # Route API pour obtenir les statistiques de santé
-    @app.route('/api/v1/health/stats', methods=['GET'])
-    def get_health_stats():
-        """Obtenir des statistiques sur la santé du cluster"""
-        try:
-            hours = request.args.get('hours', 24, type=int)
-            response = api_service.get_health_stats(hours=hours)
-            # Convertir la réponse en dictionnaire si nécessaire
-            if hasattr(response, '__dict__') and not isinstance(response, dict):
-                return jsonify(asdict(response))
-            return jsonify(response)
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération des statistiques de santé: {str(e)}")
-            return jsonify({'error': f"Erreur de statistiques de santé: {str(e)}"}), 500
+    Returns:
+        Un JSON contenant l'historique d'utilisation des modèles
+    """
+    service = request.app.ollamaproxy_service
     
-    # Route API pour obtenir l'historique de santé d'un serveur
-    @app.route('/api/v1/health/server/<server>', methods=['GET'])
-    def get_server_health_history(server):
-        """Obtenir l'historique de santé d'un serveur"""
-        try:
-            hours = request.args.get('hours', 24, type=int)
-            response = api_service.get_server_health_history(server=server, hours=hours)
-            # Convertir la réponse en dictionnaire si nécessaire
-            if hasattr(response, '__dict__') and not isinstance(response, dict):
-                return jsonify(asdict(response))
-            return jsonify(response)
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération de l'historique de santé: {str(e)}")
-            return jsonify({'error': f"Erreur d'historique de santé: {str(e)}"}), 500
+    days = int(request.args.get('days', 30))
     
-    # Routes API pour les graphiques
-    @app.route('/api/v1/chart/load', methods=['GET'])
-    def get_load_chart_data():
-        """Obtenir les données pour le graphique de charge des serveurs"""
-        try:
-            hours = request.args.get('hours', 1, type=int)
-            response = api_service.get_load_chart_data(hours=hours)
-            # Convertir la réponse en dictionnaire si nécessaire
-            if hasattr(response, '__dict__') and not isinstance(response, dict):
-                return jsonify(asdict(response))
-            return jsonify(response)
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération des données du graphique: {str(e)}")
-            return jsonify({'error': f"Erreur de données de graphique: {str(e)}"}), 500
+    logger.debug(f"Requête pour l'historique des modèles: jours={days}")
     
-    @app.route('/api/v1/chart/health', methods=['GET'])
-    def get_health_chart_data():
-        """Obtenir les données pour le graphique de santé des serveurs"""
-        try:
-            hours = request.args.get('hours', 1, type=int)
-            response = api_service.get_health_chart_data(hours=hours)
-            # Convertir la réponse en dictionnaire si nécessaire
-            if hasattr(response, '__dict__') and not isinstance(response, dict):
-                return jsonify(asdict(response))
-            return jsonify(response)
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération des données du graphique: {str(e)}")
-            return jsonify({'error': f"Erreur de données de graphique: {str(e)}"}), 500
+    # Obtenir l'historique d'utilisation des modèles
+    resp = service.get_models_history(days=days)
     
-    logger.info("Routes API enregistrées avec succès")
-    return app
+    # Retourner la réponse
+    return jsonify(resp)
+
+
+@api_bp.route('/v1/models/<model_name>/stats', methods=['GET'])
+def model_stats(model_name):
+    """
+    Point de terminaison pour obtenir des statistiques détaillées pour un modèle spécifique.
+    
+    Args:
+        model_name: Le nom du modèle
+        days: Le nombre de jours d'historique à récupérer
+    
+    Returns:
+        Un JSON contenant les statistiques du modèle
+    """
+    service = request.app.ollamaproxy_service
+    
+    days = int(request.args.get('days', 30))
+    
+    logger.debug(f"Requête pour les statistiques du modèle {model_name}: jours={days}")
+    
+    # Obtenir les statistiques du modèle
+    resp = service.get_model_stats(model_name=model_name, days=days)
+    
+    # Retourner la réponse
+    return jsonify(resp)
+
+
+@api_bp.route('/v1/health/history', methods=['GET'])
+def health_history():
+    """
+    Point de terminaison pour obtenir l'historique de santé du cluster.
+    
+    Args:
+        days: Le nombre de jours d'historique à récupérer
+        period: La période d'agrégation ('hourly', 'daily', 'weekly')
+    
+    Returns:
+        Un JSON contenant l'historique de santé
+    """
+    service = request.app.ollamaproxy_service
+    
+    days = int(request.args.get('days', 30))
+    period = request.args.get('period', 'daily')
+    
+    logger.debug(f"Requête pour l'historique de santé: période={period}, jours={days}")
+    
+    # Obtenir l'historique de santé
+    resp = service.get_health_history_long_term(days=days, period=period)
+    
+    # Retourner la réponse
+    return jsonify(resp)
+
+
+@api_bp.route('/v1/servers/stats', methods=['GET'])
+def servers_stats():
+    """
+    Point de terminaison pour obtenir des statistiques sur tous les serveurs.
+    
+    Args:
+        days: Le nombre de jours d'historique à récupérer
+        period: La période d'agrégation ('hourly', 'daily', 'weekly')
+    
+    Returns:
+        Un JSON contenant les statistiques des serveurs
+    """
+    service = request.app.ollamaproxy_service
+    
+    days = int(request.args.get('days', 7))
+    period = request.args.get('period', 'daily')
+    
+    logger.debug(f"Requête pour les statistiques des serveurs: période={period}, jours={days}")
+    
+    # Obtenir les statistiques des serveurs
+    resp = service.get_servers_stats(days=days, period=period)
+    
+    # Retourner la réponse
+    return jsonify(resp)
+
+
+@api_bp.route('/v1/admin/cleanup', methods=['POST'])
+def cleanup_data():
+    """
+    Point de terminaison pour nettoyer les anciennes données de la base de données.
+    
+    Args:
+        days_to_keep: Le nombre de jours de données à conserver
+    
+    Returns:
+        Un JSON contenant le résultat du nettoyage
+    """
+    service = request.app.ollamaproxy_service
+    
+    req_json = request.get_json() if request.is_json else {}
+    days_to_keep = req_json.get('days_to_keep', 90)
+    
+    logger.debug(f"Requête pour nettoyer les données: jours_à_conserver={days_to_keep}")
+    
+    # Nettoyer les données
+    resp = service.cleanup_old_data(days_to_keep=days_to_keep)
+    
+    # Retourner la réponse
+    return jsonify(resp)
+
+
+@api_bp.route('/v1/admin/aggregate', methods=['POST'])
+def force_aggregation():
+    """
+    Point de terminaison pour forcer l'agrégation des statistiques.
+    
+    Args:
+        period: La période d'agrégation ('hourly', 'daily')
+    
+    Returns:
+        Un JSON contenant le résultat de l'agrégation
+    """
+    service = request.app.ollamaproxy_service
+    
+    req_json = request.get_json() if request.is_json else {}
+    period = req_json.get('period', 'hourly')
+    
+    logger.debug(f"Requête pour forcer l'agrégation: période={period}")
+    
+    # Forcer l'agrégation
+    resp = service.force_aggregation(period=period)
+    
+    # Retourner la réponse
+    return jsonify(resp)

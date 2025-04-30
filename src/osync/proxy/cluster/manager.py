@@ -3,9 +3,11 @@ import logging
 import threading
 import time
 from typing import Dict, List, Optional, Set, Any
+from datetime import datetime
 
 from osync.sync.client import OllamaClient
 from osync.utils.cluster import OllamaCluster
+from osync.proxy.db.database import get_db
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -49,7 +51,7 @@ class ClusterManager:
     
     def initialize(self, cluster_config=None):
         """
-        Initialise ou réinitialise le cluster.
+        Initialise ou réinitialise le cluster et charge les données depuis TinyDB.
         
         Args:
             cluster_config: Configuration du cluster (optionnel)
@@ -61,6 +63,9 @@ class ClusterManager:
             else:
                 self._cluster = OllamaCluster()
             
+            # Charger les données depuis TinyDB
+            self._load_data_from_db()
+            
             # Démarrer le thread de rafraîchissement si nécessaire
             self._start_refresh_thread()
             
@@ -68,6 +73,63 @@ class ClusterManager:
         except Exception as e:
             logger.error(f"Erreur lors de l'initialisation du cluster: {str(e)}")
             return False
+    
+    def _load_data_from_db(self):
+        """
+        Charge les données de TinyDB et les réconcilie avec l'état actuel.
+        """
+        try:
+            db = get_db()
+            
+            # Charger les serveurs
+            servers = db.get_all("servers")
+            if servers:
+                with self._cache_lock:
+                    # Récupérer les adresses de serveurs
+                    addresses = set(server["address"] for server in servers)
+                    self._cached_server_addresses = addresses
+                    
+                    # Récupérer les états de santé
+                    health = {server["address"]: server["healthy"] for server in servers}
+                    self._cached_server_health.update(health)
+                    
+                    # Récupérer les charges
+                    loads = {server["address"]: server.get("load", 0.0) for server in servers}
+                    self._cached_server_loads.update(loads)
+                    
+                    # Mettre à jour le cluster avec les données récupérées
+                    if self._cluster:
+                        with self._cluster.server_lock:
+                            for addr in addresses:
+                                if addr not in self._cluster.server_addresses:
+                                    self._cluster.server_addresses.append(addr)
+                        
+                        with self._cluster.health_lock:
+                            self._cluster.server_health.update(health)
+                            
+                        with self._cluster.server_lock:
+                            self._cluster.server_loads.update(loads)
+            
+            # Charger les modèles
+            models = db.get_all("models")
+            if models:
+                model_servers = {}
+                for model in models:
+                    model_servers[model["name"]] = model["servers"]
+                
+                with self._cache_lock:
+                    self._cached_model_servers.update(model_servers)
+                    
+                    # Mettre à jour le cluster
+                    if self._cluster:
+                        with self._cluster.model_lock:
+                            for model_name, servers in model_servers.items():
+                                self._cluster.model_server_map[model_name] = set(servers)
+            
+            logger.info(f"Données chargées depuis la base de données: {len(servers)} serveurs, {len(models)} modèles")
+                
+        except Exception as e:
+            logger.error(f"Erreur lors du chargement des données depuis TinyDB: {str(e)}")
     
     def _start_refresh_thread(self):
         """Démarre le thread de rafraîchissement du cache."""
@@ -95,8 +157,7 @@ class ClusterManager:
     
     def refresh_cache(self):
         """
-        Met à jour le cache des informations du cluster.
-        Cette méthode est conçue pour être rapide et ne pas bloquer.
+        Met à jour le cache des informations du cluster et persiste dans TinyDB.
         """
         if not self._cluster:
             return
@@ -129,208 +190,408 @@ class ClusterManager:
                 self._cached_server_health = server_health
                 self._cached_server_loads = server_loads
                 self._cached_model_servers = model_servers
+            
+            # Persister dans TinyDB
+            self._persist_to_db(server_addresses, server_health, server_loads, model_servers)
         
         except Exception as e:
             logger.error(f"Erreur lors de la mise à jour du cache: {str(e)}")
     
-    def get_server_addresses(self) -> List[str]:
+    def _persist_to_db(self, server_addresses, server_health, server_loads, model_servers):
         """
-        Retourne la liste des adresses de serveurs sans bloquer.
-        
-        Returns:
-            List[str]: Liste des adresses de serveurs
+        Persiste les données du cluster dans TinyDB.
         """
-        with self._cache_lock:
-            return list(self._cached_server_addresses)
+        try:
+            db = get_db()
+            current_time = datetime.now().isoformat()
+            
+            # Persister les serveurs
+            for address in server_addresses:
+                server_data = {
+                    "address": address,
+                    "healthy": server_health.get(address, False),
+                    "load": server_loads.get(address, 0.0),
+                    "last_check": current_time
+                }
+                
+                # Vérifier si ce serveur existe déjà
+                existing_server = db.search_one("servers", lambda q: q.address == address)
+                
+                if existing_server:
+                    # Conserver la date de première découverte
+                    server_data["first_seen"] = existing_server.get("first_seen", current_time)
+                    
+                    # Conserver les infos matérielles si elles existent
+                    if "hardware_info" in existing_server:
+                        server_data["hardware_info"] = existing_server["hardware_info"]
+                        
+                    # Mettre à jour
+                    db.update("servers", server_data, lambda q: q.address == address)
+                else:
+                    # Ajouter la date de première découverte pour un nouveau serveur
+                    server_data["first_seen"] = current_time
+                    
+                    # Insérer
+                    db.insert("servers", server_data)
+            
+            # Persister les modèles
+            for model_name, servers in model_servers.items():
+                model_data = {
+                    "name": model_name,
+                    "servers": list(servers)
+                }
+                
+                # Vérifier si ce modèle existe déjà
+                existing_model = db.search_one("models", lambda q: q.name == model_name)
+                
+                if existing_model:
+                    # Conserver les statistiques et métadonnées
+                    model_data["first_seen"] = existing_model.get("first_seen", current_time)
+                    model_data["usage_count"] = existing_model.get("usage_count", 0)
+                    model_data["size_gb"] = existing_model.get("size_gb", None)
+                    model_data["parameter_count"] = existing_model.get("parameter_count", None)
+                    model_data["quantization"] = existing_model.get("quantization", None)
+                    
+                    # Mettre à jour
+                    db.update("models", model_data, lambda q: q.name == model_name)
+                else:
+                    # Ajouter la date de première découverte pour un nouveau modèle
+                    model_data["first_seen"] = current_time
+                    model_data["usage_count"] = 0
+                    
+                    # Insérer
+                    db.insert("models", model_data)
+                
+        except Exception as e:
+            logger.error(f"Erreur lors de la persistance des données dans TinyDB: {str(e)}")
     
-    def get_healthy_servers(self) -> List[str]:
+    def persist_server(self, server_address: str, health: bool = None, load: float = None):
         """
-        Retourne la liste des serveurs sains sans bloquer.
-        
-        Returns:
-            List[str]: Liste des serveurs sains
-        """
-        with self._cache_lock:
-            return [server for server, healthy in self._cached_server_health.items() 
-                   if healthy and server in self._cached_server_addresses]
-    
-    def get_server_health(self, server_address: str) -> bool:
-        """
-        Retourne l'état de santé d'un serveur sans bloquer.
+        Persiste les informations d'un serveur spécifique dans TinyDB.
         
         Args:
             server_address: Adresse du serveur
+            health: État de santé (optionnel)
+            load: Charge du serveur (optionnel)
+        """
+        try:
+            db = get_db()
+            current_time = datetime.now().isoformat()
             
-        Returns:
-            bool: État de santé du serveur
-        """
-        with self._cache_lock:
-            return self._cached_server_health.get(server_address, False)
-    
-    def get_server_load(self, server_address: str) -> float:
-        """
-        Retourne la charge d'un serveur sans bloquer.
-        
-        Args:
-            server_address: Adresse du serveur
+            # Récupérer les valeurs actuelles si non fournies
+            if health is None:
+                with self._cache_lock:
+                    health = self._cached_server_health.get(server_address, False)
+                    
+            if load is None:
+                with self._cache_lock:
+                    load = self._cached_server_loads.get(server_address, 0.0)
             
-        Returns:
-            float: Charge du serveur
+            # Mettre à jour ou créer le serveur
+            server_data = {
+                "address": server_address,
+                "healthy": health,
+                "load": load,
+                "last_check": current_time
+            }
+            
+            # Vérifier si ce serveur existe déjà
+            db.upsert("servers", server_data, lambda q: q.address == server_address)
+            
+        except Exception as e:
+            logger.error(f"Erreur lors de la persistance du serveur {server_address}: {str(e)}")
+
+    def persist_model_map(self, model_name: str, servers: List[str]):
         """
-        with self._cache_lock:
-            return self._cached_server_loads.get(server_address, 0.0)
-    
-    def get_servers_for_model(self, model_name: str) -> List[str]:
-        """
-        Retourne la liste des serveurs qui ont un modèle particulier.
+        Persiste le mapping modèle-serveurs dans TinyDB.
         
         Args:
             model_name: Nom du modèle
-            
-        Returns:
-            List[str]: Liste des serveurs qui ont le modèle
-        """
-        with self._cache_lock:
-            return self._cached_model_servers.get(model_name, [])
-    
-    def get_optimal_server(self, model_name: str = None) -> Optional[str]:
-        """
-        Retourne le serveur optimal pour un modèle donné.
-        
-        Args:
-            model_name: Nom du modèle (optionnel)
-            
-        Returns:
-            Optional[str]: Adresse du serveur optimal ou None si aucun n'est disponible
-        """
-        # Si un modèle est spécifié, n'utiliser que les serveurs qui l'ont
-        candidate_servers = []
-        if model_name:
-            with self._cache_lock:
-                candidate_servers = [server for server in self._cached_model_servers.get(model_name, [])
-                                   if self._cached_server_health.get(server, False)]
-        else:
-            with self._cache_lock:
-                candidate_servers = [server for server in self._cached_server_addresses
-                                   if self._cached_server_health.get(server, False)]
-        
-        if not candidate_servers:
-            return None
-        
-        # Trouver le serveur avec la charge minimale
-        min_load = float('inf')
-        optimal_server = None
-        
-        with self._cache_lock:
-            for server in candidate_servers:
-                server_load = self._cached_server_loads.get(server, 0.0)
-                if server_load < min_load:
-                    min_load = server_load
-                    optimal_server = server
-        
-        return optimal_server
-    
-    def get_client_for_server(self, server_address: str) -> Optional[OllamaClient]:
-        """
-        Crée un client Ollama pour un serveur donné.
-        
-        Args:
-            server_address: Adresse du serveur au format host:port
-            
-        Returns:
-            Optional[OllamaClient]: Client Ollama ou None en cas d'erreur
+            servers: Liste des serveurs qui ont ce modèle
         """
         try:
-            if server_address.count(':') == 1:
-                host, port_str = server_address.split(':')
-                port = int(port_str)
-                return OllamaClient(host=host, port=port)
-            return None
+            db = get_db()
+            current_time = datetime.now().isoformat()
+            
+            # Données du modèle
+            model_data = {
+                "name": model_name,
+                "servers": list(servers),
+                "last_update": current_time
+            }
+            
+            # Vérifier si ce modèle existe déjà
+            existing_model = db.search_one("models", lambda q: q.name == model_name)
+            
+            if existing_model:
+                # Conserver les statistiques et métadonnées
+                model_data["first_seen"] = existing_model.get("first_seen", current_time)
+                model_data["usage_count"] = existing_model.get("usage_count", 0)
+                model_data["size_gb"] = existing_model.get("size_gb", None)
+                model_data["parameter_count"] = existing_model.get("parameter_count", None)
+                model_data["quantization"] = existing_model.get("quantization", None)
+                
+                # Mettre à jour
+                db.update("models", model_data, lambda q: q.name == model_name)
+            else:
+                # Ajouter la date de première découverte pour un nouveau modèle
+                model_data["first_seen"] = current_time
+                model_data["usage_count"] = 0
+                
+                # Insérer
+                db.insert("models", model_data)
+                
         except Exception as e:
-            logger.error(f"Erreur lors de la création du client: {str(e)}")
-            return None
-    
-    def get_client_for_model(self, model_name: str) -> Optional[OllamaClient]:
+            logger.error(f"Erreur lors de la persistance du modèle {model_name}: {str(e)}")
+
+    def update_model_usage(self, model_name: str, tokens_generated: int = None, inference_time_ms: int = None):
         """
-        Crée un client Ollama pour un modèle donné.
+        Incrémente le compteur d'utilisation d'un modèle et met à jour ses statistiques.
         
         Args:
             model_name: Nom du modèle
-            
-        Returns:
-            Optional[OllamaClient]: Client Ollama ou None en cas d'erreur
-        """
-        server = self.get_optimal_server(model_name)
-        if server:
-            return self.get_client_for_server(server)
-        return None
-    
-    def get_all_models(self) -> Dict[str, List[str]]:
-        """
-        Retourne tous les modèles disponibles et les serveurs qui les ont.
-        
-        Returns:
-            Dict[str, List[str]]: Dictionnaire {nom_modèle: [serveur1, serveur2, ...]}
-        """
-        with self._cache_lock:
-            return {model: list(servers) for model, servers in self._cached_model_servers.items()}
-    
-    def check_server_health(self, server_address: str) -> bool:
-        """
-        Vérifie activement la santé d'un serveur et met à jour le cache.
-        
-        Args:
-            server_address: Adresse du serveur
-            
-        Returns:
-            bool: True si le serveur est sain, False sinon
+            tokens_generated: Nombre de tokens générés dans cette session (optionnel)
+            inference_time_ms: Temps d'inférence en millisecondes (optionnel)
         """
         try:
-            client = self.get_client_for_server(server_address)
-            if client:
-                try:
-                    is_healthy = client.check_health()
+            db = get_db()
+            
+            # Vérifier si le modèle existe
+            existing_model = db.search_one("models", lambda q: q.name == model_name)
+            
+            if existing_model:
+                update_data = {
+                    "usage_count": existing_model.get("usage_count", 0) + 1,
+                    "last_used": datetime.now().isoformat()
+                }
+                
+                # Mettre à jour les statistiques cumulatives si fournies
+                if tokens_generated is not None:
+                    current_tokens = existing_model.get("total_tokens_generated", 0)
+                    update_data["total_tokens_generated"] = current_tokens + tokens_generated
+                
+                if inference_time_ms is not None:
+                    current_time = existing_model.get("total_inference_time_ms", 0)
+                    update_data["total_inference_time_ms"] = current_time + inference_time_ms
                     
-                    # Mettre à jour le cache
-                    with self._cache_lock:
-                        self._cached_server_health[server_address] = is_healthy
-                    
-                    # Mettre à jour le cluster également
-                    if self._cluster:
-                        with self._cluster.health_lock:
-                            self._cluster.server_health[server_address] = is_healthy
-                    
-                    return is_healthy
-                finally:
-                    client.close()
-            return False
+                    # Calculer et stocker le temps moyen par inférence
+                    update_data["avg_inference_time_ms"] = update_data["total_inference_time_ms"] / update_data["usage_count"]
+                
+                # Mettre à jour
+                db.update("models", update_data, lambda q: q.name == model_name)
+                logger.info(f"Statistiques mises à jour pour le modèle {model_name}")
+                
         except Exception as e:
-            logger.error(f"Erreur lors de la vérification de santé: {str(e)}")
-            return False
-    
-    def update_server_load(self, server_address: str, load: float) -> None:
+            logger.error(f"Erreur lors de la mise à jour de l'utilisation du modèle {model_name}: {str(e)}")
+
+    def update_model_usage_stats(self, model_name: str, server_id: str, inference_time_ms: int = None, tokens_generated: int = None):
         """
-        Met à jour la charge d'un serveur dans le cache et dans le cluster.
+        Met à jour les statistiques d'utilisation d'un modèle avec des métriques détaillées.
         
         Args:
-            server_address: Adresse du serveur
-            load: Charge du serveur
+            model_name: Nom du modèle
+            server_id: Identifiant du serveur où le modèle a été utilisé
+            inference_time_ms: Temps d'inférence en millisecondes (optionnel)
+            tokens_generated: Nombre de tokens générés (optionnel)
         """
         try:
-            # Mettre à jour le cache
-            with self._cache_lock:
-                self._cached_server_loads[server_address] = load
+            # Incrémenter le compteur d'utilisation standard
+            self.update_model_usage(model_name, tokens_generated, inference_time_ms)
             
-            # Mettre à jour le cluster également
-            if self._cluster:
-                with self._cluster.server_lock:
-                    self._cluster.server_loads[server_address] = load
+            db = get_db()
+            current_time = datetime.now().isoformat()
+            
+            # Rechercher les statistiques existantes pour ce modèle sur ce serveur
+            model_stats = db.search_one("model_stats", lambda q: q.model_name == model_name and q.server_id == server_id)
+            
+            if model_stats:
+                # Mettre à jour les statistiques existantes
+                update_data = {
+                    "last_used": current_time,
+                    "usage_count": model_stats.get("usage_count", 0) + 1
+                }
+                
+                # Mettre à jour les statistiques cumulatives si fournies
+                if tokens_generated is not None:
+                    current_tokens = model_stats.get("total_tokens_generated", 0)
+                    update_data["total_tokens_generated"] = current_tokens + tokens_generated
+                
+                if inference_time_ms is not None:
+                    current_time = model_stats.get("total_inference_time_ms", 0)
+                    update_data["total_inference_time_ms"] = current_time + inference_time_ms
+                    
+                    # Calculer et stocker le temps moyen par inférence
+                    update_data["avg_inference_time_ms"] = update_data["total_inference_time_ms"] / update_data["usage_count"]
+                
+                # Mettre à jour
+                db.update("model_stats", update_data, lambda q: q.model_name == model_name and q.server_id == server_id)
+            else:
+                # Créer de nouvelles statistiques
+                new_stats = {
+                    "model_name": model_name,
+                    "server_id": server_id,
+                    "first_used": current_time,
+                    "last_used": current_time,
+                    "usage_count": 1
+                }
+                
+                # Ajouter les statistiques si fournies
+                if tokens_generated is not None:
+                    new_stats["total_tokens_generated"] = tokens_generated
+                
+                if inference_time_ms is not None:
+                    new_stats["total_inference_time_ms"] = inference_time_ms
+                    new_stats["avg_inference_time_ms"] = inference_time_ms
+                
+                # Insérer
+                db.insert("model_stats", new_stats)
+            
+            logger.info(f"Statistiques d'utilisation mises à jour pour le modèle {model_name} sur le serveur {server_id}")
+            
         except Exception as e:
-            logger.error(f"Erreur lors de la mise à jour de la charge: {str(e)}")
+            logger.error(f"Erreur lors de la mise à jour des statistiques d'utilisation du modèle {model_name} sur le serveur {server_id}: {str(e)}")
+
+    def get_model_stats(self, model_name: str = None, server_id: str = None):
+        """
+        Récupère les statistiques d'utilisation des modèles.
+        
+        Args:
+            model_name: Filtrer par nom de modèle (optionnel)
+            server_id: Filtrer par serveur (optionnel)
+            
+        Returns:
+            dict: Statistiques d'utilisation des modèles
+        """
+        try:
+            db = get_db()
+            
+            # Construire la requête en fonction des paramètres fournis
+            if model_name and server_id:
+                # Statistiques pour un modèle spécifique sur un serveur spécifique
+                stats = db.search_one("model_stats", lambda q: q.model_name == model_name and q.server_id == server_id)
+                return stats if stats else {}
+                
+            elif model_name:
+                # Statistiques pour un modèle spécifique sur tous les serveurs
+                stats = db.search("model_stats", lambda q: q.model_name == model_name)
+                
+                # Agréger les statistiques
+                if not stats:
+                    # Récupérer les informations de base du modèle
+                    model_info = db.search_one("models", lambda q: q.name == model_name)
+                    return model_info if model_info else {}
+                
+                # Calculer des statistiques agrégées
+                aggregated = {
+                    "model_name": model_name,
+                    "usage_count": sum(s.get("usage_count", 0) for s in stats),
+                    "total_tokens_generated": sum(s.get("total_tokens_generated", 0) for s in stats),
+                    "total_inference_time_ms": sum(s.get("total_inference_time_ms", 0) for s in stats),
+                    "server_count": len(stats),
+                    "servers": [s.get("server_id") for s in stats]
+                }
+                
+                # Calculer le temps moyen global
+                if aggregated["usage_count"] > 0:
+                    aggregated["avg_inference_time_ms"] = aggregated["total_inference_time_ms"] / aggregated["usage_count"]
+                
+                return aggregated
+                
+            elif server_id:
+                # Statistiques pour tous les modèles sur un serveur spécifique
+                stats = db.search("model_stats", lambda q: q.server_id == server_id)
+                return stats if stats else []
+                
+            else:
+                # Statistiques globales pour tous les modèles
+                models = db.get_all("models")
+                
+                # Enrichir avec les statistiques détaillées
+                for model in models:
+                    model_stats = db.search("model_stats", lambda q: q.model_name == model["name"])
+                    if model_stats:
+                        model["detailed_stats"] = model_stats
+                
+                return models
+                
+        except Exception as e:
+            logger.error(f"Erreur lors de la récupération des statistiques des modèles: {str(e)}")
+            return {}
+
+    def update_server_metrics(self, server_id: str, response_time_ms: int = None, tokens_per_second: float = None):
+        """
+        Met à jour les métriques de performance d'un serveur.
+        
+        Args:
+            server_id: Identifiant unique du serveur
+            response_time_ms: Temps de réponse en millisecondes (optionnel)
+            tokens_per_second: Débit en tokens par seconde (optionnel)
+        """
+        try:
+            db = get_db()
+            server = db.search_one("servers", lambda q: q.id == server_id)
+            
+            if server:
+                update_data = {}
+                
+                # Mise à jour du temps de réponse
+                if response_time_ms is not None:
+                    # Calculer la moyenne glissante pour le temps de réponse
+                    current_avg = server.get("avg_response_time_ms", 0)
+                    current_count = server.get("response_time_samples", 0)
+                    
+                    if current_count == 0:
+                        new_avg = response_time_ms
+                        new_count = 1
+                    else:
+                        # Limiter à 100 échantillons pour la moyenne glissante
+                        weight = min(current_count, 100)
+                        new_avg = (current_avg * weight + response_time_ms) / (weight + 1)
+                        new_count = current_count + 1
+                    
+                    update_data["avg_response_time_ms"] = new_avg
+                    update_data["response_time_samples"] = new_count
+                    update_data["last_response_time_ms"] = response_time_ms
+                
+                # Mise à jour du débit de tokens
+                if tokens_per_second is not None:
+                    current_avg = server.get("avg_tokens_per_second", 0)
+                    current_count = server.get("tokens_rate_samples", 0)
+                    
+                    if current_count == 0:
+                        new_avg = tokens_per_second
+                        new_count = 1
+                    else:
+                        # Limiter à 100 échantillons pour la moyenne glissante
+                        weight = min(current_count, 100)
+                        new_avg = (current_avg * weight + tokens_per_second) / (weight + 1)
+                        new_count = current_count + 1
+                    
+                    update_data["avg_tokens_per_second"] = new_avg
+                    update_data["tokens_rate_samples"] = new_count
+                    update_data["last_tokens_per_second"] = tokens_per_second
+                
+                if update_data:
+                    # Ajouter l'horodatage de la dernière mise à jour
+                    update_data["metrics_updated_at"] = datetime.now().isoformat()
+                    db.update("servers", update_data, lambda q: q.id == server_id)
+                    logger.info(f"Métriques mises à jour pour le serveur {server_id}")
+            else:
+                logger.warning(f"Tentative de mise à jour des métriques pour un serveur inconnu: {server_id}")
+                
+        except Exception as e:
+            logger.error(f"Erreur lors de la mise à jour des métriques du serveur {server_id}: {str(e)}")
     
     def shutdown(self):
-        """Arrête le thread de rafraîchissement."""
+        """Arrête le thread de rafraîchissement et persiste l'état final."""
         if self._refresh_thread and self._refresh_thread.is_alive():
+            # Effectuer une dernière persistance des données
+            try:
+                self.refresh_cache()
+            except Exception as e:
+                logger.error(f"Erreur lors de la persistance finale: {str(e)}")
+                
+            # Arrêter le thread
             self._stop_refresh.set()
             self._refresh_thread.join(timeout=2.0)
             self._refresh_thread = None

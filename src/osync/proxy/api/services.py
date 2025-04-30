@@ -8,10 +8,12 @@ Ce module contient les services métier pour interagir avec les serveurs Ollama
 import json
 import logging
 import time
+import datetime
 from typing import Dict, List, Any, Optional, Generator, Tuple
 
 from flask import Response, stream_with_context
 from osync.sync.client import OllamaClient
+from osync.proxy.db.database import DatabaseManager
 
 from .models import (
     GenerateRequest, GenerateResponse, 
@@ -35,6 +37,8 @@ class OllamaProxyService:
             cluster_manager: Le gestionnaire de cluster Ollama
         """
         self.cluster_manager = cluster_manager
+        # Initialiser le gestionnaire de base de données
+        self.db_manager = DatabaseManager()
     
     def get_client_for_model(self, model_name: str) -> Tuple[Optional[OllamaClient], str, int]:
         """
@@ -542,7 +546,7 @@ class OllamaProxyService:
                 }
             
             # Ajouter au cluster via l'attribut _cluster de ClusterManager
-            if hasattr(self.cluster_manager, '_cluster') and self.cluster_manager._cluster:
+            if hasattr(self.cluster_manager, '_cluster') et self.cluster_manager._cluster:
                 with self.cluster_manager._cluster.server_lock:
                     # Vérifier si le serveur existe déjà
                     if address in self.cluster_manager._cluster.server_addresses:
@@ -637,7 +641,7 @@ class OllamaProxyService:
         """
         try:
             # Supprimer du cluster via l'attribut _cluster de ClusterManager
-            if hasattr(self.cluster_manager, '_cluster') and self.cluster_manager._cluster:
+            if hasattr(self.cluster_manager, '_cluster') et self.cluster_manager._cluster:
                 with self.cluster_manager._cluster.server_lock:
                     # Vérifier si le serveur existe
                     if address not in self.cluster_manager._cluster.server_addresses:
@@ -754,357 +758,358 @@ class OllamaProxyService:
                 "error": str(e)
             }
     
-    def check_server_health(self, address: str) -> Dict[str, Any]:
+    # Nouvelles méthodes pour la persistance des données
+    
+    def get_historical_stats(self, time_range: str = "day", limit: int = 100) -> Dict[str, Any]:
         """
-        Vérifie la santé d'un serveur spécifique.
+        Récupère les statistiques historiques de requêtes.
         
         Args:
-            address: L'adresse du serveur à vérifier
+            time_range: La plage de temps ('hour', 'day', 'week', 'month', 'all')
+            limit: Nombre maximal d'enregistrements à retourner
             
         Returns:
-            Un dictionnaire contenant le résultat de la vérification
+            Un dictionnaire contenant les statistiques historiques
         """
         try:
-            # Vérifier si le serveur existe
-            if not self.cluster_manager.has_server(address):
-                return {
-                    "success": False,
-                    "error": "Serveur non trouvé"
-                }
+            # Convertir time_range en secondes pour le filtrage
+            now = datetime.datetime.now().timestamp()
+            time_filter = 0
             
-            # Créer un client pour ce serveur
-            client = self.cluster_manager.get_client_for_server(address)
-            if not client:
-                return {
-                    "success": False,
-                    "error": "Impossible de créer un client pour ce serveur"
-                }
+            if time_range == "hour":
+                time_filter = now - 3600  # 1 heure
+            elif time_range == "day":
+                time_filter = now - 86400  # 24 heures
+            elif time_range == "week":
+                time_filter = now - 604800  # 7 jours
+            elif time_range == "month":
+                time_filter = now - 2592000  # 30 jours
             
-            # Vérifier la santé
-            is_healthy = False
-            try:
-                is_healthy = client.check_health()
-            finally:
-                client.close()
-            
-            # Mettre à jour l'état de santé dans le cluster
-            self.cluster_manager.update_server_health(address, is_healthy)
-            
-            return {
-                "success": True,
-                "address": address,
-                "healthy": is_healthy,
-                "timestamp": time.time()
-            }
-            
-        except Exception as e:
-            logger.error(f"Erreur lors de la vérification de santé du serveur {address}: {e}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
-    
-    def get_health_report(self) -> Dict[str, Any]:
-        """
-        Obtient un rapport de santé global du cluster.
-        
-        Returns:
-            Un dictionnaire contenant le rapport de santé
-        """
-        try:
-            servers = {}
-            total_servers = 0
-            healthy_servers = 0
-            
-            # Récupérer les informations de santé pour chaque serveur
-            for address in self.cluster_manager.get_server_addresses():
-                total_servers += 1
-                
-                # Récupérer l'état de santé
-                is_healthy = self.cluster_manager.get_server_health(address)
-                if is_healthy:
-                    healthy_servers += 1
-                
-                # Récupérer la charge
-                server_load = self.cluster_manager.get_server_load(address)
-                
-                # Ajouter ce serveur au rapport
-                servers[address] = {
-                    "healthy": is_healthy,
-                    "load": server_load
-                }
-            
-            # Calculer le pourcentage de santé global
-            if total_servers > 0:
-                health_percent = (healthy_servers / total_servers) * 100
+            # Récupérer les données depuis TinyDB
+            if time_range == "all":
+                stats_data = self.db_manager.get_collection('stats').all()
             else:
-                health_percent = 0
+                stats_data = self.db_manager.get_collection('stats').search(
+                    lambda doc: doc.get('timestamp', 0) >= time_filter
+                )
+            
+            # Limiter le nombre d'enregistrements
+            stats_data = sorted(stats_data, key=lambda x: x.get('timestamp', 0), reverse=True)[:limit]
+            
+            # Formater la sortie
+            formatted_stats = []
+            for stat in stats_data:
+                formatted_stat = {
+                    "timestamp": stat.get('timestamp'),
+                    "datetime": datetime.datetime.fromtimestamp(stat.get('timestamp')).strftime("%Y-%m-%d %H:%M:%S"),
+                    "active_requests": stat.get('active_requests', 0),
+                    "total_requests": stat.get('total_requests', 0),
+                    "request_rate": stat.get('request_rate', 0),
+                    "success_rate": stat.get('success_rate', 100),
+                    "avg_response_time": stat.get('avg_response_time', 0)
+                }
+                
+                if 'server_loads' in stat:
+                    formatted_stat['server_loads'] = stat.get('server_loads', {})
+                
+                formatted_stats.append(formatted_stat)
             
             return {
-                "success": True,
-                "timestamp": time.time(),
-                "total_servers": total_servers,
-                "healthy_servers": healthy_servers,
-                "health_percent": health_percent,
-                "servers": servers
+                "count": len(formatted_stats),
+                "time_range": time_range,
+                "stats": formatted_stats
             }
-            
         except Exception as e:
-            logger.error(f"Erreur lors de la génération du rapport de santé: {e}")
+            logger.error(f"Erreur lors de la récupération des statistiques historiques: {e}")
             return {
-                "success": False,
-                "error": str(e)
+                "error": str(e),
+                "count": 0,
+                "stats": []
             }
     
-    def get_health_stats(self, hours: int = 24) -> Dict[str, Any]:
+    def get_aggregated_stats(self, period: str = "hourly") -> Dict[str, Any]:
         """
-        Obtient des statistiques de santé sur une période donnée.
+        Récupère les statistiques agrégées par période.
         
         Args:
-            hours: Le nombre d'heures pour lesquelles récupérer les données
+            period: La période d'agrégation ('hourly', 'daily', 'weekly')
             
         Returns:
-            Un dictionnaire contenant les statistiques de santé
+            Un dictionnaire contenant les statistiques agrégées
         """
         try:
-            # Vérifier si la fonctionnalité est supportée
-            if not hasattr(self.cluster_manager, 'get_health_history'):
-                return {
-                    "success": False,
-                    "error": "Les statistiques de santé ne sont pas disponibles"
-                }
-                
-            # Récupérer l'historique de santé
-            history = self.cluster_manager.get_health_history(hours)
-            if not history:
-                return {
-                    "success": True,
-                    "message": "Pas de données de santé disponibles",
-                    "stats": {}
-                }
+            # Récupérer les données depuis TinyDB
+            stats_data = self.db_manager.get_collection(f'stats_aggregated_{period}').all()
             
-            # Calculer les statistiques à partir de l'historique
-            stats = {}
-            for address in self.cluster_manager.get_server_addresses():
-                server_stats = {
-                    "total_checks": 0,
-                    "healthy_checks": 0,
-                    "health_ratio": 0,
-                    "avg_response_time": 0
+            # Trier par timestamp décroissant
+            stats_data = sorted(stats_data, key=lambda x: x.get('timestamp', 0), reverse=True)
+            
+            # Formater la sortie
+            formatted_stats = []
+            for stat in stats_data:
+                formatted_stat = {
+                    "timestamp": stat.get('timestamp'),
+                    "datetime": datetime.datetime.fromtimestamp(stat.get('timestamp')).strftime("%Y-%m-%d %H:%M:%S"),
+                    "period_start": stat.get('period_start'),
+                    "period_end": stat.get('period_end'),
+                    "total_requests": stat.get('total_requests', 0),
+                    "avg_request_rate": stat.get('avg_request_rate', 0),
+                    "avg_response_time": stat.get('avg_response_time', 0),
+                    "success_rate": stat.get('success_rate', 100),
+                    "max_concurrent": stat.get('max_concurrent', 0)
                 }
                 
-                # Extraire les données pour ce serveur
-                server_history = [entry for entry in history if entry.get("server") == address]
+                if 'model_distribution' in stat:
+                    formatted_stat['model_distribution'] = stat.get('model_distribution', {})
                 
-                if server_history:
-                    server_stats["total_checks"] = len(server_history)
-                    server_stats["healthy_checks"] = sum(1 for entry in server_history if entry.get("healthy", False))
-                    
-                    if server_stats["total_checks"] > 0:
-                        server_stats["health_ratio"] = server_stats["healthy_checks"] / server_stats["total_checks"]
-                        
-                    # Calculer le temps de réponse moyen si disponible
-                    response_times = [entry.get("response_time") for entry in server_history if "response_time" in entry]
-                    if response_times:
-                        server_stats["avg_response_time"] = sum(response_times) / len(response_times)
+                if 'server_distribution' in stat:
+                    formatted_stat['server_distribution'] = stat.get('server_distribution', {})
                 
-                stats[address] = server_stats
+                formatted_stats.append(formatted_stat)
             
             return {
-                "success": True,
-                "period_hours": hours,
-                "stats": stats
+                "period": period,
+                "count": len(formatted_stats),
+                "stats": formatted_stats
             }
-            
         except Exception as e:
-            logger.error(f"Erreur lors de la récupération des statistiques de santé: {e}")
+            logger.error(f"Erreur lors de la récupération des statistiques agrégées: {e}")
             return {
-                "success": False,
-                "error": str(e)
+                "error": str(e),
+                "period": period,
+                "count": 0,
+                "stats": []
             }
     
-    def get_server_health_history(self, server: str, hours: int = 24) -> Dict[str, Any]:
+    def get_model_usage_stats(self, model_name: str = None, time_range: str = "day") -> Dict[str, Any]:
         """
-        Obtient l'historique de santé d'un serveur spécifique.
+        Récupère les statistiques d'utilisation pour un modèle spécifique ou pour tous les modèles.
         
         Args:
-            server: L'adresse du serveur
-            hours: Le nombre d'heures pour lesquelles récupérer l'historique
+            model_name: Le nom du modèle (None pour tous les modèles)
+            time_range: La plage de temps ('day', 'week', 'month', 'all')
             
         Returns:
-            Un dictionnaire contenant l'historique de santé
+            Un dictionnaire contenant les statistiques d'utilisation des modèles
         """
         try:
-            # Vérifier si le serveur existe
-            if not self.cluster_manager.has_server(server):
-                return {
-                    "success": False,
-                    "error": "Serveur non trouvé"
-                }
+            # Convertir time_range en secondes pour le filtrage
+            now = datetime.datetime.now().timestamp()
+            time_filter = 0
+            
+            if time_range == "day":
+                time_filter = now - 86400  # 24 heures
+            elif time_range == "week":
+                time_filter = now - 604800  # 7 jours
+            elif time_range == "month":
+                time_filter = now - 2592000  # 30 jours
+            
+            # Récupérer les données depuis TinyDB
+            model_stats_collection = self.db_manager.get_collection('model_stats')
+            
+            if time_range == "all":
+                if model_name:
+                    stats_data = model_stats_collection.search(
+                        lambda doc: doc.get('model_name') == model_name
+                    )
+                else:
+                    stats_data = model_stats_collection.all()
+            else:
+                if model_name:
+                    stats_data = model_stats_collection.search(
+                        lambda doc: doc.get('timestamp', 0) >= time_filter and doc.get('model_name') == model_name
+                    )
+                else:
+                    stats_data = model_stats_collection.search(
+                        lambda doc: doc.get('timestamp', 0) >= time_filter
+                    )
+            
+            # Agréger les données par modèle
+            model_usage = {}
+            for stat in stats_data:
+                model = stat.get('model_name', 'unknown')
+                if model not in model_usage:
+                    model_usage[model] = {
+                        "total_requests": 0,
+                        "successful_requests": 0,
+                        "failed_requests": 0,
+                        "total_tokens": 0,
+                        "avg_response_time": 0,
+                        "requests_by_type": {
+                            "generate": 0,
+                            "chat": 0,
+                            "embeddings": 0
+                        }
+                    }
                 
-            # Vérifier si la fonctionnalité est supportée
-            if not hasattr(self.cluster_manager, 'get_server_health_history'):
-                return {
-                    "success": False,
-                    "error": "L'historique de santé n'est pas disponible"
-                }
+                # Incrémenter les compteurs
+                model_usage[model]["total_requests"] += 1
+                if stat.get('success', True):
+                    model_usage[model]["successful_requests"] += 1
+                else:
+                    model_usage[model]["failed_requests"] += 1
                 
-            # Récupérer l'historique de santé pour ce serveur
-            history = self.cluster_manager.get_server_health_history(server, hours)
+                model_usage[model]["total_tokens"] += stat.get('total_tokens', 0)
+                
+                # Mettre à jour la moyenne de temps de réponse
+                current_avg = model_usage[model]["avg_response_time"]
+                current_count = model_usage[model]["total_requests"]
+                new_time = stat.get('response_time', 0)
+                model_usage[model]["avg_response_time"] = (current_avg * (current_count - 1) + new_time) / current_count
+                
+                # Incrémenter le compteur par type
+                req_type = stat.get('request_type', 'generate')
+                model_usage[model]["requests_by_type"][req_type] = model_usage[model]["requests_by_type"].get(req_type, 0) + 1
+            
+            # Calculer les pourcentages et formater
+            result = []
+            for model, stats in model_usage.items():
+                success_rate = 0
+                if stats["total_requests"] > 0:
+                    success_rate = (stats["successful_requests"] / stats["total_requests"]) * 100
+                
+                result.append({
+                    "model_name": model,
+                    "total_requests": stats["total_requests"],
+                    "successful_requests": stats["successful_requests"],
+                    "failed_requests": stats["failed_requests"],
+                    "success_rate": round(success_rate, 2),
+                    "total_tokens": stats["total_tokens"],
+                    "avg_response_time": round(stats["avg_response_time"], 3),
+                    "requests_by_type": stats["requests_by_type"]
+                })
+            
+            # Trier par nombre total de requêtes
+            result = sorted(result, key=lambda x: x["total_requests"], reverse=True)
             
             return {
-                "success": True,
-                "server": server,
-                "period_hours": hours,
-                "history": history
+                "time_range": time_range,
+                "model_count": len(result),
+                "models": result
             }
-            
         except Exception as e:
-            logger.error(f"Erreur lors de la récupération de l'historique du serveur {server}: {e}")
+            logger.error(f"Erreur lors de la récupération des statistiques d'utilisation des modèles: {e}")
             return {
-                "success": False,
-                "error": str(e)
+                "error": str(e),
+                "time_range": time_range,
+                "model_count": 0,
+                "models": []
             }
     
-    def get_load_chart_data(self, hours: int = 1) -> Dict[str, Any]:
+    def get_server_usage_stats(self, server_address: str = None, time_range: str = "day") -> Dict[str, Any]:
         """
-        Obtient les données de graphique pour la charge des serveurs.
+        Récupère les statistiques d'utilisation pour un serveur spécifique ou pour tous les serveurs.
         
         Args:
-            hours: Le nombre d'heures pour lesquelles récupérer les données
+            server_address: L'adresse du serveur (None pour tous les serveurs)
+            time_range: La plage de temps ('day', 'week', 'month', 'all')
             
         Returns:
-            Un dictionnaire contenant les données du graphique
+            Un dictionnaire contenant les statistiques d'utilisation des serveurs
         """
         try:
-            # Vérifier si la fonctionnalité est supportée
-            if not hasattr(self.cluster_manager, 'get_load_history'):
-                return {
-                    "success": False,
-                    "error": "Les données de charge ne sont pas disponibles"
-                }
+            # Convertir time_range en secondes pour le filtrage
+            now = datetime.datetime.now().timestamp()
+            time_filter = 0
+            
+            if time_range == "day":
+                time_filter = now - 86400  # 24 heures
+            elif time_range == "week":
+                time_filter = now - 604800  # 7 jours
+            elif time_range == "month":
+                time_filter = now - 2592000  # 30 jours
+            
+            # Récupérer les données depuis TinyDB
+            server_stats_collection = self.db_manager.get_collection('server_stats')
+            
+            if time_range == "all":
+                if server_address:
+                    stats_data = server_stats_collection.search(
+                        lambda doc: doc.get('server_address') == server_address
+                    )
+                else:
+                    stats_data = server_stats_collection.all()
+            else:
+                if server_address:
+                    stats_data = server_stats_collection.search(
+                        lambda doc: doc.get('timestamp', 0) >= time_filter and doc.get('server_address') == server_address
+                    )
+                else:
+                    stats_data = server_stats_collection.search(
+                        lambda doc: doc.get('timestamp', 0) >= time_filter
+                    )
+            
+            # Agréger les données par serveur
+            server_usage = {}
+            for stat in stats_data:
+                server = stat.get('server_address', 'unknown')
+                if server not in server_usage:
+                    server_usage[server] = {
+                        "total_requests": 0,
+                        "successful_requests": 0,
+                        "failed_requests": 0,
+                        "avg_response_time": 0,
+                        "avg_load": 0,
+                        "load_samples": 0,
+                        "model_distribution": {}
+                    }
                 
-            # Récupérer l'historique de charge
-            load_history = self.cluster_manager.get_load_history(hours)
-            
-            # Organiser les données pour le graphique
-            servers = set()
-            timestamps = set()
-            
-            # Collecter tous les serveurs et timestamps
-            for entry in load_history:
-                if "server" in entry and "timestamp" in entry:
-                    servers.add(entry["server"])
-                    timestamps.add(entry["timestamp"])
-            
-            # Trier les timestamps
-            sorted_timestamps = sorted(timestamps)
-            
-            # Créer des séries pour chaque serveur
-            series = {}
-            for server in servers:
-                series[server] = []
+                # Incrémenter les compteurs
+                server_usage[server]["total_requests"] += 1
+                if stat.get('success', True):
+                    server_usage[server]["successful_requests"] += 1
+                else:
+                    server_usage[server]["failed_requests"] += 1
                 
-                # Pour chaque timestamp, trouver la valeur pour ce serveur
-                for ts in sorted_timestamps:
-                    # Trouver l'entrée correspondante dans l'historique
-                    matching_entries = [e for e in load_history 
-                                        if e.get("server") == server and e.get("timestamp") == ts]
-                    
-                    if matching_entries:
-                        # Prendre la première entrée correspondante
-                        value = matching_entries[0].get("load", 0)
-                    else:
-                        # Pas de données pour ce point
-                        value = None
-                        
-                    series[server].append({
-                        "timestamp": ts,
-                        "value": value
-                    })
+                # Mettre à jour la moyenne de temps de réponse
+                current_avg = server_usage[server]["avg_response_time"]
+                current_count = server_usage[server]["total_requests"]
+                new_time = stat.get('response_time', 0)
+                server_usage[server]["avg_response_time"] = (current_avg * (current_count - 1) + new_time) / current_count
+                
+                # Mettre à jour la moyenne de charge
+                if 'server_load' in stat:
+                    current_load_avg = server_usage[server]["avg_load"]
+                    current_load_count = server_usage[server]["load_samples"]
+                    new_load = stat.get('server_load', 0)
+                    server_usage[server]["load_samples"] += 1
+                    server_usage[server]["avg_load"] = (current_load_avg * current_load_count + new_load) / server_usage[server]["load_samples"]
+                
+                # Mettre à jour la distribution des modèles
+                model = stat.get('model_name', 'unknown')
+                server_usage[server]["model_distribution"][model] = server_usage[server]["model_distribution"].get(model, 0) + 1
+            
+            # Calculer les pourcentages et formater
+            result = []
+            for server, stats in server_usage.items():
+                success_rate = 0
+                if stats["total_requests"] > 0:
+                    success_rate = (stats["successful_requests"] / stats["total_requests"]) * 100
+                
+                result.append({
+                    "server_address": server,
+                    "total_requests": stats["total_requests"],
+                    "successful_requests": stats["successful_requests"],
+                    "failed_requests": stats["failed_requests"],
+                    "success_rate": round(success_rate, 2),
+                    "avg_response_time": round(stats["avg_response_time"], 3),
+                    "avg_load": round(stats["avg_load"], 2),
+                    "model_distribution": stats["model_distribution"]
+                })
+            
+            # Trier par nombre total de requêtes
+            result = sorted(result, key=lambda x: x["total_requests"], reverse=True)
             
             return {
-                "success": True,
-                "period_hours": hours,
-                "timestamps": sorted_timestamps,
-                "series": series
+                "time_range": time_range,
+                "server_count": len(result),
+                "servers": result
             }
-            
         except Exception as e:
-            logger.error(f"Erreur lors de la récupération des données de graphique de charge: {e}")
+            logger.error(f"Erreur lors de la récupération des statistiques d'utilisation des serveurs: {e}")
             return {
-                "success": False,
-                "error": str(e)
-            }
-    
-    def get_health_chart_data(self, hours: int = 1) -> Dict[str, Any]:
-        """
-        Obtient les données de graphique pour la santé des serveurs.
-        
-        Args:
-            hours: Le nombre d'heures pour lesquelles récupérer les données
-            
-        Returns:
-            Un dictionnaire contenant les données du graphique
-        """
-        try:
-            # Vérifier si la fonctionnalité est supportée
-            if not hasattr(self.cluster_manager, 'get_health_history'):
-                return {
-                    "success": False,
-                    "error": "Les données de santé ne sont pas disponibles"
-                }
-                
-            # Récupérer l'historique de santé
-            health_history = self.cluster_manager.get_health_history(hours)
-            
-            # Organiser les données pour le graphique
-            servers = set()
-            timestamps = set()
-            
-            # Collecter tous les serveurs et timestamps
-            for entry in health_history:
-                if "server" in entry and "timestamp" in entry:
-                    servers.add(entry["server"])
-                    timestamps.add(entry["timestamp"])
-            
-            # Trier les timestamps
-            sorted_timestamps = sorted(timestamps)
-            
-            # Créer des séries pour chaque serveur
-            series = {}
-            for server in servers:
-                series[server] = []
-                
-                # Pour chaque timestamp, trouver la valeur pour ce serveur
-                for ts in sorted_timestamps:
-                    # Trouver l'entrée correspondante dans l'historique
-                    matching_entries = [e for e in health_history 
-                                        if e.get("server") == server and e.get("timestamp") == ts]
-                    
-                    if matching_entries:
-                        # Prendre la première entrée correspondante
-                        # Convertir booléen en valeur numérique
-                        value = 1 if matching_entries[0].get("healthy", False) else 0
-                    else:
-                        # Pas de données pour ce point
-                        value = None
-                        
-                    series[server].append({
-                        "timestamp": ts,
-                        "value": value
-                    })
-            
-            return {
-                "success": True,
-                "period_hours": hours,
-                "timestamps": sorted_timestamps,
-                "series": series
-            }
-            
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération des données de graphique de santé: {e}")
-            return {
-                "success": False,
-                "error": str(e)
+                "error": str(e),
+                "time_range": time_range,
+                "server_count": 0,
+                "servers": []
             }
