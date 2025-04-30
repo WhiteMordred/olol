@@ -2,158 +2,204 @@
  * Ollama Sync - Traductions françaises
  */
 
-// Enregistrer les traductions dans le système I18n
-window.I18n.translations.fr = {
-    // Éléments communs
-    "app.name": "Ollama Sync",
-    "app.description": "Équilibrage de charge et synchronisation pour Ollama",
-    "nav.dashboard": "Tableau de bord",
-    "nav.models": "Modèles",
-    "nav.servers": "Serveurs",
-    "nav.health": "Santé",
-    "nav.queue": "File d'attente",
-    "nav.settings": "Paramètres",
-    "nav.terminal": "Terminal",
-    "nav.swagger": "Docs API",
-    "nav.playground": "Playground",
+// French translations
+window.I18n = window.I18n || {};
+window.I18n.translations = window.I18n.translations || {};
+
+window.I18n.translations['fr'] = {
+    // Application general
+    "app": {
+        "name": "Ollama Sync",
+        "copyright": "Ollama Sync © 2025",
+        "version": "Version 1.0.0"
+    },
     
-    // Boutons et actions
-    "action.save": "Enregistrer",
-    "action.cancel": "Annuler",
-    "action.add": "Ajouter",
-    "action.remove": "Supprimer",
-    "action.edit": "Modifier",
-    "action.delete": "Supprimer",
-    "action.refresh": "Actualiser",
-    "action.search": "Rechercher",
-    "action.confirm": "Confirmer",
-    "action.loading": "Chargement...",
-    "action.send": "Envoyer",
-    "action.clear": "Effacer",
-    "action.retry": "Réessayer",
-    "action.start": "Démarrer",
-    "action.stop": "Arrêter",
-    "action.restart": "Redémarrer",
+    // Navigation
+    "nav": {
+        "dashboard": "Tableau de bord",
+        "models": "Modèles",
+        "servers": "Serveurs",
+        "health": "État du système",
+        "queue": "File d'attente",
+        "settings": "Paramètres",
+        "playground": "Terrain de jeu",
+        "terminal": "Terminal",
+        "swagger": "Documentation API",
+        "api_documentation": "Documentation API",
+        "language": "Langue"
+    },
     
-    // Tableau de bord
-    "dashboard.title": "Tableau de bord",
-    "dashboard.models.count": "Modèles au total",
-    "dashboard.servers.count": "Serveurs actifs",
-    "dashboard.servers.load": "Charge des serveurs",
-    "dashboard.queue.length": "Longueur de la file",
-    "dashboard.status.title": "État du système",
-    "dashboard.status.healthy": "Opérationnel",
-    "dashboard.status.degraded": "Dégradé",
-    "dashboard.status.error": "Erreur",
-    "dashboard.models.recent": "Modèles récents",
+    // Notifications
+    "notifications": {
+        "title": "Notifications",
+        "new_server": "Nouveau serveur détecté",
+        "server_offline": "Serveur hors ligne",
+        "high_load": "Charge élevée",
+        "model_downloaded": "Modèle téléchargé",
+        "just_now": "À l'instant",
+        "see_all": "Voir toutes les notifications"
+    },
     
-    // Page des modèles
-    "models.title": "Gestion des modèles",
-    "models.table.name": "Nom",
-    "models.table.size": "Taille",
-    "models.table.modified": "Modifié",
-    "models.table.servers": "Disponible sur",
-    "models.table.actions": "Actions",
-    "models.filter.placeholder": "Filtrer les modèles...",
-    "models.add.title": "Ajouter un nouveau modèle",
-    "models.add.name": "Nom du modèle",
-    "models.add.server": "Serveur cible",
-    "models.add.file": "Fichier du modèle",
-    "models.add.submit": "Ajouter le modèle",
-    "models.pull.title": "Télécharger le modèle",
-    "models.delete.confirm": "Êtes-vous sûr de vouloir supprimer ce modèle ?",
-    "models.delete.warning": "Cela supprimera le modèle de tous les serveurs.",
+    // Dashboard
+    "dashboard": {
+        "title": "Tableau de bord système",
+        "system_stats": "Statistiques système",
+        "active_servers": "Serveurs actifs",
+        "total_models": "Modèles total",
+        "active_requests": "Requêtes actives",
+        "request_rate": "Taux de requêtes",
+        "cpu_usage": "Utilisation CPU",
+        "memory_usage": "Utilisation mémoire",
+        "disk_usage": "Utilisation disque",
+        "network_usage": "Utilisation réseau",
+        "recent_activity": "Activité récente",
+        "quick_actions": "Actions rapides"
+    },
     
-    // Page des serveurs
-    "servers.title": "Gestion des serveurs",
-    "servers.table.name": "Nom",
-    "servers.table.url": "URL",
-    "servers.table.status": "Statut",
-    "servers.table.load": "Charge",
-    "servers.table.models": "Nombre de modèles",
-    "servers.table.actions": "Actions",
-    "servers.status.online": "En ligne",
-    "servers.status.offline": "Hors ligne",
-    "servers.status.degraded": "Dégradé",
-    "servers.add.title": "Ajouter un nouveau serveur",
-    "servers.add.name": "Nom du serveur",
-    "servers.add.url": "URL du serveur",
-    "servers.add.submit": "Ajouter le serveur",
-    "servers.edit.title": "Modifier le serveur",
-    "servers.delete.confirm": "Êtes-vous sûr de vouloir supprimer ce serveur ?",
+    // Models
+    "models": {
+        "title": "Gestion des modèles",
+        "available_models": "Modèles disponibles",
+        "model_name": "Nom du modèle",
+        "size": "Taille",
+        "modified": "Modifié",
+        "quantization": "Quantification",
+        "download": "Télécharger",
+        "delete": "Supprimer",
+        "pull": "Récupérer modèle",
+        "model_details": "Détails du modèle",
+        "parameters": "Paramètres",
+        "server_location": "Localisation serveur",
+        "loading": "Chargement des modèles..."
+    },
     
-    // Page de santé
-    "health.title": "Santé du système",
-    "health.system.title": "État du système",
-    "health.system.cpu": "Utilisation CPU",
-    "health.system.memory": "Utilisation mémoire",
-    "health.system.disk": "Utilisation disque",
-    "health.servers.title": "Santé des serveurs",
-    "health.servers.response": "Temps de réponse",
-    "health.servers.status": "Code de statut",
-    "health.history.title": "Historique de santé",
-    "health.refresh.auto": "Actualisation auto",
+    // Servers
+    "servers": {
+        "title": "Gestion des serveurs",
+        "available_servers": "Serveurs disponibles",
+        "hostname": "Nom d'hôte",
+        "address": "Adresse",
+        "status": "Statut",
+        "load": "Charge",
+        "online": "En ligne",
+        "offline": "Hors ligne",
+        "add_server": "Ajouter serveur",
+        "remove": "Supprimer",
+        "server_details": "Détails du serveur",
+        "uptime": "Temps de fonctionnement",
+        "cpu": "CPU",
+        "memory": "Mémoire",
+        "models_hosted": "Modèles hébergés"
+    },
     
-    // Page de file d'attente
-    "queue.title": "File d'attente d'inférence",
-    "queue.table.id": "ID",
-    "queue.table.model": "Modèle",
-    "queue.table.status": "Statut",
-    "queue.table.created": "Créé le",
-    "queue.table.server": "Serveur",
-    "queue.table.actions": "Actions",
-    "queue.status.pending": "En attente",
-    "queue.status.running": "En cours",
-    "queue.status.completed": "Terminé",
-    "queue.status.failed": "Échoué",
-    "queue.clear.title": "Vider la file",
-    "queue.clear.confirm": "Êtes-vous sûr de vouloir effacer toutes les tâches en attente ?",
+    // Health
+    "health": {
+        "title": "État du système",
+        "system_status": "Statut du système",
+        "server_status": "Statut du serveur",
+        "response_time": "Temps de réponse",
+        "uptime": "Temps de fonctionnement",
+        "last_checked": "Dernière vérification",
+        "healthy": "En bonne santé",
+        "degraded": "Dégradé",
+        "unhealthy": "Défaillant",
+        "check_now": "Vérifier maintenant"
+    },
     
-    // Page de paramètres
-    "settings.title": "Paramètres du système",
-    "settings.language.title": "Langue",
-    "settings.language.choose": "Choisir la langue",
-    "settings.theme.title": "Thème",
-    "settings.theme.light": "Clair",
-    "settings.theme.dark": "Sombre",
-    "settings.theme.system": "Système par défaut",
-    "settings.backup.title": "Sauvegarde de la base de données",
-    "settings.backup.create": "Créer une sauvegarde",
-    "settings.backup.restore": "Restaurer une sauvegarde",
-    "settings.backup.success": "Sauvegarde créée avec succès",
-    "settings.backup.error": "Échec de la création de la sauvegarde",
-    "settings.sync.title": "Paramètres de synchronisation",
-    "settings.sync.interval": "Intervalle d'auto-synchronisation (secondes)",
-    "settings.sync.save": "Enregistrer les paramètres",
-    "settings.sync.force": "Forcer la synchronisation maintenant",
+    // Settings
+    "settings": {
+        "title": "Paramètres système",
+        "general": "Général",
+        "appearance": "Apparence",
+        "network": "Réseau",
+        "language": "Langue",
+        "language_selector": "Sélection de langue",
+        "current_language": "Langue actuelle",
+        "theme": "Thème",
+        "dark_mode": "Mode sombre",
+        "light_mode": "Mode clair",
+        "auto_discovery": "Découverte automatique",
+        "save": "Sauvegarder",
+        "reset": "Réinitialiser",
+        "enable": "Activer",
+        "disable": "Désactiver"
+    },
     
-    // Page terminal
-    "terminal.title": "Console Terminal",
-    "terminal.placeholder": "Entrer une commande...",
-    "terminal.history": "Historique des commandes",
-    "terminal.clear": "Effacer le terminal",
+    // Queue
+    "queue": {
+        "title": "File d'attente des requêtes",
+        "current_queue": "File d'attente actuelle",
+        "request_id": "ID de requête",
+        "model": "Modèle",
+        "timestamp": "Horodatage",
+        "status": "Statut",
+        "action": "Action",
+        "pending": "En attente",
+        "processing": "En cours",
+        "completed": "Terminé",
+        "failed": "Échoué",
+        "cancel": "Annuler",
+        "retry": "Réessayer"
+    },
     
     // Playground
-    "playground.title": "LLM Playground",
-    "playground.model": "Sélectionner un modèle",
-    "playground.temperature": "Température",
-    "playground.max_tokens": "Tokens max",
-    "playground.system_prompt": "Prompt système",
-    "playground.user_prompt": "Entrez votre message...",
-    "playground.response": "Réponse du modèle",
-    "playground.save": "Enregistrer la conversation",
-    "playground.reset": "Réinitialiser",
+    "playground": {
+        "title": "Terrain de jeu",
+        "select_model": "Sélectionner un modèle",
+        "parameters": "Paramètres",
+        "temperature": "Température",
+        "max_tokens": "Tokens max",
+        "top_p": "Top P",
+        "prompt": "Entrez votre prompt ici...",
+        "generate": "Générer",
+        "stop": "Arrêter",
+        "response": "Réponse",
+        "copy": "Copier",
+        "clear": "Effacer",
+        "save": "Sauvegarder"
+    },
     
-    // Erreurs et notifications
-    "error.generic": "Une erreur s'est produite",
-    "error.connection": "Erreur de connexion",
-    "error.server_unreachable": "Serveur injoignable",
-    "error.invalid_input": "Saisie invalide",
-    "error.required_field": "Ce champ est requis",
-    "error.invalid_url": "Format d'URL invalide",
-    "error.load_failed": "Échec du chargement des données",
-    "error.save_failed": "Échec de l'enregistrement des modifications",
-    "success.saved": "Modifications enregistrées avec succès",
-    "success.added": "Ajouté avec succès",
-    "success.deleted": "Supprimé avec succès"
+    // Terminal
+    "terminal": {
+        "title": "Interface Terminal",
+        "welcome": "Bienvenue sur le Terminal Ollama Sync",
+        "help": "Tapez 'help' pour une liste des commandes",
+        "command": "Commande",
+        "output": "Sortie",
+        "clear": "Effacer le terminal"
+    },
+    
+    // Common actions/buttons
+    "actions": {
+        "add": "Ajouter",
+        "edit": "Modifier",
+        "delete": "Supprimer",
+        "cancel": "Annuler",
+        "save": "Sauvegarder",
+        "refresh": "Rafraîchir",
+        "close": "Fermer",
+        "confirm": "Confirmer",
+        "back": "Retour",
+        "next": "Suivant"
+    },
+    
+    // Errors and states
+    "states": {
+        "loading": "Chargement...",
+        "error": "Erreur",
+        "success": "Succès",
+        "warning": "Avertissement",
+        "info": "Information"
+    },
+    
+    // API documentation
+    "api": {
+        "title": "Documentation API",
+        "description": "Documentation API interactive pour Ollama Sync",
+        "endpoints": "Points de terminaison",
+        "models": "Modèles",
+        "try_it": "Essayer",
+        "response": "Réponse",
+        "status": "Statut"
+    }
 };

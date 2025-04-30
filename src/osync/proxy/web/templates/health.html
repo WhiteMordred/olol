@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 
-{% block title %}Surveillance Santé - OLOL Proxy{% endblock %}
+{% block title %}<title data-i18n="health.title">Surveillance Santé - OLOL Proxy</title>{% endblock %}
 
 {% block content %}
 <div class="row">
     <div class="col-lg-12">
-        <h2 class="mb-4 cyber-heading">Surveillance de la Santé du Cluster</h2>
+        <h2 class="mb-4 cyber-heading" data-i18n="health.title">Surveillance de la Santé du Cluster</h2>
     </div>
 </div>
 
@@ -15,7 +15,7 @@
         <div class="cyber-metric good">
             <div class="d-flex justify-content-between">
                 <div>
-                    <div class="cyber-metric-label">Serveurs en ligne</div>
+                    <div class="cyber-metric-label" data-i18n="health.servers.online">Serveurs en ligne</div>
                     <div class="cyber-metric-value">{{ report.cluster_health.healthy_servers }}/{{ report.cluster_health.total_servers }}</div>
                 </div>
                 <div class="cyber-metric-icon">
@@ -28,7 +28,7 @@
         <div class="cyber-metric {% if report.cluster_health.average_load < 0.7 %}good{% elif report.cluster_health.average_load < 0.9 %}warning{% else %}danger{% endif %}">
             <div class="d-flex justify-content-between">
                 <div>
-                    <div class="cyber-metric-label">Charge moyenne</div>
+                    <div class="cyber-metric-label" data-i18n="health.average_load">Charge moyenne</div>
                     <div class="cyber-metric-value">{{ "%.1f"|format(report.cluster_health.average_load * 100) }}%</div>
                 </div>
                 <div class="cyber-metric-icon">
@@ -41,7 +41,7 @@
         <div class="cyber-metric {% if report.cluster_health.average_latency < 100 %}good{% elif report.cluster_health.average_latency < 250 %}warning{% else %}danger{% endif %}">
             <div class="d-flex justify-content-between">
                 <div>
-                    <div class="cyber-metric-label">Latence moyenne</div>
+                    <div class="cyber-metric-label" data-i18n="health.average_latency">Latence moyenne</div>
                     <div class="cyber-metric-value">{{ "%.1f"|format(report.cluster_health.average_latency) }} ms</div>
                 </div>
                 <div class="cyber-metric-icon">
@@ -54,7 +54,7 @@
         <div class="cyber-metric good">
             <div class="d-flex justify-content-between">
                 <div>
-                    <div class="cyber-metric-label">Dernière vérification</div>
+                    <div class="cyber-metric-label" data-i18n="health.last_check">Dernière vérification</div>
                     <div class="cyber-metric-value" id="lastCheckTime">{{ report.timestamp | date }}</div>
                 </div>
                 <div class="cyber-metric-icon">
@@ -72,27 +72,27 @@
             <div class="cyber-panel-body">
                 <div class="d-flex flex-wrap gap-2 align-items-center">
                     <button id="checkHealthBtn" class="cyber-btn">
-                        <i class="fas fa-sync-alt"></i> Vérifier maintenant
+                        <i class="fas fa-sync-alt"></i> <span data-i18n="health.check_now">Vérifier maintenant</span>
                     </button>
                     
                     <button class="cyber-btn auto-refresh-toggle" id="autoRefreshBtn" data-target="health-data" data-seconds="30">
                         <i class="fas fa-sync-alt"></i>
-                        <span class="status-text">Actualisation auto</span>
+                        <span class="status-text" data-i18n="health.refresh.auto">Actualisation auto</span>
                     </button>
                     
                     <div class="cyber-dropdown ms-2">
                         <button type="button" class="cyber-btn dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-                            Exporter
+                            <span data-i18n="health.export">Exporter</span>
                         </button>
                         <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="#" id="exportJsonBtn">Format JSON</a></li>
-                            <li><a class="dropdown-item" href="#" id="exportCsvBtn">Format CSV</a></li>
-                            <li><a class="dropdown-item" href="#" id="exportPdfBtn">Format PDF</a></li>
+                            <li><a class="dropdown-item" href="#" id="exportJsonBtn" data-i18n="health.export.json">Format JSON</a></li>
+                            <li><a class="dropdown-item" href="#" id="exportCsvBtn" data-i18n="health.export.csv">Format CSV</a></li>
+                            <li><a class="dropdown-item" href="#" id="exportPdfBtn" data-i18n="health.export.pdf">Format PDF</a></li>
                         </ul>
                     </div>
                     
                     <div class="ms-auto">
-                        <span class="cyber-text-secondary me-2">Dernière actualisation:</span>
+                        <span class="cyber-text-secondary me-2" data-i18n="health.last_refresh">Dernière actualisation:</span>
                         <span id="last-refresh">{{ report.timestamp | date }}</span>
                     </div>
                 </div>
@@ -106,7 +106,7 @@
     <div class="col-lg-6">
         <div class="cyber-panel mb-4">
             <div class="cyber-panel-header">
-                <i class="fas fa-chart-area"></i> Historique de charge
+                <i class="fas fa-chart-area"></i> <span data-i18n="health.load_history">Historique de charge</span>
             </div>
             <div class="cyber-panel-body">
                 <canvas id="loadHistoryChart" height="300"></canvas>
@@ -116,7 +116,7 @@
     <div class="col-lg-6">
         <div class="cyber-panel mb-4">
             <div class="cyber-panel-header">
-                <i class="fas fa-chart-line"></i> Historique de latence
+                <i class="fas fa-chart-line"></i> <span data-i18n="health.latency_history">Historique de latence</span>
             </div>
             <div class="cyber-panel-body">
                 <canvas id="latencyHistoryChart" height="300"></canvas>
@@ -131,10 +131,10 @@
         <div class="cyber-panel mb-4">
             <div class="cyber-panel-header d-flex justify-content-between align-items-center">
                 <div>
-                    <i class="fas fa-server"></i> Santé détaillée des serveurs
+                    <i class="fas fa-server"></i> <span data-i18n="health.servers.detailed">Santé détaillée des serveurs</span>
                 </div>
                 <div class="cyber-search">
-                    <input type="text" class="cyber-input" id="serverSearchInput" placeholder="Filtrer les serveurs...">
+                    <input type="text" class="cyber-input" id="serverSearchInput" data-i18n-placeholder="servers.filter.placeholder" placeholder="Filtrer les serveurs...">
                     <button class="cyber-btn cyber-btn-sm" type="button" id="serverSearchBtn">
                         <i class="fas fa-search"></i>
                     </button>
@@ -145,13 +145,13 @@
                     <table class="cyber-table" id="serversHealthTable">
                         <thead>
                             <tr>
-                                <th>Serveur</th>
-                                <th>État</th>
-                                <th>Charge</th>
-                                <th>Latence</th>
-                                <th>Temps de réponse moyen</th>
-                                <th>Mémoire</th>
-                                <th>Actions</th>
+                                <th data-i18n="servers.table.name">Serveur</th>
+                                <th data-i18n="servers.table.status">État</th>
+                                <th data-i18n="servers.table.load">Charge</th>
+                                <th data-i18n="health.servers.latency">Latence</th>
+                                <th data-i18n="health.servers.avg_response">Temps de réponse moyen</th>
+                                <th data-i18n="health.system.memory">Mémoire</th>
+                                <th data-i18n="servers.table.actions">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -161,11 +161,11 @@
                                 <td>
                                     {% if server.healthy %}
                                     <span class="cyber-badge online">
-                                        <span class="cyber-dot"></span> En ligne
+                                        <span class="cyber-dot"></span> <span data-i18n="servers.status.online">En ligne</span>
                                     </span>
                                     {% else %}
                                     <span class="cyber-badge offline">
-                                        <span class="cyber-dot"></span> Hors ligne
+                                        <span class="cyber-dot"></span> <span data-i18n="servers.status.offline">Hors ligne</span>
                                     </span>
                                     {% endif %}
                                 </td>
@@ -184,7 +184,7 @@
                                     {% if server.avg_response_time is defined %}
                                         {{ "%.1f"|format(server.avg_response_time) }} ms
                                     {% else %}
-                                        <span class="cyber-text-secondary">N/A</span>
+                                        <span class="cyber-text-secondary" data-i18n="health.not_available">N/A</span>
                                     {% endif %}
                                 </td>
                                 <td>
@@ -203,21 +203,21 @@
                                         {% endif %}
                                     </small>
                                     {% else %}
-                                    <span class="cyber-text-secondary">N/A</span>
+                                    <span class="cyber-text-secondary" data-i18n="health.not_available">N/A</span>
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <button class="cyber-btn cyber-btn-sm cyber-btn-info view-history-btn" data-server="{{ server_name }}">
+                                    <button class="cyber-btn cyber-btn-sm cyber-btn-info view-history-btn" data-server="{{ server_name }}" data-i18n-attr-title="health.view_history">
                                         <i class="fas fa-history"></i>
                                     </button>
-                                    <button class="cyber-btn cyber-btn-sm restart-service-btn" data-server="{{ server_name }}">
+                                    <button class="cyber-btn cyber-btn-sm restart-service-btn" data-server="{{ server_name }}" data-i18n-attr-title="servers.restart">
                                         <i class="fas fa-redo"></i>
                                     </button>
                                 </td>
                             </tr>
                             {% else %}
                             <tr>
-                                <td colspan="7" class="text-center">Aucun serveur disponible</td>
+                                <td colspan="7" class="text-center" data-i18n="servers.none_available">Aucun serveur disponible</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -233,7 +233,7 @@
     <div class="col-12">
         <div class="cyber-panel mb-4">
             <div class="cyber-panel-header">
-                <i class="fas fa-exclamation-triangle"></i> Historique des problèmes
+                <i class="fas fa-exclamation-triangle"></i> <span data-i18n="health.issues_history">Historique des problèmes</span>
             </div>
             <div class="cyber-panel-body">
                 {% if report.issues and report.issues|length > 0 %}
@@ -264,7 +264,7 @@
                                 <h6>{{ issue.title }}</h6>
                                 <p>{{ issue.description }}</p>
                                 {% if issue.server %}
-                                <div class="cyber-text-secondary">Serveur: {{ issue.server }}</div>
+                                <div class="cyber-text-secondary" data-i18n="servers.label">Serveur: {{ issue.server }}</div>
                                 {% endif %}
                             </div>
                         </div>
@@ -273,7 +273,7 @@
                 </div>
                 {% else %}
                 <div class="cyber-alert cyber-alert-success">
-                    <i class="fas fa-check-circle"></i> Aucun problème détecté.
+                    <i class="fas fa-check-circle"></i> <span data-i18n="health.no_issues">Aucun problème détecté.</span>
                 </div>
                 {% endif %}
             </div>
@@ -286,7 +286,7 @@
     <div class="modal-dialog modal-lg">
         <div class="modal-content cyber-modal">
             <div class="cyber-modal-header">
-                <h5 class="modal-title" id="serverHistoryModalLabel">Historique du serveur</h5>
+                <h5 class="modal-title" id="serverHistoryModalLabel" data-i18n="health.server_history">Historique du serveur</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="cyber-modal-body">
@@ -298,11 +298,11 @@
                     <table class="cyber-table cyber-table-sm" id="serverHistoryTable">
                         <thead>
                             <tr>
-                                <th>Timestamp</th>
-                                <th>État</th>
-                                <th>Charge</th>
-                                <th>Latence</th>
-                                <th>Mémoire</th>
+                                <th data-i18n="health.timestamp">Timestamp</th>
+                                <th data-i18n="servers.table.status">État</th>
+                                <th data-i18n="servers.table.load">Charge</th>
+                                <th data-i18n="health.servers.latency">Latence</th>
+                                <th data-i18n="health.system.memory">Mémoire</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -312,8 +312,8 @@
                 </div>
             </div>
             <div class="cyber-modal-footer">
-                <button type="button" class="cyber-btn cyber-btn-secondary" data-bs-dismiss="modal">Fermer</button>
-                <button type="button" class="cyber-btn" id="exportServerHistoryBtn">Exporter l'historique</button>
+                <button type="button" class="cyber-btn cyber-btn-secondary" data-bs-dismiss="modal" data-i18n="action.close">Fermer</button>
+                <button type="button" class="cyber-btn" id="exportServerHistoryBtn" data-i18n="health.export_history">Exporter l'historique</button>
             </div>
         </div>
     </div>
@@ -323,8 +323,8 @@
 <div class="toast-container position-fixed bottom-0 end-0 p-3">
     <div id="healthToast" class="cyber-toast" role="alert" aria-live="assertive" aria-atomic="true">
         <div class="cyber-toast-header">
-            <strong class="me-auto" id="toastTitle">Notification</strong>
-            <small id="toastTime">À l'instant</small>
+            <strong class="me-auto" id="toastTitle" data-i18n="notifications.title">Notification</strong>
+            <small id="toastTime" data-i18n="notifications.just_now">À l'instant</small>
             <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
         </div>
         <div class="cyber-toast-body" id="toastMessage"></div>
@@ -393,7 +393,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     },
                     title: {
                         display: true,
-                        text: 'Charge CPU',
+                        text: window.I18n ? window.I18n.t('health.system.cpu') : 'Charge CPU',
                         color: '#F0F0F0'
                     }
                 },
@@ -403,7 +403,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     },
                     title: {
                         display: true,
-                        text: 'Heure',
+                        text: window.I18n ? window.I18n.t('health.time') : 'Heure',
                         color: '#F0F0F0'
                     }
                 }
@@ -464,7 +464,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     },
                     title: {
                         display: true,
-                        text: 'Latence (ms)',
+                        text: window.I18n ? window.I18n.t('health.servers.latency') : 'Latence (ms)',
                         color: '#F0F0F0'
                     }
                 },
@@ -474,7 +474,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     },
                     title: {
                         display: true,
-                        text: 'Heure',
+                        text: window.I18n ? window.I18n.t('health.time') : 'Heure',
                         color: '#F0F0F0'
                     }
                 }
@@ -514,7 +514,13 @@ document.addEventListener('DOMContentLoaded', function() {
         
         toastTitle.textContent = title;
         toastMessage.textContent = message;
-        toastTime.textContent = 'À l\'instant';
+        
+        // Utiliser le système i18n si disponible
+        if (window.I18n) {
+            toastTime.textContent = window.I18n.t('notifications.just_now');
+        } else {
+            toastTime.textContent = 'À l\'instant';
+        }
         
         toast.classList.remove('success', 'danger', 'warning', 'info');
         toast.classList.add(type);
@@ -552,7 +558,8 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('checkHealthBtn').addEventListener('click', function() {
         this.disabled = true;
         const originalText = this.innerHTML;
-        this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Vérification...';
+        const checkingText = window.I18n ? window.I18n.t('health.checking') : '<i class="fas fa-spinner fa-spin"></i> Vérification...';
+        this.innerHTML = checkingText;
         
         // Simuler une vérification de santé
         setTimeout(() => {
@@ -563,7 +570,12 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('lastCheckTime').textContent = new Date().toLocaleString();
             document.getElementById('last-refresh').textContent = new Date().toLocaleString();
             
-            showToast('Vérification terminée', 'La santé du cluster a été mise à jour.', 'success');
+            const successMsg = window.I18n ? window.I18n.t('health.check_success') : 'La santé du cluster a été mise à jour.';
+            showToast(
+                window.I18n ? window.I18n.t('health.check_complete') : 'Vérification terminée', 
+                successMsg, 
+                'success'
+            );
         }, 2000);
     });
     
@@ -574,7 +586,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const statusText = this.querySelector('.status-text');
         
         if (isActive) {
-            statusText.textContent = 'Actualisation active';
+            statusText.textContent = window.I18n ? window.I18n.t('action.active') : 'Actualisation active';
             
             // Démarrer l'actualisation automatique
             window.healthRefreshInterval = setInterval(() => {
@@ -598,10 +610,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 latencyHistoryChart.update();
                 
                 // Afficher une notification d'actualisation
-                showToast('Actualisation automatique', 'Les données de santé ont été mises à jour.', 'info');
+                const autoRefreshMsg = window.I18n ? window.I18n.t('health.auto_refresh_msg') : 'Les données de santé ont été mises à jour.';
+                showToast(
+                    window.I18n ? window.I18n.t('health.auto_refresh') : 'Actualisation automatique',
+                    autoRefreshMsg, 
+                    'info'
+                );
             }, 30000); // Toutes les 30 secondes
         } else {
-            statusText.textContent = 'Actualisation auto';
+            statusText.textContent = window.I18n ? window.I18n.t('health.refresh.auto') : 'Actualisation auto';
             clearInterval(window.healthRefreshInterval);
         }
     });
@@ -616,7 +633,10 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function showServerHistory(serverName) {
         // Mettre à jour le titre du modal
-        document.getElementById('serverHistoryModalLabel').textContent = `Historique - ${serverName}`;
+        const historyTitle = window.I18n ? 
+            window.I18n.t('health.server_history_for', {server: serverName}) : 
+            `Historique - ${serverName}`;
+        document.getElementById('serverHistoryModalLabel').textContent = historyTitle;
         
         // Générer des données d'historique simulées
         const historyTimestamps = [];
@@ -660,7 +680,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 labels: formattedHistoryLabels,
                 datasets: [
                     {
-                        label: 'Charge (%)',
+                        label: window.I18n ? window.I18n.t('health.load_percent') : 'Charge (%)',
                         data: loadHistory.map(val => val * 100),
                         borderColor: '#00F3FF', // primary-color
                         backgroundColor: 'rgba(0, 243, 255, 0.1)',
@@ -669,7 +689,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         borderWidth: 2
                     },
                     {
-                        label: 'Latence (ms)',
+                        label: window.I18n ? window.I18n.t('health.latency_ms') : 'Latence (ms)',
                         data: latencyHistory,
                         borderColor: '#FF3333', // danger-color
                         backgroundColor: 'rgba(255, 51, 51, 0.1)',
@@ -695,7 +715,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         },
                         title: {
                             display: true,
-                            text: 'Charge (%)',
+                            text: window.I18n ? window.I18n.t('health.load_percent') : 'Charge (%)',
                             color: '#F0F0F0'
                         },
                         max: 100
@@ -710,7 +730,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         },
                         title: {
                             display: true,
-                            text: 'Latence (ms)',
+                            text: window.I18n ? window.I18n.t('health.latency_ms') : 'Latence (ms)',
                             color: '#F0F0F0'
                         }
                     },
@@ -747,7 +767,15 @@ document.addEventListener('DOMContentLoaded', function() {
             const statusDot = document.createElement('span');
             statusDot.className = 'cyber-dot';
             statusBadge.appendChild(statusDot);
-            statusBadge.appendChild(document.createTextNode(statusHistory[i] ? ' En ligne' : ' Hors ligne'));
+            
+            // Utiliser i18n si disponible
+            if (window.I18n) {
+                const statusKey = statusHistory[i] ? 'servers.status.online' : 'servers.status.offline';
+                statusBadge.appendChild(document.createTextNode(' ' + window.I18n.t(statusKey)));
+            } else {
+                statusBadge.appendChild(document.createTextNode(statusHistory[i] ? ' En ligne' : ' Hors ligne'));
+            }
+            
             statusCell.appendChild(statusBadge);
             row.appendChild(statusCell);
             
@@ -776,7 +804,12 @@ document.addEventListener('DOMContentLoaded', function() {
         btn.addEventListener('click', function() {
             const serverName = this.getAttribute('data-server');
             
-            if (confirm(`Êtes-vous sûr de vouloir redémarrer le service sur ${serverName} ?`)) {
+            // Utiliser i18n si disponible
+            const confirmMsg = window.I18n ? 
+                window.I18n.t('servers.restart.confirm', {server: serverName}) : 
+                `Êtes-vous sûr de vouloir redémarrer le service sur ${serverName} ?`;
+            
+            if (confirm(confirmMsg)) {
                 // Afficher l'indicateur de chargement
                 this.disabled = true;
                 const originalIcon = this.innerHTML;
@@ -787,7 +820,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     this.disabled = false;
                     this.innerHTML = originalIcon;
                     
-                    showToast('Service redémarré', `Le service a été redémarré avec succès sur ${serverName}.`, 'success');
+                    // Utiliser i18n si disponible
+                    const successMsg = window.I18n ? 
+                        window.I18n.t('servers.restart.success', {server: serverName}) : 
+                        `Le service a été redémarré avec succès sur ${serverName}.`;
+                    
+                    const title = window.I18n ? 
+                        window.I18n.t('servers.restart.title') : 
+                        'Service redémarré';
+                    
+                    showToast(title, successMsg, 'success');
                 }, 3000);
             }
         });
@@ -796,11 +838,27 @@ document.addEventListener('DOMContentLoaded', function() {
     // Exportation des données
     document.getElementById('exportJsonBtn').addEventListener('click', function() {
         // Simuler l'exportation
-        showToast('Export en cours', 'Exportation des données au format JSON...', 'info');
+        const exportingMsg = window.I18n ? 
+            window.I18n.t('health.export.progress_json') : 
+            'Exportation des données au format JSON...';
+        
+        showToast(
+            window.I18n ? window.I18n.t('health.export.title') : 'Export en cours', 
+            exportingMsg, 
+            'info'
+        );
         
         // Simuler un délai de traitement
         setTimeout(() => {
-            showToast('Export terminé', 'Les données ont été exportées avec succès.', 'success');
+            const exportSuccessMsg = window.I18n ? 
+                window.I18n.t('health.export.success') : 
+                'Les données ont été exportées avec succès.';
+            
+            showToast(
+                window.I18n ? window.I18n.t('health.export.complete') : 'Export terminé', 
+                exportSuccessMsg, 
+                'success'
+            );
             
             // Dans une implémentation réelle, on déclencherait un téléchargement
             // Ici, on simule
@@ -812,10 +870,26 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     document.getElementById('exportCsvBtn').addEventListener('click', function() {
-        showToast('Export en cours', 'Exportation des données au format CSV...', 'info');
+        const exportingMsg = window.I18n ? 
+            window.I18n.t('health.export.progress_csv') : 
+            'Exportation des données au format CSV...';
+        
+        showToast(
+            window.I18n ? window.I18n.t('health.export.title') : 'Export en cours', 
+            exportingMsg, 
+            'info'
+        );
         
         setTimeout(() => {
-            showToast('Export terminé', 'Les données ont été exportées avec succès.', 'success');
+            const exportSuccessMsg = window.I18n ? 
+                window.I18n.t('health.export.success') : 
+                'Les données ont été exportées avec succès.';
+            
+            showToast(
+                window.I18n ? window.I18n.t('health.export.complete') : 'Export terminé', 
+                exportSuccessMsg, 
+                'success'
+            );
             
             const link = document.createElement('a');
             link.href = 'data:text/csv;charset=utf-8,server,status,load,latency\nlocalhost:50051,online,45.2,78.5';
@@ -825,10 +899,26 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     document.getElementById('exportPdfBtn').addEventListener('click', function() {
-        showToast('Export en cours', 'Préparation du rapport PDF...', 'info');
+        const exportingMsg = window.I18n ? 
+            window.I18n.t('health.export.progress_pdf') : 
+            'Préparation du rapport PDF...';
+        
+        showToast(
+            window.I18n ? window.I18n.t('health.export.title') : 'Export en cours', 
+            exportingMsg, 
+            'info'
+        );
         
         setTimeout(() => {
-            showToast('Export terminé', 'Le rapport PDF a été généré avec succès.', 'success');
+            const exportSuccessMsg = window.I18n ? 
+                window.I18n.t('health.export.pdf_success') : 
+                'Le rapport PDF a été généré avec succès.';
+            
+            showToast(
+                window.I18n ? window.I18n.t('health.export.complete') : 'Export terminé', 
+                exportSuccessMsg, 
+                'success'
+            );
             
             // Dans une implémentation réelle, on générerait un PDF côté serveur
             // et on fournirait un lien de téléchargement
@@ -837,10 +927,26 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Export de l'historique d'un serveur
     document.getElementById('exportServerHistoryBtn').addEventListener('click', function() {
-        showToast('Export en cours', 'Exportation de l\'historique du serveur...', 'info');
+        const exportingMsg = window.I18n ? 
+            window.I18n.t('health.export.progress_history') : 
+            'Exportation de l\'historique du serveur...';
+        
+        showToast(
+            window.I18n ? window.I18n.t('health.export.title') : 'Export en cours', 
+            exportingMsg, 
+            'info'
+        );
         
         setTimeout(() => {
-            showToast('Export terminé', 'L\'historique a été exporté avec succès.', 'success');
+            const exportSuccessMsg = window.I18n ? 
+                window.I18n.t('health.export.history_success') : 
+                'L\'historique a été exporté avec succès.';
+            
+            showToast(
+                window.I18n ? window.I18n.t('health.export.complete') : 'Export terminé', 
+                exportSuccessMsg, 
+                'success'
+            );
             
             const link = document.createElement('a');
             link.href = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify({ message: "Exemple d'export d'historique" }));
@@ -848,7 +954,13 @@ document.addEventListener('DOMContentLoaded', function() {
             link.click();
         }, 1000);
     });
+    
+    // Initialiser le système de traduction si disponible
+    if (window.I18n && typeof window.I18n.init === 'function') {
+        window.I18n.init().then(() => {
+            console.log('Système de traduction initialisé sur la page de santé');
+        });
+    }
 });
-
 </script>
 {% endblock %}

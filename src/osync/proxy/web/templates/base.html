@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Ollama Sync{% endblock %}</title>
+    <title data-i18n="app.name">{% block title %}Ollama Sync{% endblock %}</title>
     
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -24,49 +24,49 @@
             <div class="sidebar-heading text-center py-3">
                 <img src="{{ url_for('static', filename='img/logo-ollama.png') }}" alt="OLOL" 
                      class="img-fluid" style="max-height: 40px;">
-                <span class="sidebar-brand d-none d-sm-inline">Ollama Sync</span>
+                <span class="sidebar-brand d-none d-sm-inline" data-i18n="app.name">Ollama Sync</span>
             </div>
             <div class="list-group list-group-flush">
                 <a href="/" class="list-group-item list-group-item-action py-3 {% if request.path == '/' %}active{% endif %}">
                     <i class="fas fa-tachometer-alt fa-fw me-2"></i>
-                    <span class="d-none d-sm-inline" data-i18n="dashboard">Tableau de bord</span>
+                    <span class="d-none d-sm-inline" data-i18n="nav.dashboard">Tableau de bord</span>
                 </a>
                 <a href="/servers" class="list-group-item list-group-item-action py-3 {% if request.path == '/servers' %}active{% endif %}">
                     <i class="fas fa-server fa-fw me-2"></i>
-                    <span class="d-none d-sm-inline" data-i18n="servers">Serveurs</span>
+                    <span class="d-none d-sm-inline" data-i18n="nav.servers">Serveurs</span>
                 </a>
                 <a href="/models" class="list-group-item list-group-item-action py-3 {% if request.path == '/models' %}active{% endif %}">
                     <i class="fas fa-brain fa-fw me-2"></i>
-                    <span class="d-none d-sm-inline" data-i18n="models">Modèles</span>
+                    <span class="d-none d-sm-inline" data-i18n="nav.models">Modèles</span>
                 </a>
                 <a href="/queue" class="list-group-item list-group-item-action py-3 {% if request.path == '/queue' %}active{% endif %}">
                     <i class="fas fa-tasks fa-fw me-2"></i>
-                    <span class="d-none d-sm-inline" data-i18n="queue">File d'attente</span>
+                    <span class="d-none d-sm-inline" data-i18n="nav.queue">File d'attente</span>
                 </a>
                 <a href="/playground" class="list-group-item list-group-item-action py-3 {% if request.path == '/playground' %}active{% endif %}">
                     <i class="fas fa-play-circle fa-fw me-2"></i>
-                    <span class="d-none d-sm-inline" data-i18n="playground">Playground</span>
+                    <span class="d-none d-sm-inline" data-i18n="nav.playground">Playground</span>
                 </a>
                 <a href="/health" class="list-group-item list-group-item-action py-3 {% if request.path == '/health' %}active{% endif %}">
                     <i class="fas fa-heartbeat fa-fw me-2"></i>
-                    <span class="d-none d-sm-inline" data-i18n="health">Santé</span>
+                    <span class="d-none d-sm-inline" data-i18n="nav.health">Santé</span>
                 </a>
                 <a href="/log" class="list-group-item list-group-item-action py-3 {% if request.path == '/log' %}active{% endif %}">
                     <i class="fas fa-clipboard-list fa-fw me-2"></i>
-                    <span class="d-none d-sm-inline" data-i18n="logs">Journaux</span>
+                    <span class="d-none d-sm-inline" data-i18n="nav.log">Journaux</span>
                 </a>
                 <a href="/terminal" class="list-group-item list-group-item-action py-3 {% if request.path == '/terminal' %}active{% endif %}">
                     <i class="fas fa-terminal fa-fw me-2"></i>
-                    <span class="d-none d-sm-inline" data-i18n="terminal">Terminal</span>
+                    <span class="d-none d-sm-inline" data-i18n="nav.terminal">Terminal</span>
                 </a>
                 <a href="/settings" class="list-group-item list-group-item-action py-3 {% if request.path == '/settings' %}active{% endif %}">
                     <i class="fas fa-cogs fa-fw me-2"></i>
-                    <span class="d-none d-sm-inline" data-i18n="settings">Paramètres</span>
+                    <span class="d-none d-sm-inline" data-i18n="nav.settings">Paramètres</span>
                 </a>
                 <div class="sidebar-divider"></div>
                 <a href="/swagger" class="list-group-item list-group-item-action py-3 {% if request.path == '/swagger' %}active{% endif %}">
                     <i class="fas fa-book fa-fw me-2"></i>
-                    <span class="d-none d-sm-inline" data-i18n="api_docs">API Swagger</span>
+                    <span class="d-none d-sm-inline" data-i18n="nav.swagger">API Swagger</span>
                 </a>
             </div>
             <!-- Sidebar Footer with Status -->
@@ -74,7 +74,7 @@
                 <div class="d-flex justify-content-between px-3 py-2 align-items-center">
                     <div class="server-status">
                         <span class="status-indicator online"></span>
-                        <span class="d-none d-sm-inline small" data-i18n="proxy_active">Proxy actif</span>
+                        <span class="d-none d-sm-inline small" data-i18n="servers.status.proxy_active">Proxy actif</span>
                     </div>
                     <div class="dropdown">
                         <button class="btn btn-sm btn-link text-light dropdown-toggle" type="button" id="dropdownMenuButton1"
@@ -83,14 +83,14 @@
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdownMenuButton1">
                             <li><a class="dropdown-item" href="#" id="toggleSidebarBtn">
-                                <i class="fas fa-angle-left me-2"></i> <span data-i18n="collapse">Replier</span>
+                                <i class="fas fa-angle-left me-2"></i> <span data-i18n="sidebar.collapse">Replier</span>
                             </a></li>
                             <li><a class="dropdown-item" href="/settings">
-                                <i class="fas fa-cogs me-2"></i> <span data-i18n="settings">Paramètres</span>
+                                <i class="fas fa-cogs me-2"></i> <span data-i18n="nav.settings">Paramètres</span>
                             </a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="/swagger">
-                                <i class="fas fa-book me-2"></i> <span data-i18n="api_docs">Documentation API</span>
+                                <i class="fas fa-book me-2"></i> <span data-i18n="nav.swagger">Documentation API</span>
                             </a></li>
                         </ul>
                     </div>
@@ -117,10 +117,11 @@
                             <li class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle" href="#" role="button"
                                    data-bs-toggle="dropdown" aria-expanded="false">
-                                    <i class="fas fa-language"></i> <span class="d-none d-md-inline" data-i18n="language">Langue</span>
+                                    <i class="fas fa-language"></i> <span class="d-none d-md-inline" data-i18n="settings.language.title">Langue</span>
                                 </a>
                                 <ul class="dropdown-menu dropdown-menu-end" id="language-selector">
-                                    <!-- Rempli dynamiquement par le JS -->
+                                    <li><a class="dropdown-item language-option" href="#" data-lang="en">English</a></li>
+                                    <li><a class="dropdown-item language-option" href="#" data-lang="fr">Français</a></li>
                                 </ul>
                             </li>
                             <li class="nav-item dropdown">
@@ -130,14 +131,14 @@
                                     <span class="notification-badge">3</span>
                                 </a>
                                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="notificationsDropdown">
-                                    <li><h6 class="dropdown-header" data-i18n="notifications">Notifications</h6></li>
+                                    <li><h6 class="dropdown-header" data-i18n="notifications.title">Notifications</h6></li>
                                     <li><a class="dropdown-item" href="#">
                                         <div class="notification-item">
                                             <div class="notification-icon text-success">
                                                 <i class="fas fa-check-circle"></i>
                                             </div>
                                             <div class="notification-content">
-                                                <div class="notification-title" data-i18n="new_server_detected">Nouveau serveur détecté</div>
+                                                <div class="notification-title" data-i18n="notifications.new_server">Nouveau serveur détecté</div>
                                                 <div class="notification-text small">localhost:50051 est en ligne.</div>
                                                 <div class="notification-time small">Il y a 5 min</div>
                                             </div>
@@ -149,7 +150,7 @@
                                                 <i class="fas fa-exclamation-circle"></i>
                                             </div>
                                             <div class="notification-content">
-                                                <div class="notification-title" data-i18n="high_load">Charge élevée</div>
+                                                <div class="notification-title" data-i18n="notifications.high_load">Charge élevée</div>
                                                 <div class="notification-text small">Le serveur srv2 a une charge > 80%</div>
                                                 <div class="notification-time small">Il y a 10 min</div>
                                             </div>
@@ -161,23 +162,23 @@
                                                 <i class="fas fa-times-circle"></i>
                                             </div>
                                             <div class="notification-content">
-                                                <div class="notification-title" data-i18n="server_offline">Serveur hors ligne</div>
+                                                <div class="notification-title" data-i18n="notifications.server_offline">Serveur hors ligne</div>
                                                 <div class="notification-text small">192.168.1.5:50051 est hors ligne.</div>
                                                 <div class="notification-time small">Il y a 15 min</div>
                                             </div>
                                         </div>
                                     </a></li>
                                     <li><hr class="dropdown-divider"></li>
-                                    <li><a class="dropdown-item text-center" href="/notifications" data-i18n="see_all_notifications">Voir toutes les notifications</a></li>
+                                    <li><a class="dropdown-item text-center" href="/notifications" data-i18n="notifications.see_all">Voir toutes les notifications</a></li>
                                 </ul>
                             </li>
                             <li class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle" id="serverStatusDropdown" href="#" role="button"
                                    data-bs-toggle="dropdown" aria-expanded="false">
-                                   <i class="fas fa-server me-1"></i> <span data-i18n="cluster_status">État du cluster</span>
+                                   <i class="fas fa-server me-1"></i> <span data-i18n="servers.cluster_status">État du cluster</span>
                                 </a>
                                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="serverStatusDropdown">
-                                    <li><h6 class="dropdown-header" data-i18n="active_servers">Serveurs actifs</h6></li>
+                                    <li><h6 class="dropdown-header" data-i18n="servers.active">Serveurs actifs</h6></li>
                                     <li><a class="dropdown-item" href="/servers">
                                         <span class="status-indicator online me-2"></span>
                                         localhost:50051
@@ -191,7 +192,7 @@
                                         192.168.1.5:50051
                                     </a></li>
                                     <li><hr class="dropdown-divider"></li>
-                                    <li><a class="dropdown-item text-center" href="/servers" data-i18n="manage_servers">Gérer les serveurs</a></li>
+                                    <li><a class="dropdown-item text-center" href="/servers" data-i18n="servers.manage">Gérer les serveurs</a></li>
                                 </ul>
                             </li>
                             <li class="nav-item dropdown">
@@ -200,8 +201,8 @@
                                     <i class="fas fa-cogs"></i>
                                 </a>
                                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
-                                    <li><a class="dropdown-item" href="/settings" data-i18n="settings">Paramètres</a></li>
-                                    <li><a class="dropdown-item" href="/swagger" data-i18n="api_docs">Documentation API</a></li>
+                                    <li><a class="dropdown-item" href="/settings" data-i18n="nav.settings">Paramètres</a></li>
+                                    <li><a class="dropdown-item" href="/swagger" data-i18n="nav.swagger">Documentation API</a></li>
                                     <li><hr class="dropdown-divider"></li>
                                     <li><a class="dropdown-item" href="https://github.com/username/osync" target="_blank">GitHub</a></li>
                                 </ul>
@@ -218,8 +219,8 @@
                     <div id="notificationToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
                         <div class="toast-header">
                             <i class="fas fa-bell me-2"></i>
-                            <strong class="me-auto" id="toastTitle">Notification</strong>
-                            <small id="toastTime">À l'instant</small>
+                            <strong class="me-auto" id="toastTitle" data-i18n="notifications.title">Notification</strong>
+                            <small id="toastTime" data-i18n="notifications.just_now">À l'instant</small>
                             <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
                         </div>
                         <div class="toast-body" id="toastMessage">
@@ -237,7 +238,7 @@
                 <div class="container-fluid px-4">
                     <div class="d-flex align-items-center justify-content-between small">
                         <div>
-                            <span class="text-muted" data-i18n="copyright">Ollama Sync &copy; 2025</span>
+                            <span class="text-muted" data-i18n="app.copyright">Ollama Sync &copy; 2025</span>
                         </div>
                         <div>
                             <a href="https://github.com/username/osync" target="_blank">
@@ -255,9 +256,9 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     
     <!-- i18n translation scripts -->
+    <script src="{{ url_for('static', filename='js/i18n/i18n.js') }}"></script>
     <script src="{{ url_for('static', filename='js/i18n/en.js') }}"></script>
     <script src="{{ url_for('static', filename='js/i18n/fr.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/i18n/i18n.js') }}"></script>
     
     <!-- Main JS -->
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
@@ -280,8 +281,10 @@
                 document.getElementById('page-content-wrapper').classList.toggle('toggled');
                 
                 const isCollapsed = document.getElementById('sidebar-wrapper').classList.contains('toggled');
-                const collapseText = window.OllamaI18n ? 
-                    (isCollapsed ? window.OllamaI18n.translate('expand') : window.OllamaI18n.translate('collapse')) :
+                
+                // Utiliser le système I18n pour les textes
+                const collapseText = window.I18n ? 
+                    (isCollapsed ? window.I18n.t('sidebar.expand') : window.I18n.t('sidebar.collapse')) :
                     (isCollapsed ? 'Déplier' : 'Replier');
                 
                 toggleSidebarBtn.innerHTML = isCollapsed ? 
@@ -318,6 +321,48 @@
             
             // Listen for window resize
             window.addEventListener('resize', checkWidth);
+            
+            // Initialiser le sélecteur de langue
+            if (window.I18n) {
+                // Initialiser le système de traduction
+                window.I18n.init().then(() => {
+                    console.log('Système de traduction initialisé');
+                    
+                    // Remplir le sélecteur de langue
+                    const languageSelector = document.getElementById('language-selector');
+                    if (languageSelector) {
+                        // Vider d'abord le sélecteur
+                        languageSelector.innerHTML = '';
+                        
+                        // Ajouter les langues disponibles
+                        Object.keys(window.I18n.availableLanguages).forEach(langCode => {
+                            const langName = window.I18n.availableLanguages[langCode];
+                            const isActive = langCode === window.I18n.currentLanguage;
+                            
+                            const li = document.createElement('li');
+                            const a = document.createElement('a');
+                            a.className = `dropdown-item ${isActive ? 'active' : ''}`;
+                            a.href = '#';
+                            a.setAttribute('data-lang', langCode);
+                            a.innerHTML = `<span class="flag-icon flag-icon-${langCode === 'en' ? 'us' : langCode}"></span> ${langName}`;
+                            
+                            a.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                window.I18n.changeLanguage(langCode).then(() => {
+                                    // Mettre à jour l'UI après le changement de langue
+                                    document.querySelectorAll('#language-selector .dropdown-item').forEach(item => {
+                                        item.classList.remove('active');
+                                    });
+                                    this.classList.add('active');
+                                });
+                            });
+                            
+                            li.appendChild(a);
+                            languageSelector.appendChild(li);
+                        });
+                    }
+                });
+            }
         });
     </script>
     

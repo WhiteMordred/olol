@@ -1,40 +1,67 @@
 {% extends "base.html" %}
 
-{% block title %}Paramètres - Ollama Sync{% endblock %}
+{% block title %}<title data-i18n="settings.title">Paramètres - Ollama Sync</title>{% endblock %}
 
 {% block content %}
 <div class="row">
     <div class="col-lg-12">
-        <h2 class="mb-4 cyber-heading">Paramètres du Proxy</h2>
+        <h2 class="mb-4 cyber-heading" data-i18n="settings.title">Paramètres du Proxy</h2>
     </div>
 </div>
 
 <div class="row">
+    <!-- Interface & langue -->
     <div class="col-lg-6">
+        <div class="cyber-panel mb-4">
+            <div class="cyber-panel-header">
+                <i class="fas fa-language"></i> <span data-i18n="settings.language.title">Langue et Interface</span>
+            </div>
+            <div class="cyber-panel-body">
+                <form id="uiSettingsForm">
+                    <div class="mb-3">
+                        <label for="uiLanguage" class="form-label" data-i18n="settings.language.choose">Choisir la langue</label>
+                        <select class="cyber-input" id="uiLanguage">
+                            <option value="en">English</option>
+                            <option value="fr">Français</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="uiTheme" class="form-label" data-i18n="settings.theme.title">Thème</label>
+                        <select class="cyber-input" id="uiTheme">
+                            <option value="dark" data-i18n="settings.theme.dark">Sombre</option>
+                            <option value="light" data-i18n="settings.theme.light">Clair</option>
+                            <option value="system" data-i18n="settings.theme.system">Système par défaut</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="cyber-btn" data-i18n="action.save">Enregistrer</button>
+                </form>
+            </div>
+        </div>
+        
         <!-- Paramètres généraux -->
         <div class="cyber-panel mb-4">
             <div class="cyber-panel-header">
-                <i class="fas fa-cogs"></i> Paramètres généraux
+                <i class="fas fa-cogs"></i> <span data-i18n="settings.general.title">Paramètres généraux</span>
             </div>
             <div class="cyber-panel-body">
                 <form id="generalSettingsForm">
                     <div class="mb-3">
-                        <label for="healthCheckInterval" class="form-label">Intervalle des vérifications de santé (secondes)</label>
+                        <label for="healthCheckInterval" class="form-label" data-i18n="settings.health_check_interval">Intervalle des vérifications de santé (secondes)</label>
                         <input type="number" class="cyber-input" id="healthCheckInterval" value="30" min="5" max="600">
                     </div>
                     <div class="mb-3 form-check">
                         <input type="checkbox" class="form-check-input" id="autoDiscoveryEnabled" checked>
-                        <label class="form-check-label" for="autoDiscoveryEnabled">Activer la découverte automatique des serveurs</label>
+                        <label class="form-check-label" for="autoDiscoveryEnabled" data-i18n="settings.auto_discovery">Activer la découverte automatique des serveurs</label>
                     </div>
                     <div class="mb-3 form-check">
                         <input type="checkbox" class="form-check-input" id="enableDistributedInference">
-                        <label class="form-check-label" for="enableDistributedInference">Activer l'inférence distribuée</label>
+                        <label class="form-check-label" for="enableDistributedInference" data-i18n="settings.distributed_inference">Activer l'inférence distribuée</label>
                     </div>
                     <div class="mb-3 form-check">
                         <input type="checkbox" class="form-check-input" id="autoDistributeLarge">
-                        <label class="form-check-label" for="autoDistributeLarge">Distribution automatique des grands modèles</label>
+                        <label class="form-check-label" for="autoDistributeLarge" data-i18n="settings.auto_distribute">Distribution automatique des grands modèles</label>
                     </div>
-                    <button type="submit" class="cyber-btn">Enregistrer les changements</button>
+                    <button type="submit" class="cyber-btn" data-i18n="action.save">Enregistrer les changements</button>
                 </form>
             </div>
         </div>
@@ -44,28 +71,28 @@
         <!-- Options de journalisation -->
         <div class="cyber-panel mb-4">
             <div class="cyber-panel-header">
-                <i class="fas fa-file-alt"></i> Journalisation
+                <i class="fas fa-file-alt"></i> <span data-i18n="settings.logging.title">Journalisation</span>
             </div>
             <div class="cyber-panel-body">
                 <form id="loggingSettingsForm">
                     <div class="mb-3">
-                        <label for="logLevel" class="form-label">Niveau de journalisation</label>
+                        <label for="logLevel" class="form-label" data-i18n="settings.logging.level">Niveau de journalisation</label>
                         <select class="cyber-input" id="logLevel">
-                            <option value="error">Erreur</option>
-                            <option value="warning">Avertissement</option>
-                            <option value="info" selected>Information</option>
-                            <option value="debug">Débogage</option>
+                            <option value="error" data-i18n="settings.logging.error">Erreur</option>
+                            <option value="warning" data-i18n="settings.logging.warning">Avertissement</option>
+                            <option value="info" selected data-i18n="settings.logging.info">Information</option>
+                            <option value="debug" data-i18n="settings.logging.debug">Débogage</option>
                         </select>
                     </div>
                     <div class="mb-3 form-check">
                         <input type="checkbox" class="form-check-input" id="logToFile">
-                        <label class="form-check-label" for="logToFile">Journaliser dans un fichier</label>
+                        <label class="form-check-label" for="logToFile" data-i18n="settings.logging.to_file">Journaliser dans un fichier</label>
                     </div>
                     <div class="mb-3">
-                        <label for="logFilePath" class="form-label">Chemin du fichier journal</label>
+                        <label for="logFilePath" class="form-label" data-i18n="settings.logging.file_path">Chemin du fichier journal</label>
                         <input type="text" class="cyber-input" id="logFilePath" value="/var/log/osync-proxy.log" disabled>
                     </div>
-                    <button type="submit" class="cyber-btn">Appliquer</button>
+                    <button type="submit" class="cyber-btn" data-i18n="action.apply">Appliquer</button>
                 </form>
             </div>
         </div>
@@ -77,31 +104,31 @@
         <!-- Paramètres avancés -->
         <div class="cyber-panel mb-4">
             <div class="cyber-panel-header">
-                <i class="fas fa-sliders-h"></i> Paramètres avancés
+                <i class="fas fa-sliders-h"></i> <span data-i18n="settings.advanced.title">Paramètres avancés</span>
             </div>
             <div class="cyber-panel-body">
                 <form id="advancedSettingsForm">
                     <div class="mb-3">
-                        <label for="loadBalanceStrategy" class="form-label">Stratégie d'équilibrage de charge</label>
+                        <label for="loadBalanceStrategy" class="form-label" data-i18n="settings.advanced.load_strategy">Stratégie d'équilibrage de charge</label>
                         <select class="cyber-input" id="loadBalanceStrategy">
-                            <option value="round_robin">Round Robin</option>
-                            <option value="least_loaded" selected>Serveur le moins chargé</option>
-                            <option value="fastest_response">Réponse la plus rapide</option>
+                            <option value="round_robin" data-i18n="settings.advanced.round_robin">Round Robin</option>
+                            <option value="least_loaded" selected data-i18n="settings.advanced.least_loaded">Serveur le moins chargé</option>
+                            <option value="fastest_response" data-i18n="settings.advanced.fastest_response">Réponse la plus rapide</option>
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label for="modelPlacement" class="form-label">Stratégie de placement des modèles</label>
+                        <label for="modelPlacement" class="form-label" data-i18n="settings.advanced.model_placement">Stratégie de placement des modèles</label>
                         <select class="cyber-input" id="modelPlacement">
-                            <option value="memory_optimized" selected>Optimisé pour la mémoire</option>
-                            <option value="speed_optimized">Optimisé pour la vitesse</option>
-                            <option value="balanced">Équilibré</option>
+                            <option value="memory_optimized" selected data-i18n="settings.advanced.memory_optimized">Optimisé pour la mémoire</option>
+                            <option value="speed_optimized" data-i18n="settings.advanced.speed_optimized">Optimisé pour la vitesse</option>
+                            <option value="balanced" data-i18n="settings.advanced.balanced">Équilibré</option>
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label for="defaultTimeout" class="form-label">Délai d'attente par défaut (secondes)</label>
+                        <label for="defaultTimeout" class="form-label" data-i18n="settings.advanced.timeout">Délai d'attente par défaut (secondes)</label>
                         <input type="number" class="cyber-input" id="defaultTimeout" value="60" min="10" max="600">
                     </div>
-                    <button type="submit" class="cyber-btn">Enregistrer</button>
+                    <button type="submit" class="cyber-btn" data-i18n="action.save">Enregistrer</button>
                 </form>
             </div>
         </div>
@@ -109,21 +136,21 @@
         <!-- Actions et maintenance -->
         <div class="cyber-panel mb-4">
             <div class="cyber-panel-header">
-                <i class="fas fa-tools"></i> Actions de maintenance
+                <i class="fas fa-tools"></i> <span data-i18n="settings.maintenance.title">Actions de maintenance</span>
             </div>
             <div class="cyber-panel-body">
                 <div class="d-flex flex-wrap gap-3">
                     <button class="cyber-btn cyber-btn-warning" id="clearCacheBtn">
-                        <i class="fas fa-broom"></i> Nettoyer le cache
+                        <i class="fas fa-broom"></i> <span data-i18n="settings.maintenance.clear_cache">Nettoyer le cache</span>
                     </button>
                     <button class="cyber-btn cyber-btn-danger" id="resetConfigBtn">
-                        <i class="fas fa-undo"></i> Réinitialiser la configuration
+                        <i class="fas fa-undo"></i> <span data-i18n="settings.maintenance.reset">Réinitialiser la configuration</span>
                     </button>
                     <button class="cyber-btn cyber-btn-info" id="exportConfigBtn">
-                        <i class="fas fa-file-export"></i> Exporter la configuration
+                        <i class="fas fa-file-export"></i> <span data-i18n="settings.maintenance.export">Exporter la configuration</span>
                     </button>
                     <button class="cyber-btn" id="importConfigBtn">
-                        <i class="fas fa-file-import"></i> Importer une configuration
+                        <i class="fas fa-file-import"></i> <span data-i18n="settings.maintenance.import">Importer une configuration</span>
                     </button>
                 </div>
             </div>
@@ -135,8 +162,8 @@
 <div class="toast-container position-fixed bottom-0 end-0 p-3">
     <div id="settingsToast" class="cyber-toast" role="alert" aria-live="assertive" aria-atomic="true">
         <div class="cyber-toast-header">
-            <strong class="me-auto" id="toastTitle">Notification</strong>
-            <small id="toastTime">À l'instant</small>
+            <strong class="me-auto" id="toastTitle" data-i18n="notifications.title">Notification</strong>
+            <small id="toastTime" data-i18n="notifications.just_now">À l'instant</small>
             <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
         </div>
         <div class="cyber-toast-body" id="toastMessage"></div>
@@ -147,6 +174,14 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Initialiser la langue dans le sélecteur
+    if (window.I18n) {
+        const langSelect = document.getElementById('uiLanguage');
+        if (langSelect) {
+            langSelect.value = window.I18n.currentLanguage || 'en';
+        }
+    }
+    
     // Fonction pour afficher les toasts
     function showToast(title, message, type = 'info') {
         const toast = document.getElementById('settingsToast');
@@ -154,9 +189,16 @@ document.addEventListener('DOMContentLoaded', function() {
         const toastMessage = document.getElementById('toastMessage');
         const toastTime = document.getElementById('toastTime');
         
-        toastTitle.textContent = title;
-        toastMessage.textContent = message;
-        toastTime.textContent = 'À l\'instant';
+        // Utiliser I18n si disponible
+        if (window.I18n) {
+            toastTitle.textContent = title;
+            toastMessage.textContent = message;
+            toastTime.textContent = window.I18n.t('notifications.just_now');
+        } else {
+            toastTitle.textContent = title;
+            toastMessage.textContent = message;
+            toastTime.textContent = 'À l\'instant';
+        }
         
         toast.classList.remove('success', 'danger', 'warning', 'info');
         toast.classList.add(type);
@@ -164,6 +206,47 @@ document.addEventListener('DOMContentLoaded', function() {
         const bsToast = new bootstrap.Toast(toast);
         bsToast.show();
     }
+    
+    // Formulaire des paramètres d'interface
+    document.getElementById('uiSettingsForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const langSelect = document.getElementById('uiLanguage');
+        const selectedLang = langSelect.value;
+        
+        // Simuler la sauvegarde des paramètres
+        const submitBtn = this.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        
+        // Utiliser I18n pour le texte de chargement
+        if (window.I18n) {
+            submitBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${window.I18n.t('action.loading')}`;
+        } else {
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enregistrement...';
+        }
+        
+        // Changer la langue si I18n est disponible
+        if (window.I18n && selectedLang) {
+            window.I18n.changeLanguage(selectedLang).then(() => {
+                setTimeout(() => {
+                    submitBtn.innerHTML = originalText;
+                    submitBtn.disabled = false;
+                    
+                    // Messages de confirmation traduits
+                    const successTitle = window.I18n.t('settings.ui.title');
+                    const successMsg = window.I18n.t('settings.ui.saved');
+                    showToast(successTitle, successMsg, 'success');
+                }, 500);
+            });
+        } else {
+            setTimeout(() => {
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+                showToast('Paramètres d\'interface', 'Les paramètres d\'interface ont été enregistrés.', 'success');
+            }, 500);
+        }
+    });
     
     // Activer/désactiver le champ de chemin de fichier journal
     document.getElementById('logToFile').addEventListener('change', function() {
@@ -177,13 +260,29 @@ document.addEventListener('DOMContentLoaded', function() {
         // Simuler la sauvegarde des paramètres
         const submitBtn = this.querySelector('button[type="submit"]');
         const originalText = submitBtn.innerHTML;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enregistrement...';
         submitBtn.disabled = true;
+        
+        // Utiliser I18n pour le texte de chargement
+        if (window.I18n) {
+            submitBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${window.I18n.t('action.loading')}`;
+        } else {
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enregistrement...';
+        }
         
         setTimeout(() => {
             submitBtn.innerHTML = originalText;
             submitBtn.disabled = false;
-            showToast('Paramètres généraux', 'Les paramètres ont été enregistrés avec succès.', 'success');
+            
+            // Messages traduits si I18n est disponible
+            if (window.I18n) {
+                showToast(
+                    window.I18n.t('settings.general.title'),
+                    window.I18n.t('settings.saved_success'),
+                    'success'
+                );
+            } else {
+                showToast('Paramètres généraux', 'Les paramètres ont été enregistrés avec succès.', 'success');
+            }
         }, 500);
     });
     
@@ -194,13 +293,29 @@ document.addEventListener('DOMContentLoaded', function() {
         // Simuler la sauvegarde des paramètres
         const submitBtn = this.querySelector('button[type="submit"]');
         const originalText = submitBtn.innerHTML;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Application...';
         submitBtn.disabled = true;
+        
+        // Utiliser I18n pour le texte de chargement
+        if (window.I18n) {
+            submitBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${window.I18n.t('action.loading')}`;
+        } else {
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Application...';
+        }
         
         setTimeout(() => {
             submitBtn.innerHTML = originalText;
             submitBtn.disabled = false;
-            showToast('Options de journalisation', 'Les options de journalisation ont été mises à jour.', 'success');
+            
+            // Messages traduits si I18n est disponible
+            if (window.I18n) {
+                showToast(
+                    window.I18n.t('settings.logging.title'),
+                    window.I18n.t('settings.logging.saved'),
+                    'success'
+                );
+            } else {
+                showToast('Options de journalisation', 'Les options de journalisation ont été mises à jour.', 'success');
+            }
         }, 500);
     });
     
@@ -211,44 +326,102 @@ document.addEventListener('DOMContentLoaded', function() {
         // Simuler la sauvegarde des paramètres
         const submitBtn = this.querySelector('button[type="submit"]');
         const originalText = submitBtn.innerHTML;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enregistrement...';
         submitBtn.disabled = true;
+        
+        // Utiliser I18n pour le texte de chargement
+        if (window.I18n) {
+            submitBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${window.I18n.t('action.loading')}`;
+        } else {
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enregistrement...';
+        }
         
         setTimeout(() => {
             submitBtn.innerHTML = originalText;
             submitBtn.disabled = false;
-            showToast('Paramètres avancés', 'Les paramètres avancés ont été enregistrés avec succès.', 'success');
+            
+            // Messages traduits si I18n est disponible
+            if (window.I18n) {
+                showToast(
+                    window.I18n.t('settings.advanced.title'),
+                    window.I18n.t('settings.saved_success'),
+                    'success'
+                );
+            } else {
+                showToast('Paramètres avancés', 'Les paramètres avancés ont été enregistrés avec succès.', 'success');
+            }
         }, 500);
     });
     
     // Bouton de nettoyage du cache
     document.getElementById('clearCacheBtn').addEventListener('click', function() {
-        if (confirm('Êtes-vous sûr de vouloir nettoyer le cache ? Cette action peut affecter les performances temporairement.')) {
+        // Message de confirmation traduit
+        const confirmMsg = window.I18n ? 
+            window.I18n.t('settings.maintenance.clear_cache_confirm') : 
+            'Êtes-vous sûr de vouloir nettoyer le cache ? Cette action peut affecter les performances temporairement.';
+        
+        if (confirm(confirmMsg)) {
             // Simuler le nettoyage du cache
             const originalText = this.innerHTML;
-            this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Nettoyage...';
             this.disabled = true;
+            
+            // Texte de chargement traduit
+            if (window.I18n) {
+                this.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${window.I18n.t('settings.maintenance.clearing')}`;
+            } else {
+                this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Nettoyage...';
+            }
             
             setTimeout(() => {
                 this.innerHTML = originalText;
                 this.disabled = false;
-                showToast('Maintenance', 'Le cache a été nettoyé avec succès.', 'success');
+                
+                // Messages traduits si I18n est disponible
+                if (window.I18n) {
+                    showToast(
+                        window.I18n.t('settings.maintenance.title'),
+                        window.I18n.t('settings.maintenance.cache_cleared'),
+                        'success'
+                    );
+                } else {
+                    showToast('Maintenance', 'Le cache a été nettoyé avec succès.', 'success');
+                }
             }, 2000);
         }
     });
     
     // Bouton de réinitialisation de la configuration
     document.getElementById('resetConfigBtn').addEventListener('click', function() {
-        if (confirm('Êtes-vous sûr de vouloir réinitialiser la configuration ? Toutes vos modifications seront perdues.')) {
+        // Message de confirmation traduit
+        const confirmMsg = window.I18n ? 
+            window.I18n.t('settings.maintenance.reset_confirm') : 
+            'Êtes-vous sûr de vouloir réinitialiser la configuration ? Toutes vos modifications seront perdues.';
+        
+        if (confirm(confirmMsg)) {
             // Simuler la réinitialisation
             const originalText = this.innerHTML;
-            this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Réinitialisation...';
             this.disabled = true;
+            
+            // Texte de chargement traduit
+            if (window.I18n) {
+                this.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${window.I18n.t('settings.maintenance.resetting')}`;
+            } else {
+                this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Réinitialisation...';
+            }
             
             setTimeout(() => {
                 this.innerHTML = originalText;
                 this.disabled = false;
-                showToast('Maintenance', 'La configuration a été réinitialisée.', 'success');
+                
+                // Messages traduits si I18n est disponible
+                if (window.I18n) {
+                    showToast(
+                        window.I18n.t('settings.maintenance.title'),
+                        window.I18n.t('settings.maintenance.reset_success'),
+                        'success'
+                    );
+                } else {
+                    showToast('Maintenance', 'La configuration a été réinitialisée.', 'success');
+                }
                 
                 // Recharger la page pour afficher les valeurs par défaut
                 setTimeout(() => {
@@ -262,13 +435,29 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('exportConfigBtn').addEventListener('click', function() {
         // Simuler l'exportation
         const originalText = this.innerHTML;
-        this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exportation...';
         this.disabled = true;
+        
+        // Texte de chargement traduit
+        if (window.I18n) {
+            this.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${window.I18n.t('settings.maintenance.exporting')}`;
+        } else {
+            this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exportation...';
+        }
         
         setTimeout(() => {
             this.innerHTML = originalText;
             this.disabled = false;
-            showToast('Exportation', 'La configuration a été exportée avec succès.', 'success');
+            
+            // Messages traduits si I18n est disponible
+            if (window.I18n) {
+                showToast(
+                    window.I18n.t('settings.maintenance.export_title'),
+                    window.I18n.t('settings.maintenance.export_success'),
+                    'success'
+                );
+            } else {
+                showToast('Exportation', 'La configuration a été exportée avec succès.', 'success');
+            }
             
             // Simuler un téléchargement
             const link = document.createElement('a');
@@ -288,6 +477,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     loadBalanceStrategy: 'least_loaded',
                     modelPlacement: 'memory_optimized',
                     defaultTimeout: 60
+                },
+                ui: {
+                    language: window.I18n ? window.I18n.currentLanguage : 'fr',
+                    theme: 'dark'
                 }
             }, null, 2));
             link.download = 'osync-proxy-config.json';
@@ -297,14 +490,29 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Bouton d'importation de la configuration
     document.getElementById('importConfigBtn').addEventListener('click', function() {
-        // Dans une implémentation réelle, on créerait un input file caché
-        // et on déclencherait un clic dessus, mais pour cette démo on va juste
-        // simuler une importation réussie
-        showToast('Importation', 'Veuillez sélectionner un fichier de configuration à importer.', 'info');
+        // Messages traduits si I18n est disponible
+        if (window.I18n) {
+            showToast(
+                window.I18n.t('settings.maintenance.import_title'),
+                window.I18n.t('settings.maintenance.import_select'),
+                'info'
+            );
+        } else {
+            showToast('Importation', 'Veuillez sélectionner un fichier de configuration à importer.', 'info');
+        }
         
         // Simuler une importation réussie après un délai
         setTimeout(() => {
-            showToast('Importation', 'La configuration a été importée avec succès. La page va se recharger.', 'success');
+            // Messages traduits si I18n est disponible
+            if (window.I18n) {
+                showToast(
+                    window.I18n.t('settings.maintenance.import_title'),
+                    window.I18n.t('settings.maintenance.import_success'),
+                    'success'
+                );
+            } else {
+                showToast('Importation', 'La configuration a été importée avec succès. La page va se recharger.', 'success');
+            }
             
             // Simuler un rechargement de page
             setTimeout(() => {

@@ -2,158 +2,204 @@
  * Ollama Sync - English translations
  */
 
-// Register translations in the I18n system
-window.I18n.translations.en = {
-    // Common elements
-    "app.name": "Ollama Sync",
-    "app.description": "Load balancing and synchronization for Ollama",
-    "nav.dashboard": "Dashboard",
-    "nav.models": "Models",
-    "nav.servers": "Servers",
-    "nav.health": "Health",
-    "nav.queue": "Queue",
-    "nav.settings": "Settings",
-    "nav.terminal": "Terminal",
-    "nav.swagger": "API Docs",
-    "nav.playground": "Playground",
+// English translations
+window.I18n = window.I18n || {};
+window.I18n.translations = window.I18n.translations || {};
+
+window.I18n.translations['en'] = {
+    // Application general
+    "app": {
+        "name": "Ollama Sync",
+        "copyright": "Ollama Sync © 2025",
+        "version": "Version 1.0.0"
+    },
     
-    // Buttons & actions
-    "action.save": "Save",
-    "action.cancel": "Cancel",
-    "action.add": "Add",
-    "action.remove": "Remove",
-    "action.edit": "Edit",
-    "action.delete": "Delete",
-    "action.refresh": "Refresh",
-    "action.search": "Search",
-    "action.confirm": "Confirm",
-    "action.loading": "Loading...",
-    "action.send": "Send",
-    "action.clear": "Clear",
-    "action.retry": "Retry",
-    "action.start": "Start",
-    "action.stop": "Stop",
-    "action.restart": "Restart",
+    // Navigation
+    "nav": {
+        "dashboard": "Dashboard",
+        "models": "Models",
+        "servers": "Servers",
+        "health": "Health",
+        "queue": "Queue",
+        "settings": "Settings",
+        "playground": "Playground",
+        "terminal": "Terminal",
+        "swagger": "API Docs",
+        "api_documentation": "API Documentation",
+        "language": "Language"
+    },
+    
+    // Notifications
+    "notifications": {
+        "title": "Notifications",
+        "new_server": "New Server Detected",
+        "server_offline": "Server Offline",
+        "high_load": "High Load",
+        "model_downloaded": "Model Downloaded",
+        "just_now": "Just now",
+        "see_all": "See All Notifications"
+    },
     
     // Dashboard
-    "dashboard.title": "Dashboard",
-    "dashboard.models.count": "Total Models",
-    "dashboard.servers.count": "Active Servers",
-    "dashboard.servers.load": "Server Load",
-    "dashboard.queue.length": "Queue Length",
-    "dashboard.status.title": "System Status",
-    "dashboard.status.healthy": "Healthy",
-    "dashboard.status.degraded": "Degraded",
-    "dashboard.status.error": "Error",
-    "dashboard.models.recent": "Recent Models",
+    "dashboard": {
+        "title": "System Dashboard",
+        "system_stats": "System Statistics",
+        "active_servers": "Active Servers",
+        "total_models": "Total Models",
+        "active_requests": "Active Requests",
+        "request_rate": "Request Rate",
+        "cpu_usage": "CPU Usage",
+        "memory_usage": "Memory Usage",
+        "disk_usage": "Disk Usage",
+        "network_usage": "Network Usage",
+        "recent_activity": "Recent Activity",
+        "quick_actions": "Quick Actions"
+    },
     
-    // Models page
-    "models.title": "Models Management",
-    "models.table.name": "Name",
-    "models.table.size": "Size",
-    "models.table.modified": "Modified",
-    "models.table.servers": "Available On",
-    "models.table.actions": "Actions",
-    "models.filter.placeholder": "Filter models...",
-    "models.add.title": "Add New Model",
-    "models.add.name": "Model Name",
-    "models.add.server": "Target Server",
-    "models.add.file": "Model File",
-    "models.add.submit": "Add Model",
-    "models.pull.title": "Pull Model",
-    "models.delete.confirm": "Are you sure you want to delete this model?",
-    "models.delete.warning": "This will remove the model from all servers.",
+    // Models
+    "models": {
+        "title": "Models Management",
+        "available_models": "Available Models",
+        "model_name": "Model Name",
+        "size": "Size",
+        "modified": "Modified",
+        "quantization": "Quantization",
+        "download": "Download",
+        "delete": "Delete",
+        "pull": "Pull Model",
+        "model_details": "Model Details",
+        "parameters": "Parameters",
+        "server_location": "Server Location",
+        "loading": "Loading models..."
+    },
     
-    // Servers page
-    "servers.title": "Servers Management",
-    "servers.table.name": "Name",
-    "servers.table.url": "URL",
-    "servers.table.status": "Status",
-    "servers.table.load": "Load",
-    "servers.table.models": "Models Count",
-    "servers.table.actions": "Actions",
-    "servers.status.online": "Online",
-    "servers.status.offline": "Offline",
-    "servers.status.degraded": "Degraded",
-    "servers.add.title": "Add New Server",
-    "servers.add.name": "Server Name",
-    "servers.add.url": "Server URL",
-    "servers.add.submit": "Add Server",
-    "servers.edit.title": "Edit Server",
-    "servers.delete.confirm": "Are you sure you want to remove this server?",
+    // Servers
+    "servers": {
+        "title": "Server Management",
+        "available_servers": "Available Servers",
+        "hostname": "Hostname",
+        "address": "Address",
+        "status": "Status",
+        "load": "Load",
+        "online": "Online",
+        "offline": "Offline",
+        "add_server": "Add Server",
+        "remove": "Remove",
+        "server_details": "Server Details",
+        "uptime": "Uptime",
+        "cpu": "CPU",
+        "memory": "Memory",
+        "models_hosted": "Models Hosted"
+    },
     
-    // Health page
-    "health.title": "System Health",
-    "health.system.title": "System Status",
-    "health.system.cpu": "CPU Usage",
-    "health.system.memory": "Memory Usage",
-    "health.system.disk": "Disk Usage",
-    "health.servers.title": "Servers Health",
-    "health.servers.response": "Response Time",
-    "health.servers.status": "Status Code",
-    "health.history.title": "Health History",
-    "health.refresh.auto": "Auto Refresh",
+    // Health
+    "health": {
+        "title": "System Health",
+        "system_status": "System Status",
+        "server_status": "Server Status",
+        "response_time": "Response Time",
+        "uptime": "Uptime",
+        "last_checked": "Last Checked",
+        "healthy": "Healthy",
+        "degraded": "Degraded",
+        "unhealthy": "Unhealthy",
+        "check_now": "Check Now"
+    },
     
-    // Queue page
-    "queue.title": "Inference Queue",
-    "queue.table.id": "ID",
-    "queue.table.model": "Model",
-    "queue.table.status": "Status",
-    "queue.table.created": "Created",
-    "queue.table.server": "Server",
-    "queue.table.actions": "Actions",
-    "queue.status.pending": "Pending",
-    "queue.status.running": "Running",
-    "queue.status.completed": "Completed",
-    "queue.status.failed": "Failed",
-    "queue.clear.title": "Clear Queue",
-    "queue.clear.confirm": "Are you sure you want to clear all pending jobs?",
+    // Settings
+    "settings": {
+        "title": "System Settings",
+        "general": "General",
+        "appearance": "Appearance",
+        "network": "Network",
+        "language": "Language",
+        "language_selector": "Language Selection",
+        "current_language": "Current Language",
+        "theme": "Theme",
+        "dark_mode": "Dark Mode",
+        "light_mode": "Light Mode",
+        "auto_discovery": "Auto Discovery",
+        "save": "Save Changes",
+        "reset": "Reset to Defaults",
+        "enable": "Enable",
+        "disable": "Disable"
+    },
     
-    // Settings page
-    "settings.title": "System Settings",
-    "settings.language.title": "Language",
-    "settings.language.choose": "Choose language",
-    "settings.theme.title": "Theme",
-    "settings.theme.light": "Light",
-    "settings.theme.dark": "Dark",
-    "settings.theme.system": "System Default",
-    "settings.backup.title": "Database Backup",
-    "settings.backup.create": "Create Backup",
-    "settings.backup.restore": "Restore Backup",
-    "settings.backup.success": "Backup created successfully",
-    "settings.backup.error": "Failed to create backup",
-    "settings.sync.title": "Sync Settings",
-    "settings.sync.interval": "Auto-sync interval (seconds)",
-    "settings.sync.save": "Save Settings",
-    "settings.sync.force": "Force Sync Now",
-    
-    // Terminal page
-    "terminal.title": "Terminal Console",
-    "terminal.placeholder": "Enter command...",
-    "terminal.history": "Command History",
-    "terminal.clear": "Clear Terminal",
+    // Queue
+    "queue": {
+        "title": "Request Queue",
+        "current_queue": "Current Queue",
+        "request_id": "Request ID",
+        "model": "Model",
+        "timestamp": "Timestamp",
+        "status": "Status",
+        "action": "Action",
+        "pending": "Pending",
+        "processing": "Processing",
+        "completed": "Completed",
+        "failed": "Failed",
+        "cancel": "Cancel",
+        "retry": "Retry"
+    },
     
     // Playground
-    "playground.title": "LLM Playground",
-    "playground.model": "Select Model",
-    "playground.temperature": "Temperature",
-    "playground.max_tokens": "Max Tokens",
-    "playground.system_prompt": "System Prompt",
-    "playground.user_prompt": "Enter your message...",
-    "playground.response": "Model Response",
-    "playground.save": "Save Conversation",
-    "playground.reset": "Reset",
+    "playground": {
+        "title": "Model Playground",
+        "select_model": "Select Model",
+        "parameters": "Parameters",
+        "temperature": "Temperature",
+        "max_tokens": "Max Tokens",
+        "top_p": "Top P",
+        "prompt": "Enter your prompt here...",
+        "generate": "Generate",
+        "stop": "Stop",
+        "response": "Response",
+        "copy": "Copy",
+        "clear": "Clear",
+        "save": "Save"
+    },
     
-    // Errors & notifications
-    "error.generic": "An error occurred",
-    "error.connection": "Connection error",
-    "error.server_unreachable": "Server unreachable",
-    "error.invalid_input": "Invalid input",
-    "error.required_field": "This field is required",
-    "error.invalid_url": "Invalid URL format",
-    "error.load_failed": "Failed to load data",
-    "error.save_failed": "Failed to save changes",
-    "success.saved": "Changes saved successfully",
-    "success.added": "Successfully added",
-    "success.deleted": "Successfully deleted"
+    // Terminal
+    "terminal": {
+        "title": "Terminal Interface",
+        "welcome": "Welcome to Ollama Sync Terminal",
+        "help": "Type 'help' for a list of commands",
+        "command": "Command",
+        "output": "Output",
+        "clear": "Clear Terminal"
+    },
+    
+    // Common actions/buttons
+    "actions": {
+        "add": "Add",
+        "edit": "Edit",
+        "delete": "Delete",
+        "cancel": "Cancel",
+        "save": "Save",
+        "refresh": "Refresh",
+        "close": "Close",
+        "confirm": "Confirm",
+        "back": "Back",
+        "next": "Next"
+    },
+    
+    // Errors and states
+    "states": {
+        "loading": "Loading...",
+        "error": "Error",
+        "success": "Success",
+        "warning": "Warning",
+        "info": "Information"
+    },
+    
+    // API documentation
+    "api": {
+        "title": "API Documentation",
+        "description": "Interactive API documentation for Ollama Sync",
+        "endpoints": "Endpoints",
+        "models": "Models",
+        "try_it": "Try It",
+        "response": "Response",
+        "status": "Status"
+    }
 };
