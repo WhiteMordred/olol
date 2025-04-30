@@ -87,9 +87,15 @@ const OLOL = {
                     break;
             }
             
-            toastTitle.innerHTML = `<i class="fas fa-${icon} me-1 ${colorClass}"></i> ${title}`;
+            // Utiliser le système de traduction pour les titres standards
+            let translatedTitle = title;
+            if (window.I18n && ['success', 'error', 'warning', 'info'].includes(title.toLowerCase())) {
+                translatedTitle = window.I18n.t(title.toLowerCase());
+            }
+            
+            toastTitle.innerHTML = `<i class="fas fa-${icon} me-1 ${colorClass}"></i> ${translatedTitle}`;
             toastMessage.textContent = message;
-            toastTime.textContent = 'À l\'instant';
+            toastTime.textContent = window.I18n ? window.I18n.t('just_now') : 'À l\'instant';
             
             // Initialiser et afficher le toast
             const toastInstance = new bootstrap.Toast(toast);
@@ -138,13 +144,18 @@ const OLOL = {
             
             if (this.classList.contains('active')) {
                 // Activer l'actualisation automatique
-                this.innerHTML = '<i class="fas fa-sync-alt fa-spin me-2"></i>Auto (ON)';
+                const autoOnText = window.I18n ? window.I18n.t('auto_refresh_on') : 'Auto (ON)';
+                this.innerHTML = '<i class="fas fa-sync-alt fa-spin me-2"></i>' + autoOnText;
                 callback(); // Actualiser immédiatement
                 refreshInterval = setInterval(callback, interval);
-                OLOL.showToast('Actualisation automatique', 'L\'actualisation automatique est activée', 'info');
+                
+                const autoRefreshTitle = window.I18n ? window.I18n.t('auto_refresh') : 'Actualisation automatique';
+                const autoRefreshMsg = window.I18n ? window.I18n.t('auto_refresh_enabled') : 'L\'actualisation automatique est activée';
+                OLOL.showToast(autoRefreshTitle, autoRefreshMsg, 'info');
             } else {
                 // Désactiver l'actualisation automatique
-                this.innerHTML = '<i class="fas fa-sync-alt me-2"></i>Auto (OFF)';
+                const autoOffText = window.I18n ? window.I18n.t('auto_refresh_off') : 'Auto (OFF)';
+                this.innerHTML = '<i class="fas fa-sync-alt me-2"></i>' + autoOffText;
                 clearInterval(refreshInterval);
             }
         });
@@ -291,7 +302,10 @@ const OLOL = {
         // Options par défaut pour le thème sombre
         const defaultOptions = {
             language: {
-                url: '//cdn.datatables.net/plug-ins/1.11.5/i18n/fr-FR.json'
+                // Utiliser la langue courante du système de traduction
+                url: window.I18n?.currentLanguage === 'fr' 
+                    ? '//cdn.datatables.net/plug-ins/1.11.5/i18n/fr-FR.json'
+                    : '//cdn.datatables.net/plug-ins/1.11.5/i18n/en-GB.json'
             },
             pageLength: 10,
             lengthMenu: [5, 10, 25, 50],
@@ -320,6 +334,9 @@ const OLOL = {
     }
 };
 
+// Exposer la fonction showToast globalement pour le système de traduction
+window.showToast = OLOL.showToast;
+
 // Initialisation au chargement du document
 document.addEventListener('DOMContentLoaded', function() {
     // Appliquer des styles spécifiques au thème sombre aux éléments interactifs
@@ -331,5 +348,90 @@ document.addEventListener('DOMContentLoaded', function() {
     var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
     var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
         return new bootstrap.Tooltip(tooltipTriggerEl)
+    });
+    
+    // Gestionnaire de changement de langue
+    function setupLanguageSwitcher() {
+        const langSwitcher = document.getElementById('languageSwitcher');
+        
+        if (langSwitcher && window.I18n) {
+            // Mise à jour de l'affichage du sélecteur de langue
+            const currentLangText = langSwitcher.querySelector('.current-language');
+            if (currentLangText) {
+                currentLangText.textContent = window.I18n.availableLanguages[window.I18n.currentLanguage];
+            }
+            
+            // Ajouter des écouteurs d'événements aux options de langue
+            const langOptions = langSwitcher.querySelectorAll('.dropdown-item[data-lang]');
+            langOptions.forEach(option => {
+                const lang = option.getAttribute('data-lang');
+                option.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    // Changer la langue
+                    window.I18n.changeLanguage(lang).then(() => {
+                        // Notifier l'utilisateur
+                        const langChangedTitle = window.I18n.t('language_changed');
+                        const langChangedMsg = window.I18n.t('language_changed_message');
+                        OLOL.showToast(langChangedTitle, langChangedMsg, 'success');
+                        
+                        // Mise à jour de l'affichage du sélecteur
+                        if (currentLangText) {
+                            currentLangText.textContent = window.I18n.availableLanguages[lang];
+                        }
+                        
+                        // Déclencher un événement pour que d'autres composants puissent réagir
+                        window.dispatchEvent(new CustomEvent('languageChanged', {
+                            detail: { language: lang }
+                        }));
+                    });
+                });
+            });
+        }
+    }
+    
+    // Initialiser le système de traduction et le sélecteur de langue
+    if (window.I18n) {
+        window.I18n.init().then(() => {
+            setupLanguageSwitcher();
+            
+            // Ajouter just_now à tous les dictionnaires si nécessaire
+            if (!window.I18n.translations.fr.just_now) {
+                window.I18n.translations.fr.just_now = "À l'instant";
+            }
+            if (!window.I18n.translations.en.just_now) {
+                window.I18n.translations.en.just_now = "Just now";
+            }
+            
+            // Ajouter les traductions pour l'auto-refresh si elles n'existent pas
+            if (!window.I18n.translations.fr.auto_refresh) {
+                window.I18n.translations.fr.auto_refresh = "Actualisation automatique";
+                window.I18n.translations.fr.auto_refresh_enabled = "L'actualisation automatique est activée";
+                window.I18n.translations.fr.auto_refresh_on = "Auto (ON)";
+                window.I18n.translations.fr.auto_refresh_off = "Auto (OFF)";
+            }
+            if (!window.I18n.translations.en.auto_refresh) {
+                window.I18n.translations.en.auto_refresh = "Auto Refresh";
+                window.I18n.translations.en.auto_refresh_enabled = "Auto refresh is enabled";
+                window.I18n.translations.en.auto_refresh_on = "Auto (ON)";
+                window.I18n.translations.en.auto_refresh_off = "Auto (OFF)";
+            }
+            
+            // Ajouter les traductions pour le changement de langue si elles n'existent pas
+            if (!window.I18n.translations.fr.language_changed_message) {
+                window.I18n.translations.fr.language_changed_message = "La langue a été changée avec succès";
+            }
+            if (!window.I18n.translations.en.language_changed_message) {
+                window.I18n.translations.en.language_changed_message = "Language has been changed successfully";
+            }
+        });
+    }
+    
+    // Écouter les changements de langue pour mettre à jour les DataTables
+    window.addEventListener('i18n:languageChanged', function(e) {
+        // Recharger la page après un court délai pour que l'utilisateur voie le toast
+        setTimeout(() => {
+            window.location.reload();
+        }, 1000);
     });
 });

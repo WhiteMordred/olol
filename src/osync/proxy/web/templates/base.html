@@ -29,44 +29,44 @@
             <div class="list-group list-group-flush">
                 <a href="/" class="list-group-item list-group-item-action py-3 {% if request.path == '/' %}active{% endif %}">
                     <i class="fas fa-tachometer-alt fa-fw me-2"></i>
-                    <span class="d-none d-sm-inline">Tableau de bord</span>
+                    <span class="d-none d-sm-inline" data-i18n="dashboard">Tableau de bord</span>
                 </a>
                 <a href="/servers" class="list-group-item list-group-item-action py-3 {% if request.path == '/servers' %}active{% endif %}">
                     <i class="fas fa-server fa-fw me-2"></i>
-                    <span class="d-none d-sm-inline">Serveurs</span>
+                    <span class="d-none d-sm-inline" data-i18n="servers">Serveurs</span>
                 </a>
                 <a href="/models" class="list-group-item list-group-item-action py-3 {% if request.path == '/models' %}active{% endif %}">
                     <i class="fas fa-brain fa-fw me-2"></i>
-                    <span class="d-none d-sm-inline">Modèles</span>
+                    <span class="d-none d-sm-inline" data-i18n="models">Modèles</span>
                 </a>
                 <a href="/queue" class="list-group-item list-group-item-action py-3 {% if request.path == '/queue' %}active{% endif %}">
                     <i class="fas fa-tasks fa-fw me-2"></i>
-                    <span class="d-none d-sm-inline">File d'attente</span>
+                    <span class="d-none d-sm-inline" data-i18n="queue">File d'attente</span>
                 </a>
                 <a href="/playground" class="list-group-item list-group-item-action py-3 {% if request.path == '/playground' %}active{% endif %}">
                     <i class="fas fa-play-circle fa-fw me-2"></i>
-                    <span class="d-none d-sm-inline">Playground</span>
+                    <span class="d-none d-sm-inline" data-i18n="playground">Playground</span>
                 </a>
                 <a href="/health" class="list-group-item list-group-item-action py-3 {% if request.path == '/health' %}active{% endif %}">
                     <i class="fas fa-heartbeat fa-fw me-2"></i>
-                    <span class="d-none d-sm-inline">Santé</span>
+                    <span class="d-none d-sm-inline" data-i18n="health">Santé</span>
                 </a>
                 <a href="/log" class="list-group-item list-group-item-action py-3 {% if request.path == '/log' %}active{% endif %}">
                     <i class="fas fa-clipboard-list fa-fw me-2"></i>
-                    <span class="d-none d-sm-inline">Journaux</span>
+                    <span class="d-none d-sm-inline" data-i18n="logs">Journaux</span>
                 </a>
                 <a href="/terminal" class="list-group-item list-group-item-action py-3 {% if request.path == '/terminal' %}active{% endif %}">
                     <i class="fas fa-terminal fa-fw me-2"></i>
-                    <span class="d-none d-sm-inline">Terminal</span>
+                    <span class="d-none d-sm-inline" data-i18n="terminal">Terminal</span>
                 </a>
                 <a href="/settings" class="list-group-item list-group-item-action py-3 {% if request.path == '/settings' %}active{% endif %}">
                     <i class="fas fa-cogs fa-fw me-2"></i>
-                    <span class="d-none d-sm-inline">Paramètres</span>
+                    <span class="d-none d-sm-inline" data-i18n="settings">Paramètres</span>
                 </a>
                 <div class="sidebar-divider"></div>
                 <a href="/swagger" class="list-group-item list-group-item-action py-3 {% if request.path == '/swagger' %}active{% endif %}">
                     <i class="fas fa-book fa-fw me-2"></i>
-                    <span class="d-none d-sm-inline">API Swagger</span>
+                    <span class="d-none d-sm-inline" data-i18n="api_docs">API Swagger</span>
                 </a>
             </div>
             <!-- Sidebar Footer with Status -->
@@ -74,7 +74,7 @@
                 <div class="d-flex justify-content-between px-3 py-2 align-items-center">
                     <div class="server-status">
                         <span class="status-indicator online"></span>
-                        <span class="d-none d-sm-inline small">Proxy actif</span>
+                        <span class="d-none d-sm-inline small" data-i18n="proxy_active">Proxy actif</span>
                     </div>
                     <div class="dropdown">
                         <button class="btn btn-sm btn-link text-light dropdown-toggle" type="button" id="dropdownMenuButton1"
@@ -83,14 +83,14 @@
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdownMenuButton1">
                             <li><a class="dropdown-item" href="#" id="toggleSidebarBtn">
-                                <i class="fas fa-angle-left me-2"></i> Replier
+                                <i class="fas fa-angle-left me-2"></i> <span data-i18n="collapse">Replier</span>
                             </a></li>
                             <li><a class="dropdown-item" href="/settings">
-                                <i class="fas fa-cogs me-2"></i> Paramètres
+                                <i class="fas fa-cogs me-2"></i> <span data-i18n="settings">Paramètres</span>
                             </a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="/swagger">
-                                <i class="fas fa-book me-2"></i> Documentation API
+                                <i class="fas fa-book me-2"></i> <span data-i18n="api_docs">Documentation API</span>
                             </a></li>
                         </ul>
                     </div>
@@ -113,6 +113,16 @@
                     </button>
                     <div class="collapse navbar-collapse" id="navbarSupportedContent">
                         <ul class="navbar-nav ms-auto">
+                            <!-- Sélecteur de langue -->
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" role="button"
+                                   data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="fas fa-language"></i> <span class="d-none d-md-inline" data-i18n="language">Langue</span>
+                                </a>
+                                <ul class="dropdown-menu dropdown-menu-end" id="language-selector">
+                                    <!-- Rempli dynamiquement par le JS -->
+                                </ul>
+                            </li>
                             <li class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle" id="notificationsDropdown" href="#" role="button"
                                    data-bs-toggle="dropdown" aria-expanded="false">
@@ -120,14 +130,14 @@
                                     <span class="notification-badge">3</span>
                                 </a>
                                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="notificationsDropdown">
-                                    <li><h6 class="dropdown-header">Notifications</h6></li>
+                                    <li><h6 class="dropdown-header" data-i18n="notifications">Notifications</h6></li>
                                     <li><a class="dropdown-item" href="#">
                                         <div class="notification-item">
                                             <div class="notification-icon text-success">
                                                 <i class="fas fa-check-circle"></i>
                                             </div>
                                             <div class="notification-content">
-                                                <div class="notification-title">Nouveau serveur détecté</div>
+                                                <div class="notification-title" data-i18n="new_server_detected">Nouveau serveur détecté</div>
                                                 <div class="notification-text small">localhost:50051 est en ligne.</div>
                                                 <div class="notification-time small">Il y a 5 min</div>
                                             </div>
@@ -139,7 +149,7 @@
                                                 <i class="fas fa-exclamation-circle"></i>
                                             </div>
                                             <div class="notification-content">
-                                                <div class="notification-title">Charge élevée</div>
+                                                <div class="notification-title" data-i18n="high_load">Charge élevée</div>
                                                 <div class="notification-text small">Le serveur srv2 a une charge > 80%</div>
                                                 <div class="notification-time small">Il y a 10 min</div>
                                             </div>
@@ -151,23 +161,23 @@
                                                 <i class="fas fa-times-circle"></i>
                                             </div>
                                             <div class="notification-content">
-                                                <div class="notification-title">Serveur hors ligne</div>
+                                                <div class="notification-title" data-i18n="server_offline">Serveur hors ligne</div>
                                                 <div class="notification-text small">192.168.1.5:50051 est hors ligne.</div>
                                                 <div class="notification-time small">Il y a 15 min</div>
                                             </div>
                                         </div>
                                     </a></li>
                                     <li><hr class="dropdown-divider"></li>
-                                    <li><a class="dropdown-item text-center" href="/notifications">Voir toutes les notifications</a></li>
+                                    <li><a class="dropdown-item text-center" href="/notifications" data-i18n="see_all_notifications">Voir toutes les notifications</a></li>
                                 </ul>
                             </li>
                             <li class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle" id="serverStatusDropdown" href="#" role="button"
                                    data-bs-toggle="dropdown" aria-expanded="false">
-                                   <i class="fas fa-server me-1"></i> État du cluster
+                                   <i class="fas fa-server me-1"></i> <span data-i18n="cluster_status">État du cluster</span>
                                 </a>
                                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="serverStatusDropdown">
-                                    <li><h6 class="dropdown-header">Serveurs actifs</h6></li>
+                                    <li><h6 class="dropdown-header" data-i18n="active_servers">Serveurs actifs</h6></li>
                                     <li><a class="dropdown-item" href="/servers">
                                         <span class="status-indicator online me-2"></span>
                                         localhost:50051
@@ -181,7 +191,7 @@
                                         192.168.1.5:50051
                                     </a></li>
                                     <li><hr class="dropdown-divider"></li>
-                                    <li><a class="dropdown-item text-center" href="/servers">Gérer les serveurs</a></li>
+                                    <li><a class="dropdown-item text-center" href="/servers" data-i18n="manage_servers">Gérer les serveurs</a></li>
                                 </ul>
                             </li>
                             <li class="nav-item dropdown">
@@ -190,8 +200,8 @@
                                     <i class="fas fa-cogs"></i>
                                 </a>
                                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
-                                    <li><a class="dropdown-item" href="/settings">Paramètres</a></li>
-                                    <li><a class="dropdown-item" href="/swagger">Documentation API</a></li>
+                                    <li><a class="dropdown-item" href="/settings" data-i18n="settings">Paramètres</a></li>
+                                    <li><a class="dropdown-item" href="/swagger" data-i18n="api_docs">Documentation API</a></li>
                                     <li><hr class="dropdown-divider"></li>
                                     <li><a class="dropdown-item" href="https://github.com/username/osync" target="_blank">GitHub</a></li>
                                 </ul>
@@ -227,7 +237,7 @@
                 <div class="container-fluid px-4">
                     <div class="d-flex align-items-center justify-content-between small">
                         <div>
-                            <span class="text-muted">Ollama Sync &copy; 2025</span>
+                            <span class="text-muted" data-i18n="copyright">Ollama Sync &copy; 2025</span>
                         </div>
                         <div>
                             <a href="https://github.com/username/osync" target="_blank">
@@ -243,6 +253,12 @@
     
     <!-- Bootstrap Bundle with Popper -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- i18n translation scripts -->
+    <script src="{{ url_for('static', filename='js/i18n/en.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/i18n/fr.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/i18n/i18n.js') }}"></script>
+    
     <!-- Main JS -->
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     
@@ -264,9 +280,13 @@
                 document.getElementById('page-content-wrapper').classList.toggle('toggled');
                 
                 const isCollapsed = document.getElementById('sidebar-wrapper').classList.contains('toggled');
+                const collapseText = window.OllamaI18n ? 
+                    (isCollapsed ? window.OllamaI18n.translate('expand') : window.OllamaI18n.translate('collapse')) :
+                    (isCollapsed ? 'Déplier' : 'Replier');
+                
                 toggleSidebarBtn.innerHTML = isCollapsed ? 
-                    '<i class="fas fa-angle-right me-2"></i> Déplier' : 
-                    '<i class="fas fa-angle-left me-2"></i> Replier';
+                    `<i class="fas fa-angle-right me-2"></i> ${collapseText}` : 
+                    `<i class="fas fa-angle-left me-2"></i> ${collapseText}`;
             }
             
             if (sidebarToggle) {
