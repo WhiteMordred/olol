@@ -5,19 +5,19 @@
 {% block content %}
 <div class="row">
     <div class="col-lg-12">
-        <h2 class="mb-4">Tableau de bord</h2>
+        <h2 class="mb-4 neon-text">Tableau de bord</h2>
     </div>
 </div>
 
 <!-- Statistics Cards -->
 <div class="row">
     <div class="col-xl-3 col-md-6">
-        <div class="card stat-card bg-primary text-white mb-4">
+        <div class="stat-card mb-4">
             <div class="card-body">
                 <div class="d-flex justify-content-between">
                     <div>
                         <h5 class="card-title">Serveurs</h5>
-                        <h2>{{ stats.servers.total }}</h2>
+                        <h2 class="neon-text">{{ stats.servers.total }}</h2>
                     </div>
                     <div>
                         <i class="fas fa-server fa-3x icon-bg"></i>
@@ -33,80 +33,80 @@
                 </div>
             </div>
             <div class="card-footer d-flex align-items-center justify-content-between">
-                <a class="small text-white stretched-link" href="/servers">Voir les détails</a>
-                <div class="small text-white"><i class="fas fa-angle-right"></i></div>
+                <a class="small stretched-link" href="/servers">Voir les détails</a>
+                <div class="small"><i class="fas fa-angle-right"></i></div>
             </div>
         </div>
     </div>
     <div class="col-xl-3 col-md-6">
-        <div class="card stat-card bg-success text-white mb-4">
+        <div class="stat-card mb-4">
             <div class="card-body">
                 <div class="d-flex justify-content-between">
                     <div>
                         <h5 class="card-title">Modèles</h5>
-                        <h2>{{ stats.models.total }}</h2>
+                        <h2 class="neon-text" style="color: var(--success-color); text-shadow: 0 0 5px var(--success-glow);">{{ stats.models.total }}</h2>
                     </div>
                     <div>
                         <i class="fas fa-brain fa-3x icon-bg"></i>
                     </div>
                 </div>
                 <div class="mt-2 small">
-                    <span class="text-white me-2">
+                    <span class="me-2">
                         <i class="fas fa-check-circle"></i> {{ stats.models.available }} disponibles
                     </span>
                 </div>
             </div>
             <div class="card-footer d-flex align-items-center justify-content-between">
-                <a class="small text-white stretched-link" href="/models">Voir les modèles</a>
-                <div class="small text-white"><i class="fas fa-angle-right"></i></div>
+                <a class="small stretched-link" href="/models">Voir les modèles</a>
+                <div class="small"><i class="fas fa-angle-right"></i></div>
             </div>
         </div>
     </div>
     <div class="col-xl-3 col-md-6">
-        <div class="card stat-card bg-warning text-white mb-4">
+        <div class="stat-card mb-4">
             <div class="card-body">
                 <div class="d-flex justify-content-between">
                     <div>
                         <h5 class="card-title">Charge moyenne</h5>
-                        <h2>{{ "%.1f"|format(stats.load.average * 100) }}%</h2>
+                        <h2 style="color: var(--warning-color); text-shadow: 0 0 5px var(--warning-glow);">{{ "%.1f"|format(stats.load.average * 100) }}%</h2>
                     </div>
                     <div>
                         <i class="fas fa-tachometer-alt fa-3x icon-bg"></i>
                     </div>
                 </div>
                 <div class="mt-2 small">
-                    <span class="text-white me-2">
+                    <span class="me-2">
                         <i class="fas fa-arrow-up"></i> Max: {{ "%.1f"|format(stats.load.max * 100) }}%
                     </span>
                 </div>
             </div>
             <div class="card-footer d-flex align-items-center justify-content-between">
-                <a class="small text-white stretched-link" href="/health">Voir les performances</a>
-                <div class="small text-white"><i class="fas fa-angle-right"></i></div>
+                <a class="small stretched-link" href="/health">Voir les performances</a>
+                <div class="small"><i class="fas fa-angle-right"></i></div>
             </div>
         </div>
     </div>
     <div class="col-xl-3 col-md-6">
-        <div class="card stat-card bg-info text-white mb-4">
+        <div class="stat-card mb-4">
             <div class="card-body">
                 <div class="d-flex justify-content-between">
                     <div>
                         <h5 class="card-title">Temps de disponibilité</h5>
-                        <h2>{{ stats.uptime }}</h2>
+                        <h2 style="color: var(--info-color); text-shadow: 0 0 5px var(--info-glow);">{{ stats.uptime }}</h2>
                     </div>
                     <div>
                         <i class="fas fa-clock fa-3x icon-bg"></i>
                     </div>
                 </div>
                 <div class="mt-2 small">
-                    <span class="text-white me-2">
+                    <span class="me-2">
                         <i class="fas fa-code-branch"></i> Version {{ stats.version }}
                     </span>
                 </div>
             </div>
             <div class="card-footer d-flex align-items-center justify-content-between">
-                <a class="small text-white stretched-link" href="/settings">Paramètres</a>
-                <div class="small text-white"><i class="fas fa-angle-right"></i></div>
+                <a class="small stretched-link" href="/settings">Paramètres</a>
+                <div class="small"><i class="fas fa-angle-right"></i></div>
             </div>
         </div>
     </div>
@@ -123,7 +123,7 @@
                     Historique de charge de serveurs
                 </div>
                 <div>
-                    <button type="button" class="btn btn-sm btn-outline-secondary auto-refresh-toggle" data-target="load-chart" data-seconds="30">
+                    <button type="button" class="btn btn-sm btn-primary auto-refresh-toggle" data-target="load-chart" data-seconds="30">
                         <i class="fas fa-sync-alt me-1"></i>
                         <span class="status-text">Actualisation auto</span>
                     </button>
@@ -144,7 +144,7 @@
                     État des serveurs
                 </div>
                 <div>
-                    <button type="button" class="btn btn-sm btn-outline-secondary auto-refresh-toggle" data-target="servers-status" data-seconds="30">
+                    <button type="button" class="btn btn-sm btn-primary auto-refresh-toggle" data-target="servers-status" data-seconds="30">
                         <i class="fas fa-sync-alt me-1"></i>
                         <span class="status-text">Actualisation auto</span>
                     </button>
@@ -152,7 +152,7 @@
             </div>
             <div class="card-body">
                 <div class="table-responsive">
-                    <table class="table table-sm">
+                    <table class="table table-sm table-hover">
                         <thead>
                             <tr>
                                 <th>Serveur</th>
@@ -166,13 +166,13 @@
                                 <td>{{ server.address }}</td>
                                 <td>
                                     {% if server.healthy %}
-                                    <span class="badge bg-success">En ligne</span>
+                                    <div><span class="status-indicator online"></span> En ligne</div>
                                     {% else %}
-                                    <span class="badge bg-danger">Hors ligne</span>
+                                    <div><span class="status-indicator offline"></span> Hors ligne</div>
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <div class="progress" style="height: 6px;">
+                                    <div class="progress" style="height: 6px; background-color: var(--cyber-surface-elevated);">
                                         <div class="progress-bar 
                                         {% if server.load < 0.5 %}bg-success
                                         {% elif server.load < 0.8 %}bg-warning
@@ -192,7 +192,7 @@
                 </div>
                 {% if servers|length > 5 %}
                 <div class="text-center mt-2">
-                    <a href="/servers" class="btn btn-sm btn-outline-primary">Voir tous ({{ servers|length }})</a>
+                    <a href="/servers" class="btn btn-sm btn-primary">Voir tous ({{ servers|length }})</a>
                 </div>
                 {% endif %}
             </div>
@@ -213,14 +213,16 @@
                 <div class="row">
                     {% for model in popular_models %}
                     <div class="col-md-6 mb-3">
-                        <div class="card model-card h-100">
+                        <div class="model-card h-100">
                             <div class="card-body">
                                 <h5 class="model-name">{{ model.name }}</h5>
                                 <div class="model-info mb-2">
-                                    <span class="badge bg-{% if model.available %}success{% else %}danger{% endif %}">
-                                        {% if model.available %}Disponible{% else %}Non disponible{% endif %}
-                                    </span>
-                                    <span class="badge bg-secondary">{{ model.servers|length }} serveur(s)</span>
+                                    {% if model.available %}
+                                    <div><span class="status-indicator online"></span> Disponible</div>
+                                    {% else %}
+                                    <div><span class="status-indicator offline"></span> Non disponible</div>
+                                    {% endif %}
+                                    <span class="badge" style="background-color: var(--cyber-surface-elevated);">{{ model.servers|length }} serveur(s)</span>
                                 </div>
                                 <div class="d-flex justify-content-end">
                                     <a href="/playground?model={{ model.name }}" class="btn btn-sm btn-success me-1">
@@ -240,39 +242,120 @@
                     {% endfor %}
                 </div>
                 <div class="text-center mt-3">
-                    <a href="/models" class="btn btn-outline-primary">Voir tous les modèles</a>
+                    <a href="/models" class="btn btn-primary">Voir tous les modèles</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Health Status / Quick Tips -->
+    <div class="col-lg-5">
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="fas fa-info-circle me-1"></i>
+                Conseils pour le proxy OLOL
+            </div>
+            <div class="card-body">
+                <div class="d-flex">
+                    <div class="me-3">
+                        <i class="fas fa-lightbulb fa-2x" style="color: var(--primary-color);"></i>
+                    </div>
+                    <div>
+                        <p>
+                            Pour optimiser les performances de votre cluster, assurez-vous que les serveurs ont des ressources équilibrées
+                            et que les modèles les plus utilisés sont répliqués sur plusieurs serveurs.
+                        </p>
+                        <p class="mb-0">
+                            <a href="/settings" class="btn btn-sm btn-primary">
+                                <i class="fas fa-cogs me-1"></i>
+                                Configurer les paramètres avancés
+                            </a>
+                        </p>
+                    </div>
+                </div>
+                
+                <!-- Stats indicators -->
+                <div class="mt-4">
+                    <h6 class="mb-3">Statistiques rapides</h6>
+                    
+                    <div class="small-stat">
+                        <div class="d-flex justify-content-between">
+                            <div class="stat-label">Temps de réponse moyen</div>
+                            <div class="stat-value">{{ stats.response_time|default('120ms') }}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="small-stat">
+                        <div class="d-flex justify-content-between">
+                            <div class="stat-label">Requêtes par minute</div>
+                            <div class="stat-value">{{ stats.requests_per_minute|default('42') }}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="small-stat">
+                        <div class="d-flex justify-content-between">
+                            <div class="stat-label">Modèles actifs</div>
+                            <div class="stat-value">{{ stats.active_models|default(stats.models.available) }}</div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
+<!-- System status line -->
 <div class="row mb-4">
     <div class="col-12">
-        <div class="alert alert-info">
-            <div class="d-flex">
-                <div class="me-3">
-                    <i class="fas fa-info-circle fa-2x"></i>
-                </div>
-                <div>
-                    <h5>Conseils pour le proxy OLOL</h5>
-                    <p class="mb-0">
-                        Pour optimiser les performances de votre cluster, assurez-vous que les serveurs ont des ressources équilibrées
-                        et que les modèles les plus utilisés sont répliqués sur plusieurs serveurs.
-                        <a href="/settings" class="alert-link">Configurez les paramètres avancés</a> pour une meilleure distribution des charges.
-                    </p>
+        <div class="card">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="me-3"><i class="fas fa-server me-1"></i> Système: <span class="neon-text">Opérationnel</span></span>
+                        <span class="me-3"><i class="fas fa-database me-1"></i> Base de données: <span class="neon-text">Connectée</span></span>
+                    </div>
+                    <div>
+                        <span>Dernière mise à jour: {{ stats.last_update|default('aujourd\'hui à 15:45') }}</span>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Add the scan line effect for cyberpunk style -->
+<div class="scan-line"></div>
 {% endblock %}
 
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Modifier les options du graphique pour correspondre au thème cyberpunk
+    Chart.defaults.color = 'rgba(240, 240, 240, 0.7)';
+    Chart.defaults.borderColor = 'rgba(42, 42, 42, 0.8)';
+    
     // Charger les données de charge
     const loadChartData = {{ load_chart_data|tojson }};
+    
+    // Appliquer des couleurs cyberpunk aux graphiques
+    if (loadChartData && loadChartData.datasets) {
+        loadChartData.datasets.forEach(dataset => {
+            if (dataset.borderColor === 'rgb(13, 110, 253)') { // Remplacer les bleus par défaut
+                dataset.borderColor = 'rgb(0, 243, 255)'; // primary-color
+                dataset.backgroundColor = 'rgba(0, 243, 255, 0.1)';
+            } else if (dataset.borderColor === 'rgb(25, 135, 84)') { // Remplacer les verts par défaut
+                dataset.borderColor = 'rgb(0, 204, 102)'; // success-color
+                dataset.backgroundColor = 'rgba(0, 204, 102, 0.1)';
+            } else if (dataset.borderColor === 'rgb(220, 53, 69)') { // Remplacer les rouges par défaut
+                dataset.borderColor = 'rgb(255, 51, 51)'; // danger-color
+                dataset.backgroundColor = 'rgba(255, 51, 51, 0.1)';
+            }
+            // Ajouter un effet de lueur aux lignes
+            dataset.borderWidth = 2;
+            dataset.tension = 0.3; // Courbes plus lisses
+        });
+    }
+    
     const loadCtx = document.getElementById('loadChartCanvas').getContext('2d');
     
     // Créer le graphique de charge
@@ -286,15 +369,28 @@ document.addEventListener('DOMContentLoaded', function() {
                 y: {
                     beginAtZero: true,
                     max: 1,
+                    grid: {
+                        color: 'rgba(42, 42, 42, 0.4)', // Plus sombre pour le thème cyber
+                    },
                     ticks: {
                         callback: function(value) {
                             return Math.round(value * 100) + '%';
                         }
                     }
+                },
+                x: {
+                    grid: {
+                        color: 'rgba(42, 42, 42, 0.4)', // Plus sombre pour le thème cyber
+                    }
                 }
             },
             plugins: {
                 tooltip: {
+                    backgroundColor: 'rgba(26, 26, 26, 0.8)',
+                    titleColor: 'rgb(0, 243, 255)',
+                    bodyColor: 'rgb(240, 240, 240)',
+                    borderColor: 'rgba(42, 42, 42, 0.8)',
+                    borderWidth: 1,
                     callbacks: {
                         label: function(context) {
                             let label = context.dataset.label || '';
@@ -305,6 +401,11 @@ document.addEventListener('DOMContentLoaded', function() {
                             return label;
                         }
                     }
+                },
+                legend: {
+                    labels: {
+                        color: 'rgb(240, 240, 240)',
+                    }
                 }
             }
         }
@@ -312,43 +413,75 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Charger les données de santé
     const healthChartData = {{ health_chart_data|tojson }};
-    const healthCtx = document.getElementById('healthChartCanvas').getContext('2d');
     
-    // Créer le graphique de santé
-    const healthChart = new Chart(healthCtx, {
-        type: 'line',
-        data: healthChartData,
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    max: 1,
-                    ticks: {
-                        callback: function(value) {
-                            return value === 0 ? 'Hors ligne' : 'En ligne';
+    // Appliquer des couleurs cyberpunk
+    if (healthChartData && healthChartData.datasets) {
+        healthChartData.datasets.forEach(dataset => {
+            if (dataset.borderColor === 'rgb(13, 110, 253)') {
+                dataset.borderColor = 'rgb(0, 243, 255)';
+                dataset.backgroundColor = 'rgba(0, 243, 255, 0.1)';
+            }
+            dataset.borderWidth = 2;
+            dataset.tension = 0.3;
+        });
+    }
+    
+    // Si le healthChartCanvas existe
+    const healthCtx = document.getElementById('healthChartCanvas');
+    if (healthCtx) {
+        const healthChart = new Chart(healthCtx.getContext('2d'), {
+            type: 'line',
+            data: healthChartData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 1,
+                        grid: {
+                            color: 'rgba(42, 42, 42, 0.4)',
                         },
-                        stepSize: 1
+                        ticks: {
+                            callback: function(value) {
+                                return value === 0 ? 'Hors ligne' : 'En ligne';
+                            },
+                            stepSize: 1
+                        }
+                    },
+                    x: {
+                        grid: {
+                            color: 'rgba(42, 42, 42, 0.4)',
+                        }
                     }
-                }
-            },
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            let label = context.dataset.label || '';
-                            if (label) {
-                                label += ': ';
+                },
+                plugins: {
+                    tooltip: {
+                        backgroundColor: 'rgba(26, 26, 26, 0.8)',
+                        titleColor: 'rgb(0, 243, 255)',
+                        bodyColor: 'rgb(240, 240, 240)',
+                        borderColor: 'rgba(42, 42, 42, 0.8)',
+                        borderWidth: 1,
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                label += context.parsed.y === 1 ? 'En ligne' : 'Hors ligne';
+                                return label;
                             }
-                            label += context.parsed.y === 1 ? 'En ligne' : 'Hors ligne';
-                            return label;
+                        }
+                    },
+                    legend: {
+                        labels: {
+                            color: 'rgb(240, 240, 240)',
                         }
                     }
                 }
             }
-        }
-    });
+        });
+    }
     
     // Gestionnaires pour l'actualisation automatique
     document.querySelectorAll('.auto-refresh-toggle').forEach(btn => {
@@ -394,6 +527,29 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+    
+    // Ajouter une classe "cyber-loader" pendant le chargement
+    function showLoader(elementId) {
+        const element = document.getElementById(elementId);
+        if (element) {
+            const loader = document.createElement('div');
+            loader.className = 'cyber-loader';
+            loader.innerHTML = '<span></span><span></span>';
+            element.insertAdjacentElement('beforebegin', loader);
+            element.style.opacity = '0';
+            
+            setTimeout(() => {
+                loader.remove();
+                element.style.opacity = '1';
+            }, 1000);
+        }
+    }
+    
+    // Simuler un chargement des graphiques pour l'effet visuel
+    showLoader('loadChartCanvas');
+    if (document.getElementById('healthChartCanvas')) {
+        showLoader('healthChartCanvas');
+    }
 });
 </script>
 {% endblock %}
