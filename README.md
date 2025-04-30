@@ -2,7 +2,7 @@
 
 A distributed inference system that allows you to build a powerful multi-host cluster for Ollama AI models with transparent scaling and fault tolerance.
 
-OLOL (Ollama Load Balancer) is a Python package providing gRPC interfaces with both synchronous and asynchronous support for distributed inference across multiple Ollama instances.
+Osync (Ollama Load Balancer) is a Python package providing gRPC interfaces with both synchronous and asynchronous support for distributed inference across multiple Ollama instances.
 
 ![osync imagry](osync.png  "Olol project mascot's")
 
