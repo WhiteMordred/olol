@@ -54,7 +54,7 @@ class OllamaClient:
         Args:
             model: Name of the model to use
             prompt: Text prompt to send to the model
-            stream: Whether to stream the response (ignored in this implementation)
+            stream: Whether to stream the response
             options: Optional dictionary of model parameters
             
         Returns:
@@ -68,25 +68,65 @@ class OllamaClient:
             request = ollama_pb2.ModelRequest(
                 model_name=model,
                 prompt=prompt,
-                parameters=options or {}
+                parameters=options or {},
+                stream=stream
             )
             
-            # Exécuter RunModel et obtenir la réponse
-            response = self.stub.RunModel(request)
-            
-            # Créer une réponse compatible avec le format attendu par le proxy
-            generate_response = ollama_pb2.GenerateResponse(
-                model=model,
-                response=response.output if hasattr(response, 'output') else str(response),
-                done=True,
-                total_duration=int(response.completion_time * 1000) if hasattr(response, 'completion_time') else 0
-            )
-            
-            # Créer un itérateur qui renvoie cette réponse
-            def response_iterator():
-                yield generate_response
-            
-            return response_iterator()
+            if stream:
+                # Utiliser StreamingRunModel si disponible et streaming demandé
+                try:
+                    responses = self.stub.StreamingRunModel(request)
+                    accumulated_response = ""
+                    
+                    # Traiter chaque réponse du stream et accumuler la réponse totale
+                    for response in responses:
+                        chunk = response.output if hasattr(response, 'output') else ""
+                        accumulated_response += chunk
+                        
+                        yield ollama_pb2.GenerateResponse(
+                            model=model,
+                            response=chunk,  # Envoyer seulement le nouveau morceau
+                            done=response.done if hasattr(response, 'done') else False,
+                            total_duration=int(response.completion_time * 1000) if hasattr(response, 'completion_time') else 0
+                        )
+                        
+                except grpc.RpcError as e:
+                    if e.code() == grpc.StatusCode.UNIMPLEMENTED:
+                        # Fallback à RunModel avec simulation de streaming
+                        logger.warning("StreamingRunModel non disponible, simulation du streaming avec RunModel")
+                        response = self.stub.RunModel(request)
+                        
+                        # Extraire la réponse complète
+                        output = response.output if hasattr(response, 'output') else str(response)
+                        
+                        # Simuler le streaming en fragmentant la réponse en plus petits morceaux
+                        # pour une meilleure expérience utilisateur
+                        chunks = [output[i:i+5] for i in range(0, len(output), 5)]
+                        
+                        for i, chunk in enumerate(chunks):
+                            is_last = i == len(chunks) - 1
+                            yield ollama_pb2.GenerateResponse(
+                                model=model,
+                                response=chunk,
+                                done=is_last,
+                                total_duration=int(response.completion_time * 1000) if hasattr(response, 'completion_time') and is_last else 0
+                            )
+                    else:
+                        raise
+            else:
+                # Mode non-streaming
+                response = self.stub.RunModel(request)
+                
+                # Extraire la réponse
+                output = response.output if hasattr(response, 'output') else str(response)
+                
+                yield ollama_pb2.GenerateResponse(
+                    model=model,
+                    response=output,
+                    done=True,
+                    total_duration=int(response.completion_time * 1000) if hasattr(response, 'completion_time') else 0
+                )
+                
         except Exception as e:
             logger.error(f"Generate error: {str(e)}")
             raise
@@ -186,7 +226,7 @@ class OllamaClient:
         Args:
             model: Name of the model to use
             messages: List of messages for the conversation
-            stream: Whether to stream the response (ignored in this implementation)
+            stream: Whether to stream the response
             options: Optional dictionary of model parameters
             
         Returns:
@@ -196,44 +236,143 @@ class OllamaClient:
             grpc.RpcError: If the gRPC call fails
         """
         try:
-            # Extraire le dernier message utilisateur pour utiliser avec RunModel
-            user_message = ""
-            for msg in reversed(messages):
-                if msg.get('role') == 'user':
-                    user_message = msg.get('content', '')
-                    break
-                    
-            if not user_message:
-                raise ValueError("No user message found in conversation")
+            # Formatage du prompt à partir de l'historique des messages
+            system_message = ""
+            conversation_history = ""
+            latest_user_message = ""
+            
+            for msg in messages:
+                role = msg.get('role', '')
+                content = msg.get('content', '')
+                
+                if role == 'system':
+                    system_message = content
+                elif role == 'user':
+                    latest_user_message = content
+                    conversation_history += f"User: {content}\n"
+                elif role == 'assistant':
+                    conversation_history += f"Assistant: {content}\n"
+            
+            # Construire le prompt complet
+            full_prompt = ""
+            if system_message:
+                full_prompt = f"{system_message}\n\n{conversation_history}"
+            else:
+                full_prompt = conversation_history
+                
+            if not latest_user_message:
+                full_prompt += "User: "  # Inciter une réponse si pas de message utilisateur
             
             # Créer une requête RunModel
             request = ollama_pb2.ModelRequest(
                 model_name=model,
-                prompt=user_message,
-                parameters=options or {}
+                prompt=full_prompt,
+                parameters=options or {},
+                stream=stream
             )
             
-            # Exécuter RunModel
-            response = self.stub.RunModel(request)
+            if stream:
+                # Utiliser StreamingRunModel si disponible et streaming demandé
+                try:
+                    # Tenter d'utiliser l'API de streaming
+                    responses = self.stub.StreamingRunModel(request)
+                    
+                    # Créer un itérateur qui transforme les réponses en ChatResponse
+                    for response in responses:
+                        response_text = response.output if hasattr(response, 'output') else ""
+                        
+                        # Créer un message assistant pour chaque morceau
+                        assistant_message = {
+                            "role": "assistant",
+                            "content": response_text
+                        }
+                        
+                        chat_response = ollama_pb2.ChatResponse()
+                        chat_response.model = model
+                        chat_response.done = response.done if hasattr(response, 'done') else False
+                        
+                        # Ajouter la durée si disponible
+                        if hasattr(response, 'completion_time'):
+                            chat_response.total_duration = int(response.completion_time * 1000)
+                            
+                        # Utiliser setattr pour le message car la structure peut varier
+                        # selon la version de protobuf
+                        try:
+                            chat_response.message.role = "assistant"
+                            chat_response.message.content = response_text
+                        except AttributeError:
+                            # Alternative en cas d'erreur d'attribut
+                            setattr(chat_response, 'message', assistant_message)
+                            
+                        yield chat_response
+                
+                except grpc.RpcError as e:
+                    if e.code() == grpc.StatusCode.UNIMPLEMENTED:
+                        # Fallback à RunModel avec simulation de streaming
+                        logger.warning("StreamingRunModel non disponible, simulation du streaming avec RunModel")
+                        response = self.stub.RunModel(request)
+                        
+                        # Extraire la réponse
+                        output = response.output if hasattr(response, 'output') else str(response)
+                        
+                        # Simuler le streaming en fragmentant la réponse en plus petits morceaux
+                        # pour une meilleure expérience utilisateur
+                        chunks = [output[i:i+5] for i in range(0, len(output), 5)]
+                        
+                        for i, chunk in enumerate(chunks):
+                            is_last = i == len(chunks) - 1
+                            
+                            chat_response = ollama_pb2.ChatResponse()
+                            chat_response.model = model
+                            chat_response.done = is_last
+                            
+                            # Ajouter la durée si disponible et si c'est le dernier message
+                            if hasattr(response, 'completion_time') and is_last:
+                                chat_response.total_duration = int(response.completion_time * 1000)
+                                
+                            # Utiliser setattr pour le message
+                            try:
+                                chat_response.message.role = "assistant"
+                                chat_response.message.content = chunk
+                            except AttributeError:
+                                # Alternative
+                                setattr(chat_response, 'message', {
+                                    "role": "assistant",
+                                    "content": chunk
+                                })
+                            
+                            yield chat_response
+                    else:
+                        raise
             
-            # Créer une réponse compatible avec l'interface Chat
-            assistant_message = ollama_pb2.Message(
-                role="assistant",
-                content=response.output if hasattr(response, 'output') else str(response)
-            )
-            
-            chat_response = ollama_pb2.ChatResponse(
-                model=model,
-                message=assistant_message,
-                done=True,
-                total_duration=int(response.completion_time * 1000) if hasattr(response, 'completion_time') else 0
-            )
-            
-            # Créer un itérateur qui renvoie cette réponse
-            def response_iterator():
+            else:
+                # Mode non-streaming
+                response = self.stub.RunModel(request)
+                
+                # Extraire la réponse
+                output = response.output if hasattr(response, 'output') else str(response)
+                
+                chat_response = ollama_pb2.ChatResponse()
+                chat_response.model = model
+                chat_response.done = True
+                
+                # Ajouter la durée si disponible
+                if hasattr(response, 'completion_time'):
+                    chat_response.total_duration = int(response.completion_time * 1000)
+                    
+                # Utiliser setattr pour le message
+                try:
+                    chat_response.message.role = "assistant"
+                    chat_response.message.content = output
+                except AttributeError:
+                    # Alternative
+                    setattr(chat_response, 'message', {
+                        "role": "assistant",
+                        "content": output
+                    })
+                
                 yield chat_response
-            
-            return response_iterator()
+                
         except Exception as e:
             logger.error(f"Chat error: {str(e)}")
             raise
