@@ -3,18 +3,23 @@
 import threading
 import time
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Deque
+from collections import deque
+import os
 
 # Import Rich components
 from rich.live import Live
-from rich.console import Console
+from rich.console import Console, RenderableType
 from rich.table import Table
 from rich.layout import Layout
 from rich.panel import Panel
 from rich.text import Text
 from rich.spinner import Spinner
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
+from rich.logging import RichHandler
+from rich.box import Box
 from rich import box
+from rich.align import Align
 
 from .stats import stats_lock, request_stats
 from .db.database import get_db
@@ -23,11 +28,46 @@ from .cluster.registry import get_model_registry
 from .queue.queue import get_queue_manager
 
 # Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Créer un logger specifique pour Rich
+console = Console(stderr=True)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(message)s",
+    datefmt="[%X]",
+    handlers=[RichHandler(console=console, rich_tracebacks=True)]
+)
 logger = logging.getLogger(__name__)
 
 # UI state
 ui_exit_event = threading.Event()
+
+# Créer un gestionnaire de logs pour capturer tous les messages
+class LogCapture(logging.Handler):
+    def __init__(self, level=logging.NOTSET, max_lines=200):
+        super().__init__(level)
+        self.log_messages = deque(maxlen=max_lines)
+        self.formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+    
+    def emit(self, record):
+        # Formatter le message et l'ajouter à notre deque
+        try:
+            log_entry = self.formatter.format(record)
+            # Ajouter la couleur selon le niveau de log
+            if record.levelno >= logging.ERROR:
+                log_entry = f"[bold red]{log_entry}[/bold red]"
+            elif record.levelno >= logging.WARNING:
+                log_entry = f"[yellow]{log_entry}[/yellow]"
+            elif record.levelno >= logging.DEBUG:
+                log_entry = f"[dim]{log_entry}[/dim]"
+            
+            self.log_messages.append(log_entry)
+        except Exception:
+            self.handleError(record)
+
+# Installer le gestionnaire de logs
+log_capture = LogCapture(max_lines=200)
+root_logger = logging.getLogger()
+root_logger.addHandler(log_capture)
 
 class RichUI:
     """Rich-based console UI for OllamaSync proxy with stats and tables."""
@@ -43,11 +83,18 @@ class RichUI:
         
         # Status messages
         self.status_messages = []
-        self.max_status_messages = 15
+        self.max_status_messages = 30  # Augmenté de 15 à 30
+        
+        # Requests log
+        self.request_logs = deque(maxlen=50)  # Pour stocker les requêtes récentes
+        
+        # Interface mode
+        self.show_logs = False  # Par défaut, on montre l'interface normale
+        self.show_requests = False  # Par défaut, on ne montre pas la liste des requêtes
         
         # Last refresh time
         self.last_update = 0
-        self.update_interval = 0.2  # seconds
+        self.update_interval = 0.5  # Augmenté de 0.2 à 0.5 secondes
         
         # Layout elements
         self.layout = self._make_layout()
@@ -64,7 +111,12 @@ class RichUI:
         
         # Add first status message
         self.add_status_message("Rich Console UI started")
-        self.add_status_message("Connecté à la base de données TinyDB")
+        self.add_status_message("Connected to TinyDB database")
+        self.add_status_message("Press 'l' to toggle logs display, 'r' for requests, 'q' to exit")
+        
+        # Keyboard handler thread
+        self.keyboard_thread = None
+        self.keyboard_monitoring = False
         
     def _make_layout(self) -> Layout:
         """Create the layout structure for the UI."""
@@ -92,7 +144,7 @@ class RichUI:
         # Split right column
         layout["right"].split(
             Layout(name="status_messages", ratio=1),
-            Layout(name="models", ratio=1)
+            Layout(name="logs_or_models", ratio=1)  # Cette zone affichera soit les logs soit les modèles
         )
         
         return layout
@@ -111,6 +163,14 @@ class RichUI:
         if len(self.status_messages) > self.max_status_messages:
             self.status_messages.pop(0)
     
+    def add_request_log(self, request_data: Dict[str, Any]) -> None:
+        """Add a request log to the requests display queue.
+        
+        Args:
+            request_data: Request data to log
+        """
+        self.request_logs.append(request_data)
+    
     def _create_header(self, stats: Dict[str, Any]) -> Panel:
         """Create header panel with basic info."""
         # Calculate uptime
@@ -121,11 +181,17 @@ class RichUI:
         
         # Utiliser un caractère fixe au lieu de spinner pour éviter l'erreur de render()
         spinner_text = "•"
+        
+        # Ajouter une indication sur le mode d'affichage actuel
+        mode_indicator = "[bold yellow]MODE LOGS[/bold yellow]" if self.show_logs else \
+                       "[bold cyan]MODE REQUÊTES[/bold cyan]" if self.show_requests else \
+                       "[bold green]MODE NORMAL[/bold green]"
+        
         grid = Table.grid(expand=True)
         grid.add_column(justify="left", ratio=1)
         grid.add_column(justify="right")
         grid.add_row(
-            f"[bold green]{spinner_text} Ollama Sync Server Status[/bold green]",
+            f"[bold green]{spinner_text} Ollama Sync Server Status[/bold green] - {mode_indicator}",
             f"[yellow]Uptime: {uptime_str}[/yellow]"
         )
         
@@ -144,7 +210,7 @@ class RichUI:
             processing_count = queue_stats.get("processing", 0)
             grid.add_row(f"Queue: [cyan]{pending_count}[/cyan] pending, [cyan]{processing_count}[/cyan] processing", "")
         except Exception as e:
-            logger.debug(f"Erreur lors de la récupération des statistiques de file d'attente: {str(e)}")
+            logger.debug(f"Error retrieving queue statistics: {str(e)}")
         
         return Panel(grid, border_style="blue", box=box.ROUNDED)
     
@@ -167,14 +233,14 @@ class RichUI:
                 if key not in stats:
                     stats[key] = value
         except Exception as e:
-            logger.debug(f"Erreur lors de la récupération des statistiques depuis la DB: {str(e)}")
+            logger.debug(f"Error retrieving statistics from DB: {str(e)}")
         
         # Obtenir les stats de la file d'attente
         queue_stats = {}
         try:
             queue_stats = self.queue_manager.get_queue_stats()
         except Exception as e:
-            logger.debug(f"Erreur lors de la récupération des statistiques de la file: {str(e)}")
+            logger.debug(f"Error retrieving queue statistics: {str(e)}")
         
         active_requests = stats.get('active_requests', 0)
         total_requests = stats.get('total_requests', 0)
@@ -237,15 +303,15 @@ class RichUI:
             servers = self.sync_manager.read_from_ram("servers")
             
             if not servers:
-                return Panel("Aucun serveur trouvé.\nVérifiez que vos serveurs Ollama sont bien accessibles.", 
-                            title="Serveurs", border_style="yellow")
+                return Panel("No server found.\nCheck that your Ollama servers are accessible.", 
+                            title="Servers", border_style="yellow")
                 
             # Création du tableau des serveurs
             table = Table(box=box.SIMPLE, expand=True)
-            table.add_column("Adresse", style="dim")
-            table.add_column("État", justify="center")
-            table.add_column("Charge", justify="right")
-            table.add_column("Modèles", justify="right")
+            table.add_column("Address", style="dim")
+            table.add_column("Status", justify="center")
+            table.add_column("Load", justify="right")
+            table.add_column("Models", justify="right")
             table.add_column("Backend", justify="right")
             
             # Afficher chaque serveur
@@ -254,7 +320,7 @@ class RichUI:
                 is_healthy = server.get("healthy", False)
                 load = server.get("load", 0.0)
                 models_count = len(server.get("models", []))
-                backend = server.get("backend", "Inconnu")
+                backend = server.get("backend", "Unknown")
                 
                 # Formater la charge
                 load_str = f"{int(load * 100)}%" if load <= 1.0 else f"{load:.2f}"
@@ -262,19 +328,19 @@ class RichUI:
                 
                 table.add_row(
                     address, 
-                    "[green]En ligne[/green]" if is_healthy else "[red]Hors ligne[/red]",
+                    "[green]Online[/green]" if is_healthy else "[red]Offline[/red]",
                     f"[{load_color}]{load_str}[/{load_color}]",
                     str(models_count) if is_healthy else "-",
-                    str(backend) if is_healthy else "Inconnu"
+                    str(backend) if is_healthy else "Unknown"
                 )
             
             # Calculer le nombre de serveurs en ligne
             healthy_servers = sum(1 for server in servers if server.get("healthy", False))
-            return Panel(table, title=f"[bold]Serveurs[/bold] ({healthy_servers}/{len(servers)} en ligne)", 
+            return Panel(table, title=f"[bold]Servers[/bold] ({healthy_servers}/{len(servers)} online)", 
                         border_style="blue", box=box.ROUNDED)
         except Exception as e:
-            logger.exception("Erreur lors de la création du panneau des serveurs")
-            return Panel(f"Erreur d'accès aux serveurs: {str(e)}", title="Serveurs", border_style="red")
+            logger.exception("Error creating servers panel")
+            return Panel(f"Error accessing servers: {str(e)}", title="Servers", border_style="red")
     
     def _create_models_panel(self) -> Panel:
         """Create models panel with model availability from registry."""
@@ -287,8 +353,8 @@ class RichUI:
                 models_list = models_status["models"]
             elif not isinstance(models_status, dict) or "error" in models_status:
                 # En cas d'erreur spécifique du registre
-                error_msg = models_status.get("error", "Erreur inconnue") if isinstance(models_status, dict) else str(models_status)
-                return Panel(f"Erreur du registre: {error_msg}", title="Modèles", border_style="red")
+                error_msg = models_status.get("error", "Unknown error") if isinstance(models_status, dict) else str(models_status)
+                return Panel(f"Registry error: {error_msg}", title="Models", border_style="red")
             
             if not models_list:
                 # Vérifier s'il y a des serveurs actifs
@@ -296,25 +362,25 @@ class RichUI:
                 healthy_servers = sum(1 for server in servers if server.get("healthy", False))
                 
                 if healthy_servers == 0:
-                    return Panel("Aucun serveur n'est disponible.\nVérifiez la connexion avec vos serveurs Ollama.", 
-                                title="Modèles", border_style="yellow")
+                    return Panel("No server is available.\nCheck connection with your Ollama servers.", 
+                                title="Models", border_style="yellow")
                 
-                return Panel("Aucun modèle disponible actuellement.\nVérifiez vos serveurs Ollama.", 
-                            title="Modèles", border_style="yellow")
+                return Panel("No model available.\nCheck your Ollama servers.", 
+                            title="Models", border_style="yellow")
             
             # Créer le tableau des modèles
             table = Table(box=box.SIMPLE, expand=True)
-            table.add_column("Nom", style="cyan")
-            table.add_column("Taille", justify="right")
-            table.add_column("Serveurs", justify="right")
-            table.add_column("Statut", justify="right")
+            table.add_column("Name", style="cyan")
+            table.add_column("Size", justify="right")
+            table.add_column("Servers", justify="right")
+            table.add_column("Status", justify="right")
                 
             # Afficher les modèles (limité pour éviter un tableau trop grand)
             for model_info in models_list[:10]:
                 model_name = model_info.get("name", "Unknown")
                 model_size = model_info.get("size", "?")
                 servers = model_info.get("servers", [])
-                status = model_info.get("status", "Prêt")
+                status = model_info.get("status", "Ready")
                 
                 # Formater la taille du modèle
                 size_str = f"{model_size} GB" if isinstance(model_size, (int, float)) else str(model_size)
@@ -330,22 +396,22 @@ class RichUI:
                 table.add_row(
                     model_name, 
                     size_str,
-                    f"{len(servers)} serveur{'s' if len(servers) > 1 else ''}",
+                    f"{len(servers)} server{'s' if len(servers) > 1 else ''}",
                     status_str
                 )
                 
             # Indiquer s'il y a plus de modèles que ceux affichés
             if len(models_list) > 10:
-                table.add_row(f"...et {len(models_list) - 10} autres", "", "", "")
+                table.add_row(f"...and {len(models_list) - 10} more", "", "", "")
                 
             # Compter les modèles prêts vs en cours de chargement
             ready_models = sum(1 for m in models_list if m.get("status", "").lower() in ["prêt", "ready"])
-            return Panel(table, title=f"[bold]Modèles disponibles[/bold] ({ready_models}/{len(models_list)} prêts)", 
+            return Panel(table, title=f"[bold]Available Models[/bold] ({ready_models}/{len(models_list)} ready)", 
                         border_style="cyan", box=box.ROUNDED)
                 
         except Exception as e:
-            logger.exception("Erreur lors de la création du panneau des modèles")
-            return Panel(f"Erreur d'accès aux modèles: {str(e)}", title="Modèles", border_style="red")
+            logger.exception("Error creating models panel")
+            return Panel(f"Error accessing models: {str(e)}", title="Models", border_style="red")
     
     def _create_status_panel(self) -> Panel:
         """Create status messages panel."""
@@ -353,15 +419,82 @@ class RichUI:
             return Panel("No status messages", title="Status", border_style="green")
         
         # Show the most recent messages
-        # Reverse order to show newest at the bottom
-        visible_messages = self.status_messages[-10:] if len(self.status_messages) > 10 else self.status_messages
+        # Afficher plus de messages quand on est en mode logs (20 au lieu de 10)
+        visible_count = 20 if self.show_logs else 10
+        visible_messages = self.status_messages[-visible_count:] if len(self.status_messages) > visible_count else self.status_messages
         
         text = "\n".join(visible_messages)
         return Panel(Text.from_markup(text), title="[bold]Status Messages[/bold]", border_style="green", box=box.ROUNDED)
     
+    def _create_logs_panel(self) -> Panel:
+        """Create logs panel with captured log messages."""
+        if not log_capture.log_messages:
+            return Panel("No log messages captured yet.", title="Logs", border_style="yellow")
+        
+        # Calculer combien de logs on peut afficher en fonction de la hauteur disponible
+        # Estimation de 20 lignes disponibles, mais cela peut varier
+        visible_logs = list(log_capture.log_messages)[-20:]
+        
+        text = "\n".join(visible_logs)
+        return Panel(
+            Text.from_markup(text),
+            title=f"[bold]Logs[/bold] ({len(log_capture.log_messages)} captured)",
+            border_style="yellow",
+            box=box.ROUNDED
+        )
+        
+    def _create_requests_panel(self) -> Panel:
+        """Create requests panel with recent requests."""
+        if not self.request_logs:
+            return Panel("No requests captured yet.", title="Recent Requests", border_style="magenta")
+        
+        # Créer un tableau pour les requêtes récentes
+        table = Table(box=box.SIMPLE, expand=True)
+        table.add_column("ID", style="dim", width=8)
+        table.add_column("Type", style="cyan", width=10)
+        table.add_column("Model", width=12)
+        table.add_column("Time", justify="right", width=8)
+        table.add_column("Status", justify="right", width=8)
+        
+        # Afficher les requêtes les plus récentes (15 max)
+        for req in list(self.request_logs)[-15:]:
+            req_id = req.get("id", "?")[:7]  # Tronquer l'ID
+            req_type = req.get("type", "Unknown")
+            model = req.get("model", "Unknown")
+            duration = req.get("duration", 0)
+            status = req.get("status", "Unknown")
+            
+            # Formater le statut avec couleur
+            if status.lower() in ["completed", "success"]:
+                status_str = f"[green]{status}[/green]"
+            elif status.lower() in ["processing", "pending"]:
+                status_str = f"[yellow]{status}[/yellow]"
+            elif status.lower() in ["failed", "error"]:
+                status_str = f"[red]{status}[/red]"
+            else:
+                status_str = status
+                
+            # Formater la durée
+            duration_str = f"{duration:.2f}s" if isinstance(duration, (int, float)) else str(duration)
+            
+            table.add_row(
+                req_id,
+                req_type,
+                model,
+                duration_str,
+                status_str
+            )
+        
+        return Panel(
+            table,
+            title=f"[bold]Recent Requests[/bold] ({len(self.request_logs)} captured)",
+            border_style="magenta",
+            box=box.ROUNDED
+        )
+    
     def _create_footer(self) -> Panel:
         """Create footer panel with help text."""
-        footer_text = "[bold]Press Ctrl+C to exit[/bold]"
+        footer_text = "[bold]Press 'l' to toggle logs | 'r' to toggle requests | 'q' to exit[/bold]"
         if self.debug:
             footer_text += " [red][DEBUG MODE][/red]"
         elif self.verbose:
@@ -390,7 +523,18 @@ class RichUI:
             self.layout["stats"].update(self._create_stats_panel(stats))
             self.layout["servers"].update(self._create_servers_panel())
             self.layout["status_messages"].update(self._create_status_panel())
-            self.layout["models"].update(self._create_models_panel())
+            
+            # Choisir ce qu'on affiche dans la zone logs_or_models en fonction du mode
+            if self.show_logs:
+                # Mode logs : afficher les logs de debug
+                self.layout["logs_or_models"].update(self._create_logs_panel())
+            elif self.show_requests:
+                # Mode requêtes : afficher les requêtes récentes
+                self.layout["logs_or_models"].update(self._create_requests_panel())
+            else:
+                # Mode normal : afficher les modèles
+                self.layout["logs_or_models"].update(self._create_models_panel())
+                
             self.layout["footer"].update(self._create_footer())
             
             return self.layout
@@ -400,12 +544,70 @@ class RichUI:
             logger.error(f"Error generating layout: {str(e)}")
             layout = Layout(Panel(f"[bold red]Error rendering UI: {str(e)}[/bold red]"))
             return layout
+    
+    def _keyboard_monitor(self):
+        """Monitor keyboard input for UI control."""
+        try:
+            import tty
+            import sys
+            import termios
+            
+            self.keyboard_monitoring = True
+            # Save terminal settings
+            fd = sys.stdin.fileno()
+            old_settings = termios.tcgetattr(fd)
+            
+            try:
+                # Set terminal to raw mode
+                tty.setraw(fd)
+                
+                while not ui_exit_event.is_set() and self.keyboard_monitoring:
+                    # Wait for a keypress (with timeout)
+                    ready_to_read = select.select([sys.stdin], [], [], 0.1)[0]
+                    if ready_to_read:
+                        key = sys.stdin.read(1)
+                        
+                        # Process the key
+                        if key == 'q':  # Exit
+                            ui_exit_event.set()
+                        elif key == 'l':  # Toggle logs display
+                            self.show_logs = not self.show_logs
+                            if self.show_logs:
+                                self.show_requests = False  # Désactiver mode requêtes
+                                self.add_status_message("Switched to LOGS mode")
+                            else:
+                                self.add_status_message("Switched to NORMAL mode")
+                        elif key == 'r':  # Toggle requests display
+                            self.show_requests = not self.show_requests
+                            if self.show_requests:
+                                self.show_logs = False  # Désactiver mode logs
+                                self.add_status_message("Switched to REQUESTS mode")
+                            else:
+                                self.add_status_message("Switched to NORMAL mode")
+            finally:
+                # Restore terminal settings
+                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+                self.keyboard_monitoring = False
+        except ImportError:
+            # If we can't import tty or termios, we're probably on Windows
+            logger.warning("Keyboard monitoring not available (requires Unix-like OS)")
+            self.keyboard_monitoring = False
+        except Exception as e:
+            logger.error(f"Error in keyboard monitor: {e}")
+            self.keyboard_monitoring = False
             
     def start(self):
         """Start the Rich UI."""
         try:
             # Ajouter un délai initial pour permettre au cluster de s'initialiser
             time.sleep(1.0)
+            
+            # Import select ici pour éviter des erreurs d'import sur Windows
+            import select
+            
+            # Démarrer le thread de surveillance du clavier
+            self.keyboard_thread = threading.Thread(target=self._keyboard_monitor, daemon=True)
+            self.keyboard_thread.start()
             
             # Run the UI with live updates - réduction du taux de rafraîchissement pour éviter les effets de glitch
             with Live(self._generate_layout(), refresh_per_second=2, screen=True) as live:
@@ -424,12 +626,32 @@ class RichUI:
                         self.add_status_message(f"UI update error: {str(e)}")
                     
                     # Augmenter le délai pour réduire l'utilisation du CPU et les glitches
-                    time.sleep(0.25)
+                    time.sleep(0.5)  # Augmenté de 0.25 à 0.5
+        except ImportError:
+            logger.error("Required module 'select' not available")
+            # Fallback to a simpler UI without keyboard control
+            self._start_simple()
         except KeyboardInterrupt:
             # Handle Ctrl+C gracefully
             ui_exit_event.set()
         except Exception as e:
             logger.error(f"UI error: {str(e)}")
+            ui_exit_event.set()
+            
+    def _start_simple(self):
+        """Start a simpler version of the UI without keyboard monitoring."""
+        try:
+            with Live(self._generate_layout(), refresh_per_second=1, screen=True) as live:
+                while not ui_exit_event.is_set():
+                    try:
+                        layout = self._generate_layout()
+                        live.update(layout)
+                        time.sleep(1.0)  # Rafraîchissement plus lent
+                    except Exception as e:
+                        logger.error(f"Error updating UI: {str(e)}")
+                    
+            time.sleep(0.5)
+        except KeyboardInterrupt:
             ui_exit_event.set()
 
 
@@ -440,11 +662,11 @@ def run_console_ui(params=None):
         params: Dictionary of parameters controlling UI behavior
     """
     try:
-        # Start with Rich UI instead of curses UI
+        # Start with Rich UI
         ui = RichUI(params)
         
         # Monitorer les changements dans la base de données pour les refléter dans l'UI
-        ui.add_status_message("Surveillance active des changements de la base de données")
+        ui.add_status_message("Monitoring database changes")
         
         # Start the UI
         ui.start()
