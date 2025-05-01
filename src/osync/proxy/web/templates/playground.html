@@ -572,7 +572,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // Make the API call
-        fetch('/v1/chat', {
+        fetch('/api/v1/chat', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -713,7 +713,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Variable to store generated content
         let generatedContent = "";
         
-        fetch('/v1/generate', {
+        fetch('/api/v1/generate', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -817,7 +817,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     function callEmbeddingsAPI(params) {
-        fetch('/v1/embeddings', {
+        fetch('/api/v1/embeddings', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
