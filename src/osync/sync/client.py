@@ -76,16 +76,15 @@ class OllamaClient:
                 # Utiliser StreamingRunModel si disponible et streaming demandé
                 try:
                     responses = self.stub.StreamingRunModel(request)
-                    accumulated_response = ""
                     
-                    # Traiter chaque réponse du stream et accumuler la réponse totale
+                    # Traiter chaque réponse du stream
                     for response in responses:
                         chunk = response.output if hasattr(response, 'output') else ""
-                        accumulated_response += chunk
                         
+                        # Créer une nouvelle réponse pour chaque morceau avec les informations pertinentes
                         yield ollama_pb2.GenerateResponse(
                             model=model,
-                            response=chunk,  # Envoyer seulement le nouveau morceau
+                            response=chunk,  # Envoyer seulement le chunk actuel
                             done=response.done if hasattr(response, 'done') else False,
                             total_duration=int(response.completion_time * 1000) if hasattr(response, 'completion_time') else 0
                         )
@@ -100,8 +99,9 @@ class OllamaClient:
                         output = response.output if hasattr(response, 'output') else str(response)
                         
                         # Simuler le streaming en fragmentant la réponse en plus petits morceaux
-                        # pour une meilleure expérience utilisateur
-                        chunks = [output[i:i+5] for i in range(0, len(output), 5)]
+                        # Utiliser des chunks plus grands pour une meilleure expérience
+                        chunk_size = 20  # Augmenter la taille des chunks pour un meilleur rendu
+                        chunks = [output[i:i+chunk_size] for i in range(0, len(output), chunk_size)]
                         
                         for i, chunk in enumerate(chunks):
                             is_last = i == len(chunks) - 1
