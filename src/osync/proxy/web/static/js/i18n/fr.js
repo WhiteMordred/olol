@@ -22,11 +22,18 @@ window.I18n.translations['fr'] = {
         "health": "État du système",
         "queue": "File d'attente",
         "settings": "Paramètres",
-        "playground": "Terrain de jeu",
+        "playground": "Playground",
         "terminal": "Terminal",
+        "log": "Journaux",
         "swagger": "Documentation API",
         "api_documentation": "Documentation API",
         "language": "Langue"
+    },
+    
+    // Sidebar
+    "sidebar": {
+        "collapse": "Replier",
+        "expand": "Déplier"
     },
     
     // Notifications
@@ -37,7 +44,11 @@ window.I18n.translations['fr'] = {
         "high_load": "Charge élevée",
         "model_downloaded": "Modèle téléchargé",
         "just_now": "À l'instant",
-        "see_all": "Voir toutes les notifications"
+        "see_all": "Voir toutes les notifications",
+        "success": "Succès",
+        "error": "Erreur",
+        "warning": "Avertissement",
+        "info": "Information"
     },
     
     // Dashboard
@@ -58,7 +69,7 @@ window.I18n.translations['fr'] = {
     
     // Models
     "models": {
-        "title": "Gestion des modèles",
+        "title": "Gestion des Modèles",
         "available_models": "Modèles disponibles",
         "model_name": "Nom du modèle",
         "size": "Taille",
@@ -66,11 +77,80 @@ window.I18n.translations['fr'] = {
         "quantization": "Quantification",
         "download": "Télécharger",
         "delete": "Supprimer",
-        "pull": "Récupérer modèle",
-        "model_details": "Détails du modèle",
-        "parameters": "Paramètres",
+        "pull": {
+            "title": "Télécharger un modèle",
+            "submit": "Télécharger",
+            "progress": "Téléchargement...",
+            "progress_msg": "Téléchargement de {{model}} en cours...",
+            "complete": "Téléchargement terminé",
+            "success": "{{model}} a été téléchargé avec succès"
+        },
+        "details": "Informations du modèle",
+        "info": {
+            "general": "Informations générales",
+            "title_for": "Informations: {{name}}"
+        },
+        "parameters": "paramètres",
         "server_location": "Localisation serveur",
-        "loading": "Chargement des modèles..."
+        "loading": "Chargement des modèles...",
+        "status": {
+            "available": "Disponible",
+            "unavailable": "Non disponible"
+        },
+        "add": {
+            "name": "Nom du modèle",
+            "server": "Serveur cible"
+        },
+        "name": {
+            "placeholder": "ex: llama2, mistral, etc.",
+            "help": "Entrez le nom du modèle à télécharger depuis le catalogue Ollama."
+        },
+        "server": {
+            "select": "Sélectionner un serveur",
+            "all": "Tous les serveurs",
+            "help": "Sélectionnez le serveur sur lequel vous souhaitez télécharger ce modèle."
+        },
+        "insecure": "Autoriser les sources non sécurisées",
+        "none_available": "Aucun modèle disponible. Utilisez le bouton \"Télécharger un modèle\" pour en ajouter.",
+        "filter": {
+            "by": "Filtrer par",
+            "all": "Tous les modèles",
+            "local": "Modèles locaux",
+            "downloaded": "Modèles téléchargés",
+            "placeholder": "Rechercher un modèle..."
+        },
+        "table": {
+            "name": "Nom",
+            "size": "Taille:",
+            "servers": "Serveurs disponibles:",
+            "parameters": "Paramètres:",
+            "modified": "Dernière mise à jour:",
+            "family": "Famille",
+            "quantization": "Quantization"
+        },
+        "test": "Tester",
+        "copy_prompt": "Copier le prompt",
+        "distribute": {
+            "title": "Distribution en cours",
+            "progress": "Distribution de {{model}} sur tous les serveurs...",
+            "complete": "Distribution terminée",
+            "success": "{{model}} a été distribué avec succès"
+        },
+        "delete": {
+            "title": "Suppression en cours",
+            "confirm": "Confirmer la suppression",
+            "confirm_text": "Êtes-vous sûr de vouloir supprimer le modèle",
+            "warning": "Cette action supprimera le modèle de tous les serveurs où il est installé.",
+            "progress": "Suppression...",
+            "progress_msg": "Suppression de {{model}}...",
+            "complete": "Suppression terminée",
+            "success": "{{model}} a été supprimé avec succès"
+        },
+        "availability": "Disponibilité",
+        "prompt_template": "Template de prompt",
+        "default_params": "Paramètres par défaut",
+        "prompt_copied": "Template de prompt copié dans le presse-papier",
+        "prompt_copy_error": "Impossible de copier le template"
     },
     
     // Servers
@@ -89,7 +169,18 @@ window.I18n.translations['fr'] = {
         "uptime": "Temps de fonctionnement",
         "cpu": "CPU",
         "memory": "Mémoire",
-        "models_hosted": "Modèles hébergés"
+        "models_hosted": "Modèles hébergés",
+        "cluster_status": "État du cluster",
+        "active": "Serveurs actifs",
+        "manage": "Gérer les serveurs",
+        "none_available": "Aucun serveur",
+        "status": {
+            "proxy_active": "Proxy actif"
+        },
+        "table": {
+            "name": "Serveur",
+            "status": "État"
+        }
     },
     
     // Health
@@ -103,7 +194,10 @@ window.I18n.translations['fr'] = {
         "healthy": "En bonne santé",
         "degraded": "Dégradé",
         "unhealthy": "Défaillant",
-        "check_now": "Vérifier maintenant"
+        "check_now": "Vérifier maintenant",
+        "refresh": {
+            "auto": "Actualisation auto"
+        }
     },
     
     // Settings
@@ -112,9 +206,12 @@ window.I18n.translations['fr'] = {
         "general": "Général",
         "appearance": "Apparence",
         "network": "Réseau",
-        "language": "Langue",
-        "language_selector": "Sélection de langue",
-        "current_language": "Langue actuelle",
+        "language": {
+            "title": "Langue",
+            "selector": "Sélection de langue", 
+            "current": "Langue actuelle",
+            "changed": "La langue a été changée avec succès"
+        },
         "theme": "Thème",
         "dark_mode": "Mode sombre",
         "light_mode": "Mode clair",
@@ -170,7 +267,7 @@ window.I18n.translations['fr'] = {
     },
     
     // Common actions/buttons
-    "actions": {
+    "action": {
         "add": "Ajouter",
         "edit": "Modifier",
         "delete": "Supprimer",
@@ -180,16 +277,33 @@ window.I18n.translations['fr'] = {
         "close": "Fermer",
         "confirm": "Confirmer",
         "back": "Retour",
-        "next": "Suivant"
+        "next": "Suivant",
+        "active": "Actualisation active"
     },
     
-    // Errors and states
-    "states": {
-        "loading": "Chargement...",
-        "error": "Erreur",
-        "success": "Succès",
-        "warning": "Avertissement",
-        "info": "Information"
+    // Success messages
+    "success": {
+        "copied": "Succès",
+        "saved": "Sauvegardé avec succès",
+        "updated": "Mise à jour réussie",
+        "deleted": "Supprimé avec succès"
+    },
+    
+    // Error messages
+    "error": {
+        "generic": "Erreur",
+        "required_field": "Veuillez remplir tous les champs requis",
+        "connection": "Erreur de connexion",
+        "not_found": "Non trouvé",
+        "server_error": "Erreur serveur",
+        "permission": "Erreur de permission"
+    },
+    
+    // Pagination
+    "pagination": {
+        "previous": "Précédent",
+        "next": "Suivant",
+        "showing": "Affichage de {{start}} à {{end}} sur {{total}} entrées"
     },
     
     // API documentation

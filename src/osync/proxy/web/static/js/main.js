@@ -89,13 +89,15 @@ const OLOL = {
             
             // Utiliser le système de traduction pour les titres standards
             let translatedTitle = title;
-            if (window.I18n && ['success', 'error', 'warning', 'info'].includes(title.toLowerCase())) {
-                translatedTitle = window.I18n.t(title.toLowerCase());
+            if (window.I18n) {
+                if (['success', 'error', 'warning', 'info'].includes(title.toLowerCase())) {
+                    translatedTitle = window.I18n.t('notifications.' + title.toLowerCase());
+                }
             }
             
             toastTitle.innerHTML = `<i class="fas fa-${icon} me-1 ${colorClass}"></i> ${translatedTitle}`;
             toastMessage.textContent = message;
-            toastTime.textContent = window.I18n ? window.I18n.t('just_now') : 'À l\'instant';
+            toastTime.textContent = window.I18n ? window.I18n.t('notifications.just_now') : 'À l\'instant';
             
             // Initialiser et afficher le toast
             const toastInstance = new bootstrap.Toast(toast);
@@ -331,6 +333,63 @@ const OLOL = {
         
         // Initialiser DataTable avec les options fusionnées
         return new DataTable(`#${tableId}`, finalOptions);
+    },
+    
+    // Gestionnaire de changement de langue
+    setupLanguageSwitcher: function() {
+        const languageSelector = document.getElementById('language-selector');
+        if (!languageSelector || !window.I18n) return;
+        
+        // Nettoyer et remplir le sélecteur de langue
+        function updateLanguageSelector() {
+            // Effacer le contenu existant
+            languageSelector.innerHTML = '';
+            
+            // Ajouter les options de langue
+            Object.keys(window.I18n.availableLanguages).forEach(langCode => {
+                const langName = window.I18n.availableLanguages[langCode];
+                const isActive = langCode === window.I18n.currentLanguage;
+                
+                const li = document.createElement('li');
+                const a = document.createElement('a');
+                a.className = `dropdown-item ${isActive ? 'active' : ''}`;
+                a.href = '#';
+                a.setAttribute('data-lang', langCode);
+                
+                // Ajouter le drapeau et le nom de la langue
+                const flag = document.createElement('span');
+                flag.className = `me-2 flag-icon flag-icon-${langCode === 'en' ? 'us' : langCode}`;
+                a.appendChild(flag);
+                a.appendChild(document.createTextNode(langName));
+                
+                // Ajouter l'écouteur d'événement pour changer la langue
+                a.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    // Désactiver le lien pendant le changement
+                    this.classList.add('disabled');
+                    
+                    // Changer la langue
+                    window.I18n.changeLanguage(langCode).then(() => {
+                        // Mettre à jour le sélecteur
+                        updateLanguageSelector();
+                        
+                        // Afficher un toast de confirmation
+                        const message = window.I18n.t('settings.language.changed');
+                        OLOL.showToast(window.I18n.t('settings.language.title'), message, 'success');
+                        
+                        // Réactiver le lien
+                        this.classList.remove('disabled');
+                    });
+                });
+                
+                li.appendChild(a);
+                languageSelector.appendChild(li);
+            });
+        }
+        
+        // Initialiser le sélecteur
+        updateLanguageSelector();
     }
 };
 
@@ -350,88 +409,70 @@ document.addEventListener('DOMContentLoaded', function() {
         return new bootstrap.Tooltip(tooltipTriggerEl)
     });
     
-    // Gestionnaire de changement de langue
-    function setupLanguageSwitcher() {
-        const langSwitcher = document.getElementById('languageSwitcher');
-        
-        if (langSwitcher && window.I18n) {
-            // Mise à jour de l'affichage du sélecteur de langue
-            const currentLangText = langSwitcher.querySelector('.current-language');
-            if (currentLangText) {
-                currentLangText.textContent = window.I18n.availableLanguages[window.I18n.currentLanguage];
-            }
-            
-            // Ajouter des écouteurs d'événements aux options de langue
-            const langOptions = langSwitcher.querySelectorAll('.dropdown-item[data-lang]');
-            langOptions.forEach(option => {
-                const lang = option.getAttribute('data-lang');
-                option.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    
-                    // Changer la langue
-                    window.I18n.changeLanguage(lang).then(() => {
-                        // Notifier l'utilisateur
-                        const langChangedTitle = window.I18n.t('language_changed');
-                        const langChangedMsg = window.I18n.t('language_changed_message');
-                        OLOL.showToast(langChangedTitle, langChangedMsg, 'success');
-                        
-                        // Mise à jour de l'affichage du sélecteur
-                        if (currentLangText) {
-                            currentLangText.textContent = window.I18n.availableLanguages[lang];
-                        }
-                        
-                        // Déclencher un événement pour que d'autres composants puissent réagir
-                        window.dispatchEvent(new CustomEvent('languageChanged', {
-                            detail: { language: lang }
-                        }));
-                    });
-                });
-            });
-        }
-    }
-    
-    // Initialiser le système de traduction et le sélecteur de langue
+    // Initialiser le système de traduction
     if (window.I18n) {
         window.I18n.init().then(() => {
-            setupLanguageSwitcher();
+            // Configure le sélecteur de langue
+            OLOL.setupLanguageSwitcher();
             
-            // Ajouter just_now à tous les dictionnaires si nécessaire
-            if (!window.I18n.translations.fr.just_now) {
-                window.I18n.translations.fr.just_now = "À l'instant";
-            }
-            if (!window.I18n.translations.en.just_now) {
-                window.I18n.translations.en.just_now = "Just now";
-            }
+            // Traduire la page après chargement
+            window.I18n.translatePage();
             
-            // Ajouter les traductions pour l'auto-refresh si elles n'existent pas
-            if (!window.I18n.translations.fr.auto_refresh) {
-                window.I18n.translations.fr.auto_refresh = "Actualisation automatique";
-                window.I18n.translations.fr.auto_refresh_enabled = "L'actualisation automatique est activée";
-                window.I18n.translations.fr.auto_refresh_on = "Auto (ON)";
-                window.I18n.translations.fr.auto_refresh_off = "Auto (OFF)";
-            }
-            if (!window.I18n.translations.en.auto_refresh) {
-                window.I18n.translations.en.auto_refresh = "Auto Refresh";
-                window.I18n.translations.en.auto_refresh_enabled = "Auto refresh is enabled";
-                window.I18n.translations.en.auto_refresh_on = "Auto (ON)";
-                window.I18n.translations.en.auto_refresh_off = "Auto (OFF)";
-            }
-            
-            // Ajouter les traductions pour le changement de langue si elles n'existent pas
-            if (!window.I18n.translations.fr.language_changed_message) {
-                window.I18n.translations.fr.language_changed_message = "La langue a été changée avec succès";
-            }
-            if (!window.I18n.translations.en.language_changed_message) {
-                window.I18n.translations.en.language_changed_message = "Language has been changed successfully";
-            }
+            console.log(`Système de traduction initialisé. Langue active: ${window.I18n.currentLanguage}`);
+        }).catch(err => {
+            console.error("Erreur lors de l'initialisation du système de traduction:", err);
         });
     }
     
-    // Écouter les changements de langue pour mettre à jour les DataTables
+    // Écouter les changements de langue pour mettre à jour l'interface
     window.addEventListener('i18n:languageChanged', function(e) {
-        // Recharger la page après un court délai pour que l'utilisateur voie le toast
-        setTimeout(() => {
-            window.location.reload();
-        }, 1000);
+        console.log(`Langue changée pour: ${e.detail.language}`);
+        
+        // Mettre à jour les textes traduits par data-i18n
+        window.I18n.translatePage();
+        
+        // Mettre à jour les éléments dynamiques
+        const sidebarToggleBtn = document.getElementById('toggleSidebarBtn');
+        if (sidebarToggleBtn) {
+            const isCollapsed = document.getElementById('sidebar-wrapper').classList.contains('toggled');
+            const collapseText = isCollapsed ? window.I18n.t('sidebar.expand') : window.I18n.t('sidebar.collapse');
+            sidebarToggleBtn.innerHTML = isCollapsed ? 
+                `<i class="fas fa-angle-right me-2"></i> ${collapseText}` : 
+                `<i class="fas fa-angle-left me-2"></i> ${collapseText}`;
+        }
+        
+        // Mettre à jour les boutons d'actualisation automatique
+        document.querySelectorAll('.auto-refresh-toggle').forEach(btn => {
+            const isActive = btn.classList.contains('active');
+            const statusText = btn.querySelector('.status-text');
+            if (statusText) {
+                statusText.textContent = isActive 
+                    ? window.I18n.t('action.active') 
+                    : window.I18n.t('health.refresh.auto');
+            }
+        });
+        
+        // Si des graphiques sont présents, mettre à jour leurs labels
+        if (window.charts) {
+            Object.keys(window.charts).forEach(chartName => {
+                const chart = window.charts[chartName];
+                if (chart && chart.options && chart.options.scales) {
+                    // Mettre à jour les titres des axes si nécessaire
+                    if (chart.options.scales.y && chart.options.scales.y.title) {
+                        const yTitleKey = chart.options.scales.y._titleKey;
+                        if (yTitleKey) {
+                            chart.options.scales.y.title.text = window.I18n.t(yTitleKey);
+                        }
+                    }
+                    if (chart.options.scales.x && chart.options.scales.x.title) {
+                        const xTitleKey = chart.options.scales.x._titleKey;
+                        if (xTitleKey) {
+                            chart.options.scales.x.title.text = window.I18n.t(xTitleKey);
+                        }
+                    }
+                    chart.update();
+                }
+            });
+        }
     });
 });

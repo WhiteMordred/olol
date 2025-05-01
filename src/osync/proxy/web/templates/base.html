@@ -113,15 +113,22 @@
                     </button>
                     <div class="collapse navbar-collapse" id="navbarSupportedContent">
                         <ul class="navbar-nav ms-auto">
-                            <!-- Sélecteur de langue -->
+                            <!-- Sélecteur de langue - maintenant avec des badges pour une meilleure visibilité -->
                             <li class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle" href="#" role="button"
-                                   data-bs-toggle="dropdown" aria-expanded="false">
-                                    <i class="fas fa-language"></i> <span class="d-none d-md-inline" data-i18n="settings.language.title">Langue</span>
+                                <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" role="button"
+                                   data-bs-toggle="dropdown" aria-expanded="false" id="currentLangDisplay">
+                                    <i class="fas fa-language me-1"></i> 
+                                    <span class="current-language-badge"></span>
+                                    <span class="ms-1 d-none d-md-inline" data-i18n="nav.language">Langue</span>
                                 </a>
                                 <ul class="dropdown-menu dropdown-menu-end" id="language-selector">
-                                    <li><a class="dropdown-item language-option" href="#" data-lang="en">English</a></li>
-                                    <li><a class="dropdown-item language-option" href="#" data-lang="fr">Français</a></li>
+                                    <li><h6 class="dropdown-header" data-i18n="settings.language.selector">Sélection de langue</h6></li>
+                                    <li><a class="dropdown-item language-option d-flex align-items-center" href="#" data-lang="en">
+                                        <span class="language-badge me-2">EN</span> English
+                                    </a></li>
+                                    <li><a class="dropdown-item language-option d-flex align-items-center" href="#" data-lang="fr">
+                                        <span class="language-badge me-2">FR</span> Français
+                                    </a></li>
                                 </ul>
                             </li>
                             <li class="nav-item dropdown">
@@ -227,6 +234,19 @@
                             Contenu de la notification
                         </div>
                     </div>
+                    
+                    <!-- Toast pour le changement de langue -->
+                    <div id="languageToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+                        <div class="toast-header bg-success text-white">
+                            <i class="fas fa-language me-2"></i>
+                            <strong class="me-auto" id="langToastTitle" data-i18n="settings.language.title">Langue</strong>
+                            <small data-i18n="notifications.just_now">À l'instant</small>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+                        </div>
+                        <div class="toast-body" id="langToastMessage" data-i18n="settings.language.changed">
+                            La langue a été changée avec succès
+                        </div>
+                    </div>
                 </div>
                 
                 <!-- Page Content -->
@@ -266,6 +286,35 @@
     <!-- Scripts and page-specific JS -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // CSS styles for language badges
+            const style = document.createElement('style');
+            style.textContent = `
+                .language-badge {
+                    display: inline-block;
+                    padding: 0.2em 0.5em;
+                    background-color: var(--cyber-accent);
+                    color: var(--cyber-text-on-accent);
+                    font-size: 0.75rem;
+                    font-weight: bold;
+                    border-radius: 3px;
+                    min-width: 2.5em;
+                    text-align: center;
+                }
+                .current-language-badge {
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 28px;
+                    height: 20px;
+                    background-color: var(--cyber-accent);
+                    color: var(--cyber-text-on-accent);
+                    font-size: 0.75rem;
+                    font-weight: bold;
+                    border-radius: 3px;
+                }
+            `;
+            document.head.appendChild(style);
+            
             // Configurer les options de Chart.js pour le thème sombre
             Chart.defaults.color = '#f1f1f1';
             Chart.defaults.scale.grid.color = 'rgba(255, 255, 255, 0.1)';
@@ -322,45 +371,72 @@
             // Listen for window resize
             window.addEventListener('resize', checkWidth);
             
+            // Fonction pour mettre à jour le badge de langue actuelle
+            function updateCurrentLanguageBadge(langCode) {
+                const currentLangBadge = document.querySelector('.current-language-badge');
+                if (currentLangBadge) {
+                    currentLangBadge.textContent = langCode.toUpperCase();
+                }
+                
+                // Mettre à jour également la langue de la balise HTML
+                document.documentElement.lang = langCode;
+            }
+            
+            // Fonction pour afficher le toast de changement de langue
+            function showLanguageToast(langName) {
+                const langToastMessage = document.getElementById('langToastMessage');
+                
+                // Traduire le message si le système I18n est disponible
+                if (window.I18n) {
+                    langToastMessage.textContent = window.I18n.t('settings.language.changed');
+                }
+                
+                const toast = new bootstrap.Toast(document.getElementById('languageToast'));
+                toast.show();
+            }
+            
             // Initialiser le sélecteur de langue
             if (window.I18n) {
                 // Initialiser le système de traduction
                 window.I18n.init().then(() => {
                     console.log('Système de traduction initialisé');
                     
-                    // Remplir le sélecteur de langue
-                    const languageSelector = document.getElementById('language-selector');
-                    if (languageSelector) {
-                        // Vider d'abord le sélecteur
-                        languageSelector.innerHTML = '';
+                    // Mettre à jour l'indicateur de langue actuelle
+                    updateCurrentLanguageBadge(window.I18n.currentLanguage);
+                    
+                    // Configurer les événements de changement de langue
+                    document.querySelectorAll('.language-option').forEach(option => {
+                        const langCode = option.getAttribute('data-lang');
                         
-                        // Ajouter les langues disponibles
-                        Object.keys(window.I18n.availableLanguages).forEach(langCode => {
-                            const langName = window.I18n.availableLanguages[langCode];
-                            const isActive = langCode === window.I18n.currentLanguage;
+                        option.addEventListener('click', function(e) {
+                            e.preventDefault();
                             
-                            const li = document.createElement('li');
-                            const a = document.createElement('a');
-                            a.className = `dropdown-item ${isActive ? 'active' : ''}`;
-                            a.href = '#';
-                            a.setAttribute('data-lang', langCode);
-                            a.innerHTML = `<span class="flag-icon flag-icon-${langCode === 'en' ? 'us' : langCode}"></span> ${langName}`;
-                            
-                            a.addEventListener('click', function(e) {
-                                e.preventDefault();
-                                window.I18n.changeLanguage(langCode).then(() => {
-                                    // Mettre à jour l'UI après le changement de langue
-                                    document.querySelectorAll('#language-selector .dropdown-item').forEach(item => {
-                                        item.classList.remove('active');
-                                    });
-                                    this.classList.add('active');
+                            window.I18n.changeLanguage(langCode).then(() => {
+                                // Mettre à jour l'UI après le changement de langue
+                                document.querySelectorAll('.language-option').forEach(item => {
+                                    item.classList.remove('active');
                                 });
+                                this.classList.add('active');
+                                
+                                // Mettre à jour le badge de langue actuelle
+                                updateCurrentLanguageBadge(langCode);
+                                
+                                // Afficher le toast
+                                const langName = window.I18n.availableLanguages[langCode];
+                                showLanguageToast(langName);
                             });
-                            
-                            li.appendChild(a);
-                            languageSelector.appendChild(li);
                         });
-                    }
+                        
+                        // Marquer l'option active
+                        if (langCode === window.I18n.currentLanguage) {
+                            option.classList.add('active');
+                        }
+                    });
+                });
+                
+                // Écouter l'événement de changement de langue
+                window.addEventListener('i18n:languageChanged', function(e) {
+                    updateCurrentLanguageBadge(e.detail.language);
                 });
             }
         });

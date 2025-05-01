@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 
-{% block title %}Modèles - Ollama Sync{% endblock %}
+{% block title %}<title data-i18n="models.title">Modèles - Ollama Sync</title>{% endblock %}
 
 {% block content %}
 <div class="row">
     <div class="col-lg-12">
-        <h2 class="mb-4 cyber-heading">Gestion des Modèles</h2>
+        <h2 class="mb-4 cyber-heading" data-i18n="models.title">Gestion des Modèles</h2>
     </div>
 </div>
 
@@ -16,7 +16,7 @@
             <div class="cyber-panel-body">
                 <div class="d-flex flex-wrap gap-2 align-items-center">
                     <div class="cyber-search">
-                        <input type="text" class="cyber-input" id="modelSearchInput" placeholder="Rechercher un modèle...">
+                        <input type="text" class="cyber-input" id="modelSearchInput" data-i18n-placeholder="models.filter.placeholder" placeholder="Rechercher un modèle...">
                         <button class="cyber-btn cyber-btn-sm" type="button" id="modelSearchBtn">
                             <i class="fas fa-search"></i>
                         </button>
@@ -24,25 +24,25 @@
                     
                     <div class="cyber-dropdown ms-2">
                         <button type="button" class="cyber-btn dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-                            Filtrer par
+                            <span data-i18n="models.filter.by">Filtrer par</span>
                         </button>
                         <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="#" data-filter="all">Tous les modèles</a></li>
-                            <li><a class="dropdown-item" href="#" data-filter="available">Disponibles</a></li>
-                            <li><a class="dropdown-item" href="#" data-filter="unavailable">Non disponibles</a></li>
+                            <li><a class="dropdown-item" href="#" data-filter="all" data-i18n="models.filter.all">Tous les modèles</a></li>
+                            <li><a class="dropdown-item" href="#" data-filter="available" data-i18n="models.status.available">Disponibles</a></li>
+                            <li><a class="dropdown-item" href="#" data-filter="unavailable" data-i18n="models.status.unavailable">Non disponibles</a></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="#" data-filter="local">Modèles locaux</a></li>
-                            <li><a class="dropdown-item" href="#" data-filter="downloaded">Modèles téléchargés</a></li>
+                            <li><a class="dropdown-item" href="#" data-filter="local" data-i18n="models.filter.local">Modèles locaux</a></li>
+                            <li><a class="dropdown-item" href="#" data-filter="downloaded" data-i18n="models.filter.downloaded">Modèles téléchargés</a></li>
                         </ul>
                     </div>
                     
                     <div class="ms-auto d-flex gap-2">
                         <button class="cyber-btn" data-bs-toggle="modal" data-bs-target="#pullModelModal">
-                            <i class="fas fa-download"></i> Télécharger un modèle
+                            <i class="fas fa-download"></i> <span data-i18n="models.pull.title">Télécharger un modèle</span>
                         </button>
                         <button class="cyber-btn auto-refresh-toggle" id="refreshModelsBtn" data-target="models-list" data-seconds="60">
                             <i class="fas fa-sync-alt"></i> 
-                            <span class="status-text">Actualisation auto</span>
+                            <span class="status-text" data-i18n="health.refresh.auto">Actualisation auto</span>
                         </button>
                     </div>
                 </div>
@@ -60,22 +60,22 @@
                 <h5 class="cyber-model-name">{{ model.name }}</h5>
                 {% if model.available %}
                 <span class="cyber-badge online">
-                    <span class="cyber-dot"></span> Disponible
+                    <span class="cyber-dot"></span> <span data-i18n="models.status.available">Disponible</span>
                 </span>
                 {% else %}
                 <span class="cyber-badge offline">
-                    <span class="cyber-dot"></span> Non disponible
+                    <span class="cyber-dot"></span> <span data-i18n="models.status.unavailable">Non disponible</span>
                 </span>
                 {% endif %}
             </div>
             <div class="cyber-model-body">
                 <div class="mb-3">
-                    <small class="cyber-text-secondary d-block mb-1">Taille:</small>
+                    <small class="cyber-text-secondary d-block mb-1" data-i18n="models.table.size">Taille:</small>
                     <strong>{{ model.size|filesizeformat }}</strong>
                 </div>
                 
                 <div class="mb-3">
-                    <small class="cyber-text-secondary d-block mb-1">Serveurs disponibles:</small>
+                    <small class="cyber-text-secondary d-block mb-1" data-i18n="models.table.servers">Serveurs disponibles:</small>
                     <div>
                         {% if model.servers %}
                             {% for server in model.servers[:3] %}
@@ -85,31 +85,31 @@
                                 <span class="cyber-badge servers">+{{ model.servers|length - 3 }}</span>
                             {% endif %}
                         {% else %}
-                            <span class="cyber-text-secondary">Aucun serveur</span>
+                            <span class="cyber-text-secondary" data-i18n="servers.none_available">Aucun serveur</span>
                         {% endif %}
                     </div>
                 </div>
                 
                 <div class="mb-3">
-                    <small class="cyber-text-secondary d-block mb-1">Paramètres:</small>
+                    <small class="cyber-text-secondary d-block mb-1" data-i18n="models.table.parameters">Paramètres:</small>
                     <div class="d-flex flex-wrap gap-1">
-                        <span class="cyber-badge">{{ model.parameters|default('N/A') }} paramètres</span>
+                        <span class="cyber-badge">{{ model.parameters|default('N/A') }} <span data-i18n="models.parameters">paramètres</span></span>
                         <span class="cyber-badge">quantized: {{ model.quantized|yesno("oui,non") }}</span>
                     </div>
                 </div>
                 
                 <div>
-                    <small class="cyber-text-secondary d-block mb-1">Dernière mise à jour:</small>
+                    <small class="cyber-text-secondary d-block mb-1" data-i18n="models.table.modified">Dernière mise à jour:</small>
                     <span>{{ model.modified_at|default('Inconnue') }}</span>
                 </div>
             </div>
             <div class="cyber-model-footer">
                 <div class="d-flex justify-content-between">
                     <a href="/playground?model={{ model.name }}" class="cyber-btn cyber-btn-sm cyber-btn-success">
-                        <i class="fas fa-play"></i> Tester
+                        <i class="fas fa-play"></i> <span data-i18n="models.test">Tester</span>
                     </a>
                     <div class="d-flex gap-1">
-                        <button class="cyber-btn cyber-btn-sm cyber-btn-info model-info-btn" data-model="{{ model.name }}">
+                        <button class="cyber-btn cyber-btn-sm cyber-btn-info model-info-btn" data-model="{{ model.name }}" data-i18n-attr-title="models.details">
                             <i class="fas fa-info-circle"></i>
                         </button>
                         <div class="cyber-dropdown">
@@ -118,14 +118,14 @@
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end">
                                 <li><a class="dropdown-item" href="#" onclick="copyModelPrompt('{{ model.name }}')">
-                                    <i class="fas fa-copy"></i> Copier le prompt
+                                    <i class="fas fa-copy"></i> <span data-i18n="models.copy_prompt">Copier le prompt</span>
                                 </a></li>
                                 <li><a class="dropdown-item" href="#" onclick="distributeModel('{{ model.name }}')">
-                                    <i class="fas fa-server"></i> Distribuer sur les serveurs
+                                    <i class="fas fa-server"></i> <span data-i18n="models.distribute">Distribuer sur les serveurs</span>
                                 </a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item text-danger" href="#" onclick="deleteModel('{{ model.name }}')">
-                                    <i class="fas fa-trash"></i> Supprimer
+                                    <i class="fas fa-trash"></i> <span data-i18n="action.delete">Supprimer</span>
                                 </a></li>
                             </ul>
                         </div>
@@ -137,7 +137,7 @@
     {% else %}
     <div class="col-12">
         <div class="cyber-alert">
-            <i class="fas fa-info-circle"></i> Aucun modèle disponible. Utilisez le bouton "Télécharger un modèle" pour en ajouter.
+            <i class="fas fa-info-circle"></i> <span data-i18n="models.none_available">Aucun modèle disponible. Utilisez le bouton "Télécharger un modèle" pour en ajouter.</span>
         </div>
     </div>
     {% endfor %}
@@ -150,13 +150,13 @@
         <nav>
             <ul class="pagination justify-content-center">
                 <li class="page-item disabled">
-                    <a class="page-link" href="#" tabindex="-1">Précédent</a>
+                    <a class="page-link" href="#" tabindex="-1" data-i18n="pagination.previous">Précédent</a>
                 </li>
                 <li class="page-item active"><a class="page-link" href="#">1</a></li>
                 <li class="page-item"><a class="page-link" href="#">2</a></li>
                 <li class="page-item"><a class="page-link" href="#">3</a></li>
                 <li class="page-item">
-                    <a class="page-link" href="#">Suivant</a>
+                    <a class="page-link" href="#" data-i18n="pagination.next">Suivant</a>
                 </li>
             </ul>
         </nav>
@@ -169,40 +169,40 @@
     <div class="modal-dialog">
         <div class="modal-content cyber-modal">
             <div class="cyber-modal-header">
-                <h5 class="modal-title" id="pullModelModalLabel">Télécharger un modèle</h5>
+                <h5 class="modal-title" id="pullModelModalLabel" data-i18n="models.pull.title">Télécharger un modèle</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="cyber-modal-body">
                 <form id="pullModelForm">
                     <div class="mb-3">
-                        <label for="modelName" class="form-label">Nom du modèle</label>
-                        <input type="text" class="cyber-input form-control" id="modelName" placeholder="ex: llama2, mistral, etc." required>
-                        <div class="form-text">
+                        <label for="modelName" class="form-label" data-i18n="models.add.name">Nom du modèle</label>
+                        <input type="text" class="cyber-input form-control" id="modelName" data-i18n-placeholder="models.name.placeholder" placeholder="ex: llama2, mistral, etc." required>
+                        <div class="form-text" data-i18n="models.name.help">
                             Entrez le nom du modèle à télécharger depuis le catalogue Ollama.
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label for="serverSelect" class="form-label">Serveur cible</label>
+                        <label for="serverSelect" class="form-label" data-i18n="models.add.server">Serveur cible</label>
                         <select class="cyber-input form-select" id="serverSelect" required>
-                            <option value="" selected disabled>Sélectionner un serveur</option>
-                            <option value="all">Tous les serveurs</option>
+                            <option value="" selected disabled data-i18n="models.server.select">Sélectionner un serveur</option>
+                            <option value="all" data-i18n="models.server.all">Tous les serveurs</option>
                             {% for server in servers %}
                                 <option value="{{ server.address }}">{{ server.address }}</option>
                             {% endfor %}
                         </select>
-                        <div class="form-text">
+                        <div class="form-text" data-i18n="models.server.help">
                             Sélectionnez le serveur sur lequel vous souhaitez télécharger ce modèle.
                         </div>
                     </div>
                     <div class="mb-3 form-check">
                         <input type="checkbox" class="form-check-input" id="insecureCheckbox">
-                        <label class="form-check-label" for="insecureCheckbox">Autoriser les sources non sécurisées</label>
+                        <label class="form-check-label" for="insecureCheckbox" data-i18n="models.insecure">Autoriser les sources non sécurisées</label>
                     </div>
                 </form>
             </div>
             <div class="cyber-modal-footer">
-                <button type="button" class="cyber-btn cyber-btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                <button type="button" class="cyber-btn" id="pullModelBtn">Télécharger</button>
+                <button type="button" class="cyber-btn cyber-btn-secondary" data-bs-dismiss="modal" data-i18n="action.cancel">Annuler</button>
+                <button type="button" class="cyber-btn" id="pullModelBtn" data-i18n="models.pull.submit">Télécharger</button>
             </div>
         </div>
     </div>
@@ -213,43 +213,43 @@
     <div class="modal-dialog modal-lg">
         <div class="modal-content cyber-modal">
             <div class="cyber-modal-header">
-                <h5 class="modal-title" id="modelInfoModalLabel">Informations du modèle</h5>
+                <h5 class="modal-title" id="modelInfoModalLabel" data-i18n="models.details">Informations du modèle</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="cyber-modal-body">
                 <div class="row mb-4">
                     <div class="col-md-6">
-                        <h6>Informations générales</h6>
+                        <h6 data-i18n="models.info.general">Informations générales</h6>
                         <table class="cyber-table cyber-table-sm">
                             <tr>
-                                <th>Nom</th>
+                                <th data-i18n="models.table.name">Nom</th>
                                 <td id="infoModelName"></td>
                             </tr>
                             <tr>
-                                <th>Taille</th>
+                                <th data-i18n="models.table.size">Taille</th>
                                 <td id="infoModelSize"></td>
                             </tr>
                             <tr>
-                                <th>Paramètres</th>
+                                <th data-i18n="models.table.parameters">Paramètres</th>
                                 <td id="infoModelParams"></td>
                             </tr>
                             <tr>
-                                <th>Famille</th>
+                                <th data-i18n="models.table.family">Famille</th>
                                 <td id="infoModelFamily"></td>
                             </tr>
                             <tr>
-                                <th>Quantization</th>
+                                <th data-i18n="models.table.quantization">Quantization</th>
                                 <td id="infoModelQuant"></td>
                             </tr>
                         </table>
                     </div>
                     <div class="col-md-6">
-                        <h6>Disponibilité</h6>
+                        <h6 data-i18n="models.availability">Disponibilité</h6>
                         <table class="cyber-table cyber-table-sm" id="infoServerTable">
                             <thead>
                                 <tr>
-                                    <th>Serveur</th>
-                                    <th>État</th>
+                                    <th data-i18n="servers.table.name">Serveur</th>
+                                    <th data-i18n="servers.table.status">État</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -259,14 +259,14 @@
                     </div>
                 </div>
                 
-                <h6>Template de prompt</h6>
+                <h6 data-i18n="models.prompt_template">Template de prompt</h6>
                 <div class="cyber-code-block mb-4" id="infoModelTemplate"></div>
                 
-                <h6>Paramètres par défaut</h6>
+                <h6 data-i18n="models.default_params">Paramètres par défaut</h6>
                 <div class="cyber-code-block" id="infoModelDefaultParams"></div>
             </div>
             <div class="cyber-modal-footer">
-                <button type="button" class="cyber-btn cyber-btn-secondary" data-bs-dismiss="modal">Fermer</button>
+                <button type="button" class="cyber-btn cyber-btn-secondary" data-bs-dismiss="modal" data-i18n="action.close">Fermer</button>
             </div>
         </div>
     </div>
@@ -277,19 +277,19 @@
     <div class="modal-dialog">
         <div class="modal-content cyber-modal">
             <div class="cyber-modal-header">
-                <h5 class="modal-title" id="deleteModelModalLabel">Confirmer la suppression</h5>
+                <h5 class="modal-title" id="deleteModelModalLabel" data-i18n="models.delete.confirm">Confirmer la suppression</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="cyber-modal-body">
-                <p>Êtes-vous sûr de vouloir supprimer le modèle <strong id="deleteModelName"></strong> ?</p>
+                <p><span data-i18n="models.delete.confirm_text">Êtes-vous sûr de vouloir supprimer le modèle</span> <strong id="deleteModelName"></strong> ?</p>
                 <div class="cyber-alert">
                     <i class="fas fa-exclamation-triangle"></i> 
-                    Cette action supprimera le modèle de tous les serveurs où il est installé.
+                    <span data-i18n="models.delete.warning">Cette action supprimera le modèle de tous les serveurs où il est installé.</span>
                 </div>
             </div>
             <div class="cyber-modal-footer">
-                <button type="button" class="cyber-btn cyber-btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                <button type="button" class="cyber-btn cyber-btn-danger" id="confirmDeleteModelBtn">Supprimer</button>
+                <button type="button" class="cyber-btn cyber-btn-secondary" data-bs-dismiss="modal" data-i18n="action.cancel">Annuler</button>
+                <button type="button" class="cyber-btn cyber-btn-danger" id="confirmDeleteModelBtn" data-i18n="action.delete">Supprimer</button>
             </div>
         </div>
     </div>
@@ -299,8 +299,8 @@
 <div class="toast-container position-fixed bottom-0 end-0 p-3">
     <div id="modelToast" class="cyber-toast" role="alert" aria-live="assertive" aria-atomic="true">
         <div class="cyber-toast-header">
-            <strong class="me-auto" id="toastTitle">Notification</strong>
-            <small id="toastTime">À l'instant</small>
+            <strong class="me-auto" id="toastTitle" data-i18n="notifications.title">Notification</strong>
+            <small id="toastTime" data-i18n="notifications.just_now">À l'instant</small>
             <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
         </div>
         <div class="cyber-toast-body" id="toastMessage"></div>
@@ -389,7 +389,10 @@ document.addEventListener('DOMContentLoaded', function() {
         // Pour l'exemple, on va simuler une réponse
         
         // Mettre à jour le titre du modal
-        document.getElementById('modelInfoModalLabel').textContent = `Informations: ${modelName}`;
+        const infoTitle = window.I18n ? 
+            window.I18n.t('models.info.title_for', {name: modelName}) : 
+            `Informations: ${modelName}`;
+        document.getElementById('modelInfoModalLabel').textContent = infoTitle;
         
         // Mettre à jour les informations générales
         document.getElementById('infoModelName').textContent = modelName;
@@ -440,13 +443,23 @@ document.addEventListener('DOMContentLoaded', function() {
                 const dotSpan = document.createElement('span');
                 dotSpan.className = 'cyber-dot';
                 statusBadge.appendChild(dotSpan);
-                statusBadge.appendChild(document.createTextNode(' Disponible'));
+                
+                // Utiliser le système de traduction si disponible
+                const availableText = window.I18n ? 
+                    window.I18n.t('models.status.available') : 
+                    ' Disponible';
+                statusBadge.appendChild(document.createTextNode(availableText));
             } else {
                 statusBadge.className = 'cyber-badge offline';
                 const dotSpan = document.createElement('span');
                 dotSpan.className = 'cyber-dot';
                 statusBadge.appendChild(dotSpan);
-                statusBadge.appendChild(document.createTextNode(' Non disponible'));
+                
+                // Utiliser le système de traduction si disponible
+                const unavailableText = window.I18n ? 
+                    window.I18n.t('models.status.unavailable') : 
+                    ' Non disponible';
+                statusBadge.appendChild(document.createTextNode(unavailableText));
             }
             
             statusCell.appendChild(statusBadge);
@@ -465,21 +478,48 @@ document.addEventListener('DOMContentLoaded', function() {
         // Simuler la copie du prompt
         navigator.clipboard.writeText(`<s>[INST] {{prompt}} [/INST]</s>`)
             .then(() => {
-                showToast('Succès', 'Template de prompt copié dans le presse-papier', 'success');
+                const successTitle = window.I18n ? window.I18n.t('success.copied') : 'Succès';
+                const successMsg = window.I18n ? 
+                    window.I18n.t('models.prompt_copied') : 
+                    'Template de prompt copié dans le presse-papier';
+                
+                showToast(successTitle, successMsg, 'success');
             })
             .catch(err => {
                 console.error('Erreur lors de la copie :', err);
-                showToast('Erreur', 'Impossible de copier le template', 'danger');
+                
+                const errorTitle = window.I18n ? window.I18n.t('error.generic') : 'Erreur';
+                const errorMsg = window.I18n ? 
+                    window.I18n.t('models.prompt_copy_error') : 
+                    'Impossible de copier le template';
+                
+                showToast(errorTitle, errorMsg, 'danger');
             });
     };
     
     // Fonction pour distribuer le modèle
     window.distributeModel = function(modelName) {
-        showToast('Distribution en cours', `Distribution de ${modelName} sur tous les serveurs...`, 'info');
+        const distributingTitle = window.I18n ? 
+            window.I18n.t('models.distribute.title') : 
+            'Distribution en cours';
+        
+        const distributingMsg = window.I18n ? 
+            window.I18n.t('models.distribute.progress', {model: modelName}) : 
+            `Distribution de ${modelName} sur tous les serveurs...`;
+        
+        showToast(distributingTitle, distributingMsg, 'info');
         
         // Ici on simulerait un appel API pour distribuer le modèle
         setTimeout(() => {
-            showToast('Distribution terminée', `${modelName} a été distribué avec succès`, 'success');
+            const successTitle = window.I18n ? 
+                window.I18n.t('models.distribute.complete') : 
+                'Distribution terminée';
+            
+            const successMsg = window.I18n ? 
+                window.I18n.t('models.distribute.success', {model: modelName}) : 
+                `${modelName} a été distribué avec succès`;
+            
+            showToast(successTitle, successMsg, 'success');
         }, 2000);
     };
     
@@ -500,9 +540,19 @@ document.addEventListener('DOMContentLoaded', function() {
         modal.hide();
         
         // Afficher un indicateur de chargement
-        this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Suppression...';
+        const deletingText = window.I18n ? 
+            `<i class="fas fa-spinner fa-spin"></i> ${window.I18n.t('models.delete.progress')}` : 
+            '<i class="fas fa-spinner fa-spin"></i> Suppression...';
+        
+        this.innerHTML = deletingText;
         this.disabled = true;
-        showToast('Suppression en cours', `Suppression de ${modelName}...`, 'info');
+        
+        const deletingTitle = window.I18n ? window.I18n.t('models.delete.title') : 'Suppression en cours';
+        const deletingMsg = window.I18n ? 
+            window.I18n.t('models.delete.progress_msg', {model: modelName}) : 
+            `Suppression de ${modelName}...`;
+        
+        showToast(deletingTitle, deletingMsg, 'info');
         
         // Simuler un appel API pour supprimer le modèle
         setTimeout(() => {
@@ -515,7 +565,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 modelElement.remove();
             }
             
-            showToast('Suppression terminée', `${modelName} a été supprimé avec succès`, 'success');
+            const successTitle = window.I18n ? window.I18n.t('models.delete.complete') : 'Suppression terminée';
+            const successMsg = window.I18n ? 
+                window.I18n.t('models.delete.success', {model: modelName}) : 
+                `${modelName} a été supprimé avec succès`;
+            
+            showToast(successTitle, successMsg, 'success');
         }, 1500);
     });
     
@@ -527,12 +582,21 @@ document.addEventListener('DOMContentLoaded', function() {
         const originalText = this.innerHTML;
         
         if (!modelName || !server) {
-            showToast('Erreur', 'Veuillez remplir tous les champs requis', 'danger');
+            const errorTitle = window.I18n ? window.I18n.t('error.generic') : 'Erreur';
+            const errorMsg = window.I18n ? 
+                window.I18n.t('error.required_field') : 
+                'Veuillez remplir tous les champs requis';
+            
+            showToast(errorTitle, errorMsg, 'danger');
             return;
         }
         
         // Afficher un indicateur de chargement
-        this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Téléchargement...';
+        const downloadingText = window.I18n ? 
+            `<i class="fas fa-spinner fa-spin"></i> ${window.I18n.t('models.pull.progress')}` : 
+            '<i class="fas fa-spinner fa-spin"></i> Téléchargement...';
+        
+        this.innerHTML = downloadingText;
         this.disabled = true;
         
         // Fermer le modal
@@ -540,13 +604,24 @@ document.addEventListener('DOMContentLoaded', function() {
         modal.hide();
         
         // Simuler le téléchargement
-        showToast('Téléchargement', `Téléchargement de ${modelName} en cours...`, 'info');
+        const downloadingTitle = window.I18n ? window.I18n.t('models.pull.title') : 'Téléchargement';
+        const downloadingMsg = window.I18n ? 
+            window.I18n.t('models.pull.progress_msg', {model: modelName}) :
+            `Téléchargement de ${modelName} en cours...`;
+        
+        showToast(downloadingTitle, downloadingMsg, 'info');
         
         // Dans un cas réel, on ferait un appel API ici
         setTimeout(() => {
             this.innerHTML = originalText;
             this.disabled = false;
-            showToast('Téléchargement terminé', `${modelName} a été téléchargé avec succès`, 'success');
+            
+            const successTitle = window.I18n ? window.I18n.t('models.pull.complete') : 'Téléchargement terminé';
+            const successMsg = window.I18n ? 
+                window.I18n.t('models.pull.success', {model: modelName}) : 
+                `${modelName} a été téléchargé avec succès`;
+            
+            showToast(successTitle, successMsg, 'success');
             
             // Recharger la page pour afficher le nouveau modèle
             // Dans un cas réel, on ajouterait dynamiquement le modèle à la liste
@@ -561,9 +636,17 @@ document.addEventListener('DOMContentLoaded', function() {
         const toast = document.getElementById('modelToast');
         const toastTitle = document.getElementById('toastTitle');
         const toastMessage = document.getElementById('toastMessage');
+        const toastTime = document.getElementById('toastTime');
         
         toastTitle.textContent = title;
         toastMessage.textContent = message;
+        
+        // Utiliser le système i18n pour le timestamp si disponible
+        if (window.I18n) {
+            toastTime.textContent = window.I18n.t('notifications.just_now');
+        } else {
+            toastTime.textContent = 'À l\'instant';
+        }
         
         toast.classList.remove('success', 'danger', 'warning', 'info');
         toast.classList.add(type);
@@ -579,12 +662,19 @@ document.addEventListener('DOMContentLoaded', function() {
         const statusText = this.querySelector('.status-text');
         
         if (isActive) {
-            statusText.textContent = 'Actualisation active';
+            statusText.textContent = window.I18n ? window.I18n.t('action.active') : 'Actualisation active';
             // Dans un cas réel, on mettrait en place un appel périodique à l'API
         } else {
-            statusText.textContent = 'Actualisation auto';
+            statusText.textContent = window.I18n ? window.I18n.t('health.refresh.auto') : 'Actualisation auto';
         }
     });
+    
+    // Initialiser le système de traduction si disponible
+    if (window.I18n && typeof window.I18n.init === 'function') {
+        window.I18n.init().then(() => {
+            console.log('Système de traduction initialisé sur la page des modèles');
+        });
+    }
 });
 </script>
 {% endblock %}

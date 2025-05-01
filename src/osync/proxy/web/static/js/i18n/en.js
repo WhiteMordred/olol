@@ -24,9 +24,16 @@ window.I18n.translations['en'] = {
         "settings": "Settings",
         "playground": "Playground",
         "terminal": "Terminal",
+        "log": "Logs",
         "swagger": "API Docs",
         "api_documentation": "API Documentation",
         "language": "Language"
+    },
+    
+    // Sidebar
+    "sidebar": {
+        "collapse": "Collapse",
+        "expand": "Expand"
     },
     
     // Notifications
@@ -37,7 +44,11 @@ window.I18n.translations['en'] = {
         "high_load": "High Load",
         "model_downloaded": "Model Downloaded",
         "just_now": "Just now",
-        "see_all": "See All Notifications"
+        "see_all": "See All Notifications",
+        "success": "Success",
+        "error": "Error",
+        "warning": "Warning",
+        "info": "Information"
     },
     
     // Dashboard
@@ -66,11 +77,80 @@ window.I18n.translations['en'] = {
         "quantization": "Quantization",
         "download": "Download",
         "delete": "Delete",
-        "pull": "Pull Model",
-        "model_details": "Model Details",
-        "parameters": "Parameters",
+        "pull": {
+            "title": "Download Model",
+            "submit": "Download",
+            "progress": "Downloading...",
+            "progress_msg": "Downloading {{model}}...",
+            "complete": "Download Complete",
+            "success": "{{model}} has been downloaded successfully"
+        },
+        "details": "Model Information",
+        "info": {
+            "general": "General Information",
+            "title_for": "Information: {{name}}"
+        },
+        "parameters": "parameters",
         "server_location": "Server Location",
-        "loading": "Loading models..."
+        "loading": "Loading models...",
+        "status": {
+            "available": "Available",
+            "unavailable": "Unavailable"
+        },
+        "add": {
+            "name": "Model Name",
+            "server": "Target Server"
+        },
+        "name": {
+            "placeholder": "e.g. llama2, mistral, etc.",
+            "help": "Enter the model name to download from the Ollama catalog."
+        },
+        "server": {
+            "select": "Select a server",
+            "all": "All servers",
+            "help": "Select the server where you want to download this model."
+        },
+        "insecure": "Allow Insecure Sources",
+        "none_available": "No models available. Use the \"Download Model\" button to add one.",
+        "filter": {
+            "by": "Filter by",
+            "all": "All Models",
+            "local": "Local Models",
+            "downloaded": "Downloaded Models",
+            "placeholder": "Search for a model..."
+        },
+        "table": {
+            "name": "Name",
+            "size": "Size:",
+            "servers": "Available Servers:",
+            "parameters": "Parameters:",
+            "modified": "Last Updated:",
+            "family": "Family",
+            "quantization": "Quantization"
+        },
+        "test": "Test",
+        "copy_prompt": "Copy Prompt",
+        "distribute": {
+            "title": "Distribution in Progress",
+            "progress": "Distributing {{model}} to all servers...",
+            "complete": "Distribution Complete",
+            "success": "{{model}} has been distributed successfully"
+        },
+        "delete": {
+            "title": "Deletion in Progress",
+            "confirm": "Confirm Deletion",
+            "confirm_text": "Are you sure you want to delete the model",
+            "warning": "This action will delete the model from all servers where it is installed.",
+            "progress": "Deleting...",
+            "progress_msg": "Deleting {{model}}...",
+            "complete": "Deletion Complete",
+            "success": "{{model}} has been deleted successfully"
+        },
+        "availability": "Availability",
+        "prompt_template": "Prompt Template",
+        "default_params": "Default Parameters",
+        "prompt_copied": "Prompt template copied to clipboard",
+        "prompt_copy_error": "Unable to copy the template"
     },
     
     // Servers
@@ -89,7 +169,18 @@ window.I18n.translations['en'] = {
         "uptime": "Uptime",
         "cpu": "CPU",
         "memory": "Memory",
-        "models_hosted": "Models Hosted"
+        "models_hosted": "Models Hosted",
+        "cluster_status": "Cluster Status",
+        "active": "Active Servers",
+        "manage": "Manage Servers",
+        "none_available": "No Servers",
+        "status": {
+            "proxy_active": "Proxy Active"
+        },
+        "table": {
+            "name": "Server",
+            "status": "Status"
+        }
     },
     
     // Health
@@ -103,7 +194,10 @@ window.I18n.translations['en'] = {
         "healthy": "Healthy",
         "degraded": "Degraded",
         "unhealthy": "Unhealthy",
-        "check_now": "Check Now"
+        "check_now": "Check Now",
+        "refresh": {
+            "auto": "Auto Refresh"
+        }
     },
     
     // Settings
@@ -112,9 +206,12 @@ window.I18n.translations['en'] = {
         "general": "General",
         "appearance": "Appearance",
         "network": "Network",
-        "language": "Language",
-        "language_selector": "Language Selection",
-        "current_language": "Current Language",
+        "language": {
+            "title": "Language",
+            "selector": "Language Selection",
+            "current": "Current Language",
+            "changed": "Language has been changed successfully"
+        },
         "theme": "Theme",
         "dark_mode": "Dark Mode",
         "light_mode": "Light Mode",
@@ -170,7 +267,7 @@ window.I18n.translations['en'] = {
     },
     
     // Common actions/buttons
-    "actions": {
+    "action": {
         "add": "Add",
         "edit": "Edit",
         "delete": "Delete",
@@ -180,16 +277,33 @@ window.I18n.translations['en'] = {
         "close": "Close",
         "confirm": "Confirm",
         "back": "Back",
-        "next": "Next"
+        "next": "Next",
+        "active": "Active Refresh"
     },
     
-    // Errors and states
-    "states": {
-        "loading": "Loading...",
-        "error": "Error",
-        "success": "Success",
-        "warning": "Warning",
-        "info": "Information"
+    // Success messages
+    "success": {
+        "copied": "Success",
+        "saved": "Saved successfully",
+        "updated": "Updated successfully",
+        "deleted": "Deleted successfully"
+    },
+    
+    // Error messages
+    "error": {
+        "generic": "Error",
+        "required_field": "Please fill in all required fields",
+        "connection": "Connection error",
+        "not_found": "Not found",
+        "server_error": "Server error",
+        "permission": "Permission error"
+    },
+    
+    // Pagination
+    "pagination": {
+        "previous": "Previous",
+        "next": "Next",
+        "showing": "Showing {{start}} to {{end}} of {{total}} entries"
     },
     
     // API documentation
