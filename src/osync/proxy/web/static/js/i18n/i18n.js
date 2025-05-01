@@ -1,6 +1,7 @@
 /**
  * Ollama Sync - Système de traduction (i18n)
  * Module de gestion des traductions pour l'interface web
+ * Version 2.0 - Architecture modulaire par page
  */
 
 const I18n = {
@@ -21,6 +22,57 @@ const I18n = {
     translations: {
         'en': {},
         'fr': {}
+    },
+    
+    /**
+     * Détermine les sections/pages à charger en fonction de la page courante
+     * @returns {Array} - Liste des sections à charger
+     */
+    getSectionsToLoad: function() {
+        // Toujours charger les traductions communes
+        const sections = ['common'];
+        
+        // Déterminer la page actuelle en fonction de l'URL
+        const path = window.location.pathname.toLowerCase();
+        
+        if (path.includes('dashboard') || path === '/' || path === '') {
+            sections.push('dashboard');
+        }
+        if (path.includes('models')) {
+            sections.push('models');
+        }
+        if (path.includes('servers')) {
+            sections.push('servers');
+        }
+        if (path.includes('health')) {
+            sections.push('health');
+        }
+        if (path.includes('settings')) {
+            sections.push('settings');
+        }
+        if (path.includes('playground')) {
+            sections.push('playground');
+        }
+        if (path.includes('queue')) {
+            sections.push('queue');
+        }
+        if (path.includes('terminal')) {
+            sections.push('terminal');
+        }
+        if (path.includes('log')) {
+            sections.push('log');
+        }
+        if (path.includes('swagger')) {
+            sections.push('swagger');
+        }
+        
+        // Si aucune section spécifique n'est détectée, charger toutes les sections
+        if (sections.length === 1) {
+            sections.push('dashboard', 'models', 'servers', 'health', 'settings', 
+                         'playground', 'queue', 'terminal', 'log', 'swagger');
+        }
+        
+        return sections;
     },
     
     /**
@@ -47,45 +99,87 @@ const I18n = {
         // Traduire la page au chargement
         this.translatePage();
         
+        // Ajouter un écouteur d'événements pour les changements de langue
+        window.addEventListener('i18n:languageChanged', () => {
+            this.translatePage();
+        });
+        
         // Marquer comme initialisé
         this.initialized = true;
+        
+        // Ajouter un helper pour le débogage des traductions
+        if (window.location.search.includes('debug_i18n=1')) {
+            this.enableDebugMode();
+        }
         
         return Promise.resolve();
     },
     
     /**
-     * Charge les fichiers de traduction
+     * Active le mode de débogage pour les traductions
+     */
+    enableDebugMode: function() {
+        document.body.classList.add('i18n-debug');
+        document.querySelectorAll('[data-i18n]').forEach(element => {
+            const key = element.getAttribute('data-i18n');
+            element.setAttribute('title', `Translation key: ${key}`);
+            element.style.outline = '1px dashed orange';
+        });
+        console.log('Mode débogage i18n activé');
+        console.log('Traductions disponibles:', this.translations);
+    },
+    
+    /**
+     * Charge les fichiers de traduction JSON pour toutes les sections nécessaires
      * @returns {Promise} - Promise résolue quand le chargement est terminé
      */
     loadTranslations: async function() {
-        // Définir les langues à charger
-        const langsToLoad = ['en', 'fr']; // Toujours charger l'anglais comme fallback
+        // Obtenir les sections à charger
+        const sections = this.getSectionsToLoad();
+        const languages = ['en', this.currentLanguage]; // Toujours charger l'anglais comme fallback
         
-        // Charger chaque fichier de traduction
-        const promises = langsToLoad.map(lang => {
-            return fetch(`/static/js/i18n/${lang}.js`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`Erreur de chargement du fichier de traduction ${lang}`);
-                    }
-                    return response.text();
-                })
-                .then(jsContent => {
-                    // Exécuter le script pour enregistrer les traductions
-                    // Le fichier de traduction doit définir sa variable sur window.I18n.translations[lang]
-                    try {
-                        eval(jsContent);
-                    } catch (e) {
-                        console.error(`Erreur dans le fichier de traduction ${lang}:`, e);
-                    }
-                })
-                .catch(err => {
-                    console.error(`Impossible de charger le fichier de traduction ${lang}:`, err);
-                });
-        });
+        // Créer un ensemble unique de langues à charger
+        const uniqueLanguages = [...new Set(languages)];
         
-        // Attendre que tous les fichiers soient chargés
-        await Promise.all(promises);
+        const loadPromises = [];
+        
+        // Pour chaque langue, charger toutes les sections nécessaires
+        for (const lang of uniqueLanguages) {
+            for (const section of sections) {
+                const url = `/static/js/i18n/${section}/${lang}.json`;
+                
+                const promise = fetch(url)
+                    .then(response => {
+                        if (!response.ok) {
+                            console.warn(`Fichier de traduction non trouvé: ${url}`);
+                            return null; // Continuer même si le fichier n'existe pas
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (!data) return; // Si pas de données, ne rien faire
+                        
+                        // Initialiser la section si nécessaire
+                        if (!this.translations[lang]) {
+                            this.translations[lang] = {};
+                        }
+                        
+                        // Fusionner les traductions
+                        this.translations[lang] = {
+                            ...this.translations[lang],
+                            ...data
+                        };
+                    })
+                    .catch(err => {
+                        console.error(`Erreur lors du chargement des traductions ${section}/${lang}:`, err);
+                    });
+                
+                loadPromises.push(promise);
+            }
+        }
+        
+        // Attendre que toutes les traductions soient chargées
+        await Promise.all(loadPromises);
         
         return Promise.resolve();
     },
@@ -108,10 +202,8 @@ const I18n = {
         // Sauvegarder la préférence
         localStorage.setItem('olol_language', lang);
         
-        // Charger les traductions si nécessaire
-        if (Object.keys(this.translations[lang]).length === 0) {
-            await this.loadTranslations();
-        }
+        // Recharger les traductions pour la nouvelle langue
+        await this.loadTranslations();
         
         // Traduire la page
         this.translatePage();
@@ -125,23 +217,38 @@ const I18n = {
     },
     
     /**
-     * Traduit un texte dans la langue active
-     * @param {string} key - Clé de traduction à rechercher
+     * Traduit un texte dans la langue active avec support pour les clés hiérarchiques
+     * @param {string} key - Clé de traduction à rechercher (peut être imbriquée avec des points)
      * @param {Object} params - Paramètres à substituer dans la traduction
      * @returns {string} - Texte traduit ou clé si non trouvée
      */
     t: function(key, params = {}) {
-        // Vérifier si la clé existe dans la langue actuelle
-        let text = this.translations[this.currentLanguage][key];
+        // Support des clés imbriquées (ex: "app.title")
+        let translation = null;
+        
+        // Pour la langue actuelle
+        let obj = this.translations[this.currentLanguage];
+        if (obj) {
+            translation = this.getNestedTranslation(obj, key);
+        }
         
         // Si non trouvée, utiliser l'anglais comme fallback
-        if (!text && this.currentLanguage !== 'en') {
-            text = this.translations['en'][key];
+        if (translation === null && this.currentLanguage !== 'en') {
+            obj = this.translations['en'];
+            if (obj) {
+                translation = this.getNestedTranslation(obj, key);
+            }
         }
         
         // Si toujours non trouvée, retourner la clé
-        if (!text) {
+        if (translation === null) {
             console.warn(`Traduction manquante pour la clé "${key}" en ${this.currentLanguage}`);
+            return key;
+        }
+        
+        // Si la traduction est un objet (ce qui ne devrait pas arriver), retourner la clé
+        if (typeof translation === 'object') {
+            console.warn(`La clé "${key}" pointe vers un objet et non une chaîne de caractères`);
             return key;
         }
         
@@ -149,11 +256,53 @@ const I18n = {
         if (params && Object.keys(params).length > 0) {
             Object.keys(params).forEach(param => {
                 const regex = new RegExp(`{{${param}}}`, 'g');
-                text = text.replace(regex, params[param]);
+                translation = translation.replace(regex, params[param]);
             });
         }
         
-        return text;
+        return translation;
+    },
+    
+    /**
+     * Récupère une traduction depuis un objet imbriqué avec support des points dans les clés
+     * @param {Object} obj - Objet de traduction
+     * @param {string} key - Clé à rechercher (peut contenir des points)
+     * @returns {string|null} - Traduction trouvée ou null si non trouvée
+     */
+    getNestedTranslation: function(obj, key) {
+        // Clé simple (sans hiérarchie)
+        if (!key.includes('.')) {
+            return obj[key] || null;
+        }
+        
+        // Clé imbriquée
+        const parts = key.split('.');
+        let current = obj;
+        
+        // Parcourir la hiérarchie
+        for (let i = 0; i < parts.length; i++) {
+            const part = parts[i];
+            
+            // Si la partie n'existe pas ou n'est pas un objet
+            if (!current[part]) {
+                return null;
+            }
+            
+            // Si c'est la dernière partie, retourner la valeur
+            if (i === parts.length - 1) {
+                return current[part];
+            }
+            
+            // Sinon, continuer à descendre dans la hiérarchie
+            current = current[part];
+            
+            // Si on arrive sur une feuille avant la fin du chemin
+            if (typeof current !== 'object') {
+                return null;
+            }
+        }
+        
+        return null;
     },
     
     /**
@@ -166,7 +315,10 @@ const I18n = {
             
             // Traduire le contenu
             if (key) {
-                element.textContent = this.t(key);
+                const translation = this.t(key);
+                if (translation !== key) { // Ne mettre à jour que si la traduction est disponible
+                    element.textContent = translation;
+                }
             }
             
             // Traduire les attributs (data-i18n-attr="title:key")
@@ -196,3 +348,10 @@ const I18n = {
 
 // Exposer l'objet I18n globalement
 window.I18n = I18n;
+
+// Initialiser le système de traduction dès que le DOM est chargé
+document.addEventListener('DOMContentLoaded', () => {
+    window.I18n.init().catch(err => {
+        console.error("Erreur lors de l'initialisation du système de traduction:", err);
+    });
+});

@@ -1,0 +1,67 @@
+{
+  "dashboard": {
+    "title": "Tableau de bord",
+    "subtitle": "Vue d'ensemble du système",
+    "summary": "Résumé",
+    "servers": {
+      "total": "Total des serveurs",
+      "online": "Serveurs en ligne",
+      "offline": "Serveurs hors ligne",
+      "status": "État des serveurs",
+      "load": "Charge du système",
+      "history": "Historique d'activité",
+      "management": "Gestion des serveurs"
+    },
+    "models": {
+      "total": "Total des modèles",
+      "active": "Modèles actifs",
+      "popular": "Modèles populaires"
+    },
+    "view": {
+      "details": "Voir les détails",
+      "models": "Voir les modèles",
+      "all_models": "Voir tous les modèles",
+      "performance": "Voir les performances"
+    },
+    "uptime": "Temps de fonctionnement",
+    "version": "Version",
+    "system": {
+      "status": "État du système",
+      "health": "Santé du système",
+      "resources": "Ressources",
+      "cpu": "CPU",
+      "memory": "Mémoire",
+      "disk": "Disque",
+      "network": "Réseau"
+    },
+    "statistics": {
+      "requests": "Requêtes",
+      "tokens": "Tokens générés",
+      "latency": "Latence moyenne",
+      "success_rate": "Taux de succès"
+    },
+    "activity": {
+      "recent": "Activité récente",
+      "no_activity": "Aucune activité récente"
+    },
+    "tips": {
+      "title": "Conseils",
+      "content": "Bienvenue sur OLOL, votre gestionnaire de cluster Ollama. Utilisez la barre latérale pour naviguer entre les différentes fonctionnalités."
+    },
+    "quick_actions": {
+      "title": "Actions rapides",
+      "add_server": "Ajouter un serveur",
+      "download_model": "Télécharger un modèle",
+      "test_playground": "Tester le playground",
+      "check_health": "Vérifier l'état du système"
+    },
+    "alerts": {
+      "title": "Alertes",
+      "no_alerts": "Aucune alerte",
+      "server_offline": "Serveur hors ligne",
+      "high_load": "Charge élevée",
+      "low_disk": "Espace disque faible",
+      "update_available": "Mise à jour disponible"
+    }
+  }
+}

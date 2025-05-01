@@ -1,0 +1,56 @@
+{
+  "app": {
+    "name": "Ollama Sync",
+    "copyright": "Ollama Sync © 2025",
+    "version": "Version 1.0.0"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "models": "Models",
+    "servers": "Servers", 
+    "health": "System Health",
+    "queue": "Queue",
+    "settings": "Settings",
+    "playground": "Playground",
+    "terminal": "Terminal",
+    "log": "Logs",
+    "swagger": "API Documentation",
+    "api_documentation": "API Documentation",
+    "language": "Language"
+  },
+  "sidebar": {
+    "collapse": "Collapse",
+    "expand": "Expand"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "new_server": "New server detected",
+    "server_offline": "Server offline",
+    "high_load": "High load",
+    "model_downloaded": "Model downloaded",
+    "just_now": "Just now",
+    "see_all": "See all notifications",
+    "success": "Success",
+    "error": "Error",
+    "warning": "Warning",
+    "info": "Information"
+  },
+  "common": {
+    "loading": "Loading...",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "edit": "Edit",
+    "save": "Save",
+    "details": "Details",
+    "actions": "Actions",
+    "status": "Status",
+    "name": "Name",
+    "id": "ID",
+    "type": "Type",
+    "size": "Size",
+    "date": "Date",
+    "version": "Version",
+    "close": "Close"
+  }
+}

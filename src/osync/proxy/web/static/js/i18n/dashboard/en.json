@@ -1,0 +1,49 @@
+{
+  "dashboard": {
+    "title": "Dashboard",
+    "welcome": "Welcome to Ollama Sync",
+    "summary": "System Overview",
+    "servers": {
+      "title": "Servers",
+      "online": "Online",
+      "offline": "Offline",
+      "total": "Total",
+      "load": "Load",
+      "status": "Status",
+      "history": "History",
+      "details": "Server Details"
+    },
+    "models": {
+      "title": "Models",
+      "available": "Available",
+      "downloading": "Downloading",
+      "popular": "Popular",
+      "recent": "Recent"
+    },
+    "performance": {
+      "title": "Performance",
+      "cpu": "CPU",
+      "memory": "Memory",
+      "disk": "Disk",
+      "network": "Network"
+    },
+    "stats": {
+      "title": "Statistics",
+      "total_requests": "Total Requests",
+      "avg_response_time": "Avg Response Time",
+      "error_rate": "Error Rate"
+    },
+    "uptime": "Uptime",
+    "version": "Version",
+    "view": {
+      "details": "View Details",
+      "all_models": "All Models",
+      "performance": "Performance",
+      "all_servers": "All Servers"
+    },
+    "tips": {
+      "title": "Tips",
+      "content": "Explore the different sections of the interface to discover all the features of Ollama Sync."
+    }
+  }
+}

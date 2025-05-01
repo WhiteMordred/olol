@@ -1,0 +1,87 @@
+{
+  "models": {
+    "title": "Bibliothèque de modèles",
+    "subtitle": "Gérez vos modèles d'IA à travers le cluster",
+    "search": "Rechercher un modèle...",
+    "filter": {
+      "all": "Tous",
+      "available": "Disponibles",
+      "downloading": "En téléchargement",
+      "by_size": "Par taille",
+      "by_popularity": "Par popularité",
+      "by_date": "Par date"
+    },
+    "status": {
+      "available": "Disponible",
+      "downloading": "En téléchargement",
+      "pending": "En attente",
+      "failed": "Échec",
+      "unknown": "Inconnu",
+      "ready": "Prêt",
+      "loading": "Chargement"
+    },
+    "card": {
+      "details": "Détails",
+      "download": "Télécharger",
+      "delete": "Supprimer",
+      "try_it": "Essayer",
+      "size": "Taille",
+      "parameters": "Paramètres",
+      "servers": "Serveurs",
+      "tags": "Tags",
+      "license": "Licence"
+    },
+    "details": {
+      "title": "Détails du modèle",
+      "description": "Description",
+      "family": "Famille",
+      "quantization": "Quantification",
+      "format": "Format",
+      "version": "Version",
+      "last_updated": "Dernière mise à jour",
+      "parameters": "Paramètres",
+      "size": "Taille",
+      "license": "Licence",
+      "server_availability": "Disponibilité sur les serveurs",
+      "benchmark": "Benchmarks",
+      "examples": "Exemples d'utilisation",
+      "configuration": "Configuration",
+      "close": "Fermer"
+    },
+    "actions": {
+      "refresh": "Actualiser",
+      "download": "Télécharger",
+      "delete": "Supprimer",
+      "try": "Essayer",
+      "view": "Voir",
+      "deploy": "Déployer",
+      "cancel": "Annuler",
+      "show_details": "Afficher les détails"
+    },
+    "servers": {
+      "count": "Nombre de serveurs",
+      "availability": "Disponibilité",
+      "manage": "Gérer"
+    },
+    "modal": {
+      "download_title": "Télécharger le modèle",
+      "download_prompt": "Sur quels serveurs souhaitez-vous télécharger ce modèle ?",
+      "delete_title": "Supprimer le modèle",
+      "delete_prompt": "Êtes-vous sûr de vouloir supprimer ce modèle des serveurs sélectionnés ?",
+      "deploy_title": "Déployer le modèle",
+      "deploy_prompt": "Choisissez les serveurs sur lesquels déployer ce modèle",
+      "server_selection": "Sélection des serveurs",
+      "all_servers": "Tous les serveurs",
+      "selected_servers": "Serveurs sélectionnés",
+      "confirm": "Confirmer",
+      "cancel": "Annuler"
+    },
+    "messages": {
+      "download_started": "Téléchargement démarré",
+      "download_complete": "Téléchargement terminé",
+      "download_error": "Erreur lors du téléchargement",
+      "delete_success": "Modèle supprimé avec succès",
+      "delete_error": "Erreur lors de la suppression"
+    }
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "servers": {
+    "title": "Server Management",
+    "cluster_status": "Cluster Status",
+    "add_server": "Add Server",
+    "refresh": "Refresh",
+    "search": "Search server...",
+    "table": {
+      "name": "Name",
+      "address": "Address",
+      "status": "Status",
+      "load": "Load",
+      "models": "Models",
+      "uptime": "Uptime",
+      "version": "Version",
+      "actions": "Actions"
+    },
+    "status": {
+      "online": "Online",
+      "offline": "Offline",
+      "busy": "Busy",
+      "error": "Error",
+      "unknown": "Unknown",
+      "proxy_active": "Proxy Active"
+    },
+    "details": {
+      "title": "Server Details",
+      "system_info": "System Info",
+      "hardware": "Hardware",
+      "os": "Operating System",
+      "cpu": "CPU",
+      "memory": "Memory",
+      "disk": "Disk",
+      "network": "Network",
+      "models_section": "Installed Models",
+      "statistics": "Statistics",
+      "requests": "Requests",
+      "latency": "Latency",
+      "connections": "Active Connections",
+      "logs": "Recent Logs",
+      "api_endpoint": "API Endpoint"
+    },
+    "actions": {
+      "view": "View",
+      "edit": "Edit",
+      "restart": "Restart",
+      "delete": "Delete",
+      "disable": "Disable",
+      "enable": "Enable",
+      "test": "Test Connection"
+    },
+    "form": {
+      "address": "Address",
+      "port": "Port",
+      "name": "Name",
+      "description": "Description",
+      "api_key": "API Key",
+      "tags": "Tags",
+      "priority": "Priority",
+      "auto_discover": "Auto Discover",
+      "ssl_enabled": "Enable SSL",
+      "save": "Save",
+      "cancel": "Cancel"
+    },
+    "messages": {
+      "added": "Server added successfully",
+      "updated": "Server updated successfully",
+      "deleted": "Server deleted successfully",
+      "error": "Error during server operation",
+      "confirm_delete": "Are you sure you want to delete this server?"
+    }
+  }
+}

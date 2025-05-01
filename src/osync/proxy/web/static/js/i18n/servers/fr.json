@@ -1,0 +1,73 @@
+{
+  "servers": {
+    "title": "Gestion des serveurs",
+    "cluster_status": "État du cluster",
+    "add_server": "Ajouter un serveur",
+    "refresh": "Actualiser",
+    "search": "Rechercher un serveur...",
+    "table": {
+      "name": "Nom",
+      "address": "Adresse",
+      "status": "Statut",
+      "load": "Charge",
+      "models": "Modèles",
+      "uptime": "Uptime",
+      "version": "Version",
+      "actions": "Actions"
+    },
+    "status": {
+      "online": "En ligne",
+      "offline": "Hors ligne",
+      "busy": "Occupé",
+      "error": "Erreur",
+      "unknown": "Inconnu",
+      "proxy_active": "Proxy actif"
+    },
+    "details": {
+      "title": "Détails du serveur",
+      "system_info": "Informations système",
+      "hardware": "Matériel",
+      "os": "Système d'exploitation",
+      "cpu": "Processeur",
+      "memory": "Mémoire",
+      "disk": "Disque",
+      "network": "Réseau",
+      "models_section": "Modèles installés",
+      "statistics": "Statistiques",
+      "requests": "Requêtes",
+      "latency": "Latence",
+      "connections": "Connexions actives",
+      "logs": "Journaux récents",
+      "api_endpoint": "Point d'accès API"
+    },
+    "actions": {
+      "view": "Voir",
+      "edit": "Modifier",
+      "restart": "Redémarrer",
+      "delete": "Supprimer",
+      "disable": "Désactiver",
+      "enable": "Activer",
+      "test": "Tester connexion"
+    },
+    "form": {
+      "address": "Adresse",
+      "port": "Port",
+      "name": "Nom",
+      "description": "Description",
+      "api_key": "Clé API",
+      "tags": "Tags",
+      "priority": "Priorité",
+      "auto_discover": "Découverte automatique",
+      "ssl_enabled": "Activer SSL",
+      "save": "Enregistrer",
+      "cancel": "Annuler"
+    },
+    "messages": {
+      "added": "Serveur ajouté avec succès",
+      "updated": "Serveur mis à jour avec succès",
+      "deleted": "Serveur supprimé avec succès",
+      "error": "Erreur lors de l'opération sur le serveur",
+      "confirm_delete": "Êtes-vous sûr de vouloir supprimer ce serveur ?"
+    }
+  }
+}
