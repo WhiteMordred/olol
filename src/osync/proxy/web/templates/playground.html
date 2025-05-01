@@ -5,8 +5,30 @@
 {% block content %}
 <h1 class="mb-4 cyber-heading"><i class="fas fa-play-circle me-2"></i>Playground</h1>
 
-<div class="row mb-4">
-    <div class="col-md-8 col-lg-9">
+<!-- Onglets pour les différents modes -->
+<ul class="nav nav-tabs cyber-tabs mb-4" id="playgroundTabs" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" id="chat-tab" data-bs-toggle="tab" data-bs-target="#chat-panel" type="button" role="tab" aria-controls="chat-panel" aria-selected="true">
+        <i class="fas fa-comments me-2"></i>Chat
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="generate-tab" data-bs-toggle="tab" data-bs-target="#generate-panel" type="button" role="tab" aria-controls="generate-panel" aria-selected="false">
+        <i class="fas fa-robot me-2"></i>Generate
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="embeddings-tab" data-bs-toggle="tab" data-bs-target="#embeddings-panel" type="button" role="tab" aria-controls="embeddings-panel" aria-selected="false">
+        <i class="fas fa-vector-square me-2"></i>Embeddings
+    </button>
+  </li>
+</ul>
+
+<div class="tab-content" id="playgroundTabsContent">
+  <!-- Panneau Chat -->
+  <div class="tab-pane fade show active" id="chat-panel" role="tabpanel" aria-labelledby="chat-tab">
+    <div class="row mb-4">
+      <div class="col-md-8 col-lg-9">
         <!-- Chat Interface -->
         <div class="cyber-panel">
             <div class="cyber-panel-header d-flex justify-content-between align-items-center">
@@ -60,9 +82,9 @@
                 </form>
             </div>
         </div>
-    </div>
-    
-    <div class="col-md-4 col-lg-3">
+      </div>
+      
+      <div class="col-md-4 col-lg-3">
         <!-- Model Selection and Parameters -->
         <div class="cyber-panel mb-3">
             <div class="cyber-panel-header">
@@ -135,7 +157,189 @@
                 </div>
             </div>
         </div>
+      </div>
     </div>
+  </div>
+  
+  <!-- Panneau Generate -->
+  <div class="tab-pane fade" id="generate-panel" role="tabpanel" aria-labelledby="generate-tab">
+    <div class="row mb-4">
+      <div class="col-md-8 col-lg-9">
+        <!-- Generate Interface -->
+        <div class="cyber-panel">
+            <div class="cyber-panel-header d-flex justify-content-between align-items-center">
+                <div>
+                    <span class="fw-bold">
+                        <i class="fas fa-robot me-2"></i>Génération de texte avec
+                        {% if selected_model %}
+                            {{ selected_model }}
+                        {% else %}
+                            Modèle
+                        {% endif %}
+                    </span>
+                </div>
+                <div>
+                    <button class="cyber-btn cyber-btn-sm" id="clearGenerateBtn" title="Effacer">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                    <button class="cyber-btn cyber-btn-sm ms-2" id="exportGenerateBtn" title="Exporter">
+                        <i class="fas fa-download"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="cyber-panel-body p-0">
+                <div class="p-3">
+                    <form id="generateForm">
+                        <div class="mb-3">
+                            <label for="promptInput" class="form-label">Prompt</label>
+                            <textarea class="cyber-input" id="promptInput" rows="4" placeholder="Entrez votre prompt ici..."></textarea>
+                        </div>
+                        <button type="submit" class="cyber-btn w-100">
+                            <i class="fas fa-bolt me-2"></i>Générer
+                        </button>
+                    </form>
+                </div>
+                
+                <div class="border-top p-3">
+                    <h5 class="mb-3">Résultat</h5>
+                    <div id="generateResult" class="cyber-result-container">
+                        <div class="text-muted text-center p-5">
+                            <i class="fas fa-robot fa-2x mb-3"></i>
+                            <p>Le texte généré apparaîtra ici</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+      </div>
+      
+      <div class="col-md-4 col-lg-3">
+        <!-- Generate Parameters -->
+        <div class="cyber-panel mb-3">
+            <div class="cyber-panel-header">
+                <i class="fas fa-sliders-h me-2"></i>Paramètres
+            </div>
+            <div class="cyber-panel-body">
+                <div class="mb-3">
+                    <label for="generateModelSelect" class="form-label">Modèle</label>
+                    <select class="cyber-input form-select" id="generateModelSelect">
+                        <option value="" {% if not selected_model %}selected{% endif %}>Sélectionnez un modèle</option>
+                        {% for model in models %}
+                            <option value="{{ model.name }}" {% if selected_model == model.name %}selected{% endif %}>
+                                {{ model.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="generateTemperatureRange" class="form-label">Température: <span id="generateTemperatureValue">0.7</span></label>
+                    <input type="range" class="cyber-range" min="0" max="2" step="0.1" value="0.7" id="generateTemperatureRange">
+                </div>
+                
+                <div class="mb-3">
+                    <label for="generateMaxTokens" class="form-label">Tokens max.</label>
+                    <input type="number" class="cyber-input form-control" id="generateMaxTokens" value="2048" min="1" max="4096">
+                </div>
+                
+                <div class="mb-3">
+                    <label for="generateTopP" class="form-label">Top-P: <span id="generateTopPValue">0.9</span></label>
+                    <input type="range" class="cyber-range" min="0" max="1" step="0.05" value="0.9" id="generateTopP">
+                </div>
+                
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" value="" id="generateStreamToggle" checked>
+                    <label class="form-check-label" for="generateStreamToggle">
+                        Streaming
+                    </label>
+                </div>
+            </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Panneau Embeddings -->
+  <div class="tab-pane fade" id="embeddings-panel" role="tabpanel" aria-labelledby="embeddings-tab">
+    <div class="row mb-4">
+      <div class="col-md-8 col-lg-9">
+        <!-- Embeddings Interface -->
+        <div class="cyber-panel">
+            <div class="cyber-panel-header">
+                <span class="fw-bold">
+                    <i class="fas fa-vector-square me-2"></i>Embeddings avec
+                    {% if selected_model %}
+                        {{ selected_model }}
+                    {% else %}
+                        Modèle
+                    {% endif %}
+                </span>
+            </div>
+            <div class="cyber-panel-body p-0">
+                <div class="p-3">
+                    <form id="embeddingsForm">
+                        <div class="mb-3">
+                            <label for="embeddingsInput" class="form-label">Texte</label>
+                            <textarea class="cyber-input" id="embeddingsInput" rows="4" placeholder="Entrez le texte pour générer des embeddings..."></textarea>
+                        </div>
+                        <button type="submit" class="cyber-btn w-100">
+                            <i class="fas fa-calculator me-2"></i>Générer les embeddings
+                        </button>
+                    </form>
+                </div>
+                
+                <div class="border-top p-3">
+                    <h5 class="mb-3">Résultat</h5>
+                    <div id="embeddingsResult" class="cyber-result-container">
+                        <div class="text-muted text-center p-5">
+                            <i class="fas fa-vector-square fa-2x mb-3"></i>
+                            <p>Les vecteurs d'embeddings apparaîtront ici</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+      </div>
+      
+      <div class="col-md-4 col-lg-3">
+        <!-- Embeddings Parameters -->
+        <div class="cyber-panel mb-3">
+            <div class="cyber-panel-header">
+                <i class="fas fa-sliders-h me-2"></i>Paramètres
+            </div>
+            <div class="cyber-panel-body">
+                <div class="mb-3">
+                    <label for="embeddingsModelSelect" class="form-label">Modèle</label>
+                    <select class="cyber-input form-select" id="embeddingsModelSelect">
+                        <option value="" {% if not selected_model %}selected{% endif %}>Sélectionnez un modèle</option>
+                        {% for model in models %}
+                            <option value="{{ model.name }}" {% if selected_model == model.name %}selected{% endif %}>
+                                {{ model.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="embeddingsDimensions" class="form-label">Visualisation</label>
+                    <select class="cyber-input form-select" id="embeddingsDimensions">
+                        <option value="full">Vecteur complet</option>
+                        <option value="truncated" selected>Tronqué (premiers 10)</option>
+                        <option value="stats">Statistiques seulement</option>
+                    </select>
+                </div>
+                
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" value="" id="normalizeVectors">
+                    <label class="form-check-label" for="normalizeVectors">
+                        Normaliser les vecteurs
+                    </label>
+                </div>
+            </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- Popular Models Section -->
@@ -187,11 +391,16 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Elements
+    // Elements communs
+    const modelSelect = document.getElementById('modelSelect');
+    const generateModelSelect = document.getElementById('generateModelSelect');
+    const embeddingsModelSelect = document.getElementById('embeddingsModelSelect');
+    const modelCards = document.querySelectorAll('.cyber-model-card');
+    
+    // Elements Chat
     const chatContainer = document.getElementById('chatContainer');
     const chatForm = document.getElementById('chatForm');
     const userInput = document.getElementById('userInput');
-    const modelSelect = document.getElementById('modelSelect');
     const clearChatBtn = document.getElementById('clearChatBtn');
     const exportChatBtn = document.getElementById('exportChatBtn');
     const temperatureRange = document.getElementById('temperatureRange');
@@ -202,7 +411,27 @@ document.addEventListener('DOMContentLoaded', function() {
     const presencePenaltyValue = document.getElementById('presencePenaltyValue');
     const frequencyPenalty = document.getElementById('frequencyPenalty');
     const frequencyPenaltyValue = document.getElementById('frequencyPenaltyValue');
-    const modelCards = document.querySelectorAll('.cyber-model-card');
+    const streamToggle = document.getElementById('streamToggle');
+    
+    // Elements Generate
+    const generateForm = document.getElementById('generateForm');
+    const promptInput = document.getElementById('promptInput');
+    const generateResult = document.getElementById('generateResult');
+    const clearGenerateBtn = document.getElementById('clearGenerateBtn');
+    const exportGenerateBtn = document.getElementById('exportGenerateBtn');
+    const generateTemperatureRange = document.getElementById('generateTemperatureRange');
+    const generateTemperatureValue = document.getElementById('generateTemperatureValue');
+    const generateTopP = document.getElementById('generateTopP');
+    const generateTopPValue = document.getElementById('generateTopPValue');
+    const generateMaxTokens = document.getElementById('generateMaxTokens');
+    const generateStreamToggle = document.getElementById('generateStreamToggle');
+    
+    // Elements Embeddings
+    const embeddingsForm = document.getElementById('embeddingsForm');
+    const embeddingsInput = document.getElementById('embeddingsInput');
+    const embeddingsResult = document.getElementById('embeddingsResult');
+    const normalizeVectors = document.getElementById('normalizeVectors');
+    const embeddingsDimensions = document.getElementById('embeddingsDimensions');
     
     // Update range values
     temperatureRange.addEventListener('input', function() {
@@ -221,6 +450,63 @@ document.addEventListener('DOMContentLoaded', function() {
         frequencyPenaltyValue.textContent = this.value;
     });
     
+    generateTemperatureRange.addEventListener('input', function() {
+        generateTemperatureValue.textContent = this.value;
+    });
+    
+    generateTopP.addEventListener('input', function() {
+        generateTopPValue.textContent = this.value;
+    });
+    
+    // Fonction pour synchroniser la sélection du modèle entre les différentes interfaces
+    function syncModelSelections(modelName) {
+        modelSelect.value = modelName;
+        generateModelSelect.value = modelName;
+        embeddingsModelSelect.value = modelName;
+        
+        document.querySelectorAll('.cyber-model-card').forEach(card => {
+            if (card.dataset.modelName === modelName) {
+                card.classList.add('active');
+            } else {
+                card.classList.remove('active');
+            }
+        });
+        
+        // Update headers
+        const chatHeader = document.querySelector('#chat-panel .cyber-panel-header .fw-bold');
+        const generateHeader = document.querySelector('#generate-panel .cyber-panel-header .fw-bold');
+        const embeddingsHeader = document.querySelector('#embeddings-panel .cyber-panel-header .fw-bold');
+        
+        chatHeader.innerHTML = `<i class="fas fa-comments me-2"></i>Chat avec ${modelName}`;
+        generateHeader.innerHTML = `<i class="fas fa-robot me-2"></i>Génération de texte avec ${modelName}`;
+        embeddingsHeader.innerHTML = `<i class="fas fa-vector-square me-2"></i>Embeddings avec ${modelName}`;
+    }
+    
+    // Gestion de la sélection du modèle
+    modelSelect.addEventListener('change', function() {
+        syncModelSelections(this.value);
+    });
+    
+    generateModelSelect.addEventListener('change', function() {
+        syncModelSelections(this.value);
+    });
+    
+    embeddingsModelSelect.addEventListener('change', function() {
+        syncModelSelections(this.value);
+    });
+    
+    // Model selection from cards
+    modelCards.forEach(card => {
+        card.addEventListener('click', function() {
+            const modelName = this.dataset.modelName;
+            syncModelSelections(modelName);
+        });
+    });
+    
+    // ------------ CHAT IMPLEMENTATION ------------
+    
+    let chatHistory = [];
+    
     // Handle chat submission
     chatForm.addEventListener('submit', function(e) {
         e.preventDefault();
@@ -228,8 +514,15 @@ document.addEventListener('DOMContentLoaded', function() {
         const userMessage = userInput.value.trim();
         if (!userMessage) return;
         
-        // Add user message
+        // Add user message to UI
         addMessage('user', userMessage);
+        
+        // Add to chat history
+        chatHistory.push({
+            role: "user",
+            content: userMessage
+        });
+        
         userInput.value = '';
         
         // Get selected model
@@ -242,6 +535,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Get parameters
         const params = {
             model: selectedModel,
+            messages: chatHistory,
             temperature: parseFloat(temperatureRange.value),
             top_p: parseFloat(topP.value),
             max_tokens: parseInt(document.getElementById('maxTokens').value),
@@ -254,25 +548,102 @@ document.addEventListener('DOMContentLoaded', function() {
         const typingIndicator = document.querySelector('.cyber-typing-indicator');
         typingIndicator.classList.remove('d-none');
         
-        // Simulate API call (replace with actual API call)
-        setTimeout(function() {
+        // Make API call
+        callChatAPI(params, typingIndicator);
+    });
+    
+    function callChatAPI(params, typingIndicator) {
+        // Prepare response container if streaming
+        let responseContainer = null;
+        let responseContent = "";
+        
+        if (params.stream) {
+            // Add an empty AI message that will be filled as stream arrives
+            responseContainer = document.createElement('div');
+            responseContainer.classList.add('cyber-message', 'ai');
+            
+            const paragraph = document.createElement('p');
+            paragraph.classList.add('mb-0');
+            
+            responseContainer.appendChild(paragraph);
+            
+            // Insert before typing indicator
+            chatContainer.insertBefore(responseContainer, typingIndicator);
+        }
+        
+        // Make the API call
+        fetch('/v1/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(params)
+        }).then(response => {
+            if (!response.ok) {
+                throw new Error(`Erreur HTTP: ${response.status}`);
+            }
+            
+            if (params.stream) {
+                // Handle streaming response
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                
+                return readStream(reader, decoder, content => {
+                    try {
+                        const json = JSON.parse(content);
+                        if (json.message && json.message.content) {
+                            responseContent += json.message.content;
+                            responseContainer.querySelector('p').textContent = responseContent;
+                            
+                            // Scroll to bottom
+                            chatContainer.scrollTop = chatContainer.scrollHeight;
+                        }
+                    } catch (e) {
+                        console.error("Erreur lors du parsing JSON:", e);
+                    }
+                });
+            } else {
+                // Handle regular response
+                return response.json();
+            }
+        })
+        .then(data => {
+            // Hide typing indicator
             typingIndicator.classList.add('d-none');
             
-            // Add AI response (replace with actual response)
-            let response = "Voici une réponse simulée du modèle " + selectedModel + ". ";
-            response += "Dans une implémentation réelle, cette réponse viendrait de l'API Ollama. ";
-            response += "Vous pouvez ajuster les paramètres à droite pour modifier le comportement du modèle.";
-            
-            addMessage('ai', response);
+            if (!params.stream && data) {
+                // For non-streaming response, add message to chat
+                const aiMessage = data.message.content;
+                addMessage('ai', aiMessage);
+                
+                // Add to chat history
+                chatHistory.push({
+                    role: "assistant",
+                    content: aiMessage
+                });
+            } else if (params.stream) {
+                // For streaming response, complete chat history
+                chatHistory.push({
+                    role: "assistant",
+                    content: responseContent
+                });
+            }
             
             // Scroll to bottom
             chatContainer.scrollTop = chatContainer.scrollHeight;
-        }, 1500);
-    });
+        })
+        .catch(error => {
+            console.error('Erreur de l\'API:', error);
+            typingIndicator.classList.add('d-none');
+            showToast('Erreur', `Échec de la requête: ${error.message}`, 'danger');
+        });
+    }
     
     // Clear chat
     clearChatBtn.addEventListener('click', function() {
         if (confirm('Voulez-vous vraiment effacer toute la conversation?')) {
+            chatHistory = [];
+            
             // Remove all messages except the first one (greeting) and the typing indicator
             const messages = chatContainer.querySelectorAll('.cyber-message');
             for (let i = 1; i < messages.length; i++) {
@@ -302,26 +673,218 @@ document.addEventListener('DOMContentLoaded', function() {
             conversation: messages
         };
         
-        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `chat-export-${new Date().toISOString().slice(0, 10)}.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        downloadJson(exportData, `chat-export-${new Date().toISOString().slice(0, 10)}.json`);
     });
     
-    // Model selection from cards
-    modelCards.forEach(card => {
-        card.addEventListener('click', function() {
-            const modelName = this.dataset.modelName;
-            selectModel(modelName);
+    // ------------ GENERATE IMPLEMENTATION ------------
+    
+    // Handle generate submission
+    generateForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const prompt = promptInput.value.trim();
+        if (!prompt) return;
+        
+        // Get selected model
+        const selectedModel = generateModelSelect.value;
+        if (!selectedModel) {
+            showToast('Erreur', 'Veuillez sélectionner un modèle', 'danger');
+            return;
+        }
+        
+        // Get parameters
+        const params = {
+            model: selectedModel,
+            prompt: prompt,
+            temperature: parseFloat(generateTemperatureRange.value),
+            top_p: parseFloat(generateTopP.value),
+            max_tokens: parseInt(generateMaxTokens.value),
+            stream: generateStreamToggle.checked
+        };
+        
+        // Show loading state
+        generateResult.innerHTML = '<div class="text-center p-4"><div class="spinner-border" role="status"></div><p class="mt-2">Génération en cours...</p></div>';
+        
+        // Make API call
+        callGenerateAPI(params);
+    });
+    
+    function callGenerateAPI(params) {
+        // Variable to store generated content
+        let generatedContent = "";
+        
+        fetch('/v1/generate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(params)
+        }).then(response => {
+            if (!response.ok) {
+                throw new Error(`Erreur HTTP: ${response.status}`);
+            }
+            
+            if (params.stream) {
+                // Handle streaming response
+                generateResult.innerHTML = '<div class="cyber-result-content"></div>';
+                const resultContent = generateResult.querySelector('.cyber-result-content');
+                
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                
+                return readStream(reader, decoder, content => {
+                    try {
+                        const json = JSON.parse(content);
+                        if (json.response) {
+                            generatedContent += json.response;
+                            resultContent.innerHTML = formatGeneratedText(generatedContent);
+                        }
+                    } catch (e) {
+                        console.error("Erreur lors du parsing JSON:", e);
+                    }
+                });
+            } else {
+                // Handle regular response
+                return response.json();
+            }
+        })
+        .then(data => {
+            if (!params.stream && data) {
+                generatedContent = data.response;
+                generateResult.innerHTML = formatGeneratedText(generatedContent);
+            }
+        })
+        .catch(error => {
+            console.error('Erreur de l\'API:', error);
+            generateResult.innerHTML = `<div class="alert alert-danger">Échec de la requête: ${error.message}</div>`;
+            showToast('Erreur', `Échec de la requête: ${error.message}`, 'danger');
         });
+    }
+    
+    function formatGeneratedText(text) {
+        // Simple formatting - can be enhanced for markdown etc.
+        return `<div class="cyber-result-content">${text.replace(/\n/g, '<br>')}</div>`;
+    }
+    
+    // Clear generate
+    clearGenerateBtn.addEventListener('click', function() {
+        if (confirm('Voulez-vous vraiment effacer le résultat?')) {
+            generateResult.innerHTML = '<div class="text-muted text-center p-5"><i class="fas fa-robot fa-2x mb-3"></i><p>Le texte généré apparaîtra ici</p></div>';
+            promptInput.value = '';
+        }
     });
     
-    // Helper functions
+    // Export generate
+    exportGenerateBtn.addEventListener('click', function() {
+        const exportData = {
+            timestamp: new Date().toISOString(),
+            model: generateModelSelect.value || 'non spécifié',
+            prompt: promptInput.value,
+            generated_text: generateResult.textContent.trim()
+        };
+        
+        downloadJson(exportData, `generation-export-${new Date().toISOString().slice(0, 10)}.json`);
+    });
+    
+    // ------------ EMBEDDINGS IMPLEMENTATION ------------
+    
+    // Handle embeddings submission
+    embeddingsForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const text = embeddingsInput.value.trim();
+        if (!text) return;
+        
+        // Get selected model
+        const selectedModel = embeddingsModelSelect.value;
+        if (!selectedModel) {
+            showToast('Erreur', 'Veuillez sélectionner un modèle', 'danger');
+            return;
+        }
+        
+        // Get parameters
+        const params = {
+            model: selectedModel,
+            prompt: text,
+            normalize: normalizeVectors.checked
+        };
+        
+        // Show loading state
+        embeddingsResult.innerHTML = '<div class="text-center p-4"><div class="spinner-border" role="status"></div><p class="mt-2">Calcul en cours...</p></div>';
+        
+        // Make API call
+        callEmbeddingsAPI(params);
+    });
+    
+    function callEmbeddingsAPI(params) {
+        fetch('/v1/embeddings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(params)
+        }).then(response => {
+            if (!response.ok) {
+                throw new Error(`Erreur HTTP: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data && data.embedding) {
+                displayEmbedding(data.embedding);
+            } else {
+                throw new Error("Format de réponse invalide");
+            }
+        })
+        .catch(error => {
+            console.error('Erreur de l\'API:', error);
+            embeddingsResult.innerHTML = `<div class="alert alert-danger">Échec de la requête: ${error.message}</div>`;
+            showToast('Erreur', `Échec de la requête: ${error.message}`, 'danger');
+        });
+    }
+    
+    function displayEmbedding(embedding) {
+        const displayMode = embeddingsDimensions.value;
+        let html = '';
+        
+        if (displayMode === 'full') {
+            // Afficher le vecteur complet
+            html = `<div class="overflow-auto"><pre class="cyber-code">${JSON.stringify(embedding, null, 2)}</pre></div>`;
+        } else if (displayMode === 'truncated') {
+            // Afficher les 10 premiers éléments
+            const truncated = embedding.slice(0, 10);
+            html = `
+                <div class="cyber-result-content">
+                    <p><strong>Dimensions totales:</strong> ${embedding.length}</p>
+                    <p><strong>10 premiers éléments:</strong></p>
+                    <pre class="cyber-code">${JSON.stringify(truncated, null, 2)}</pre>
+                    <p class="text-muted">(${embedding.length - 10} éléments supplémentaires non affichés)</p>
+                </div>
+            `;
+        } else if (displayMode === 'stats') {
+            // Calculer des statistiques
+            const min = Math.min(...embedding);
+            const max = Math.max(...embedding);
+            const sum = embedding.reduce((a, b) => a + b, 0);
+            const avg = sum / embedding.length;
+            const norm = Math.sqrt(embedding.reduce((a, b) => a + b * b, 0));
+            
+            html = `
+                <div class="cyber-result-content">
+                    <p><strong>Dimensions:</strong> ${embedding.length}</p>
+                    <p><strong>Minimum:</strong> ${min.toFixed(6)}</p>
+                    <p><strong>Maximum:</strong> ${max.toFixed(6)}</p>
+                    <p><strong>Moyenne:</strong> ${avg.toFixed(6)}</p>
+                    <p><strong>Norme L2:</strong> ${norm.toFixed(6)}</p>
+                </div>
+            `;
+        }
+        
+        embeddingsResult.innerHTML = html;
+    }
+    
+    // ------------ HELPER FUNCTIONS ------------
+    
     function addMessage(type, content) {
         const message = document.createElement('div');
         message.classList.add('cyber-message');
@@ -341,6 +904,23 @@ document.addEventListener('DOMContentLoaded', function() {
         chatContainer.scrollTop = chatContainer.scrollHeight;
     }
     
+    function readStream(reader, decoder, callback) {
+        return reader.read().then(function processText({ done, value }) {
+            if (done) {
+                return Promise.resolve();
+            }
+            
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n').filter(line => line.trim());
+            
+            lines.forEach(line => {
+                callback(line);
+            });
+            
+            return reader.read().then(processText);
+        });
+    }
+    
     function showToast(title, message, type = 'info') {
         const toastEl = document.getElementById('notificationToast');
         const toastTitle = document.getElementById('toastTitle');
@@ -358,12 +938,25 @@ document.addEventListener('DOMContentLoaded', function() {
         const toast = new bootstrap.Toast(toastEl);
         toast.show();
     }
+    
+    function downloadJson(data, filename) {
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
 });
 
 // Global function for model selection
 function selectModel(modelName) {
-    const modelSelect = document.getElementById('modelSelect');
-    modelSelect.value = modelName;
+    document.getElementById('modelSelect').value = modelName;
+    document.getElementById('generateModelSelect').value = modelName;
+    document.getElementById('embeddingsModelSelect').value = modelName;
     
     // Update model cards
     document.querySelectorAll('.cyber-model-card').forEach(card => {
@@ -374,9 +967,14 @@ function selectModel(modelName) {
         }
     });
     
-    // Update chat header
-    const chatHeader = document.querySelector('.cyber-panel-header .fw-bold');
+    // Update headers
+    const chatHeader = document.querySelector('#chat-panel .cyber-panel-header .fw-bold');
+    const generateHeader = document.querySelector('#generate-panel .cyber-panel-header .fw-bold');
+    const embeddingsHeader = document.querySelector('#embeddings-panel .cyber-panel-header .fw-bold');
+    
     chatHeader.innerHTML = `<i class="fas fa-comments me-2"></i>Chat avec ${modelName}`;
+    generateHeader.innerHTML = `<i class="fas fa-robot me-2"></i>Génération de texte avec ${modelName}`;
+    embeddingsHeader.innerHTML = `<i class="fas fa-vector-square me-2"></i>Embeddings avec ${modelName}`;
 }
 </script>
 {% endblock %}
