@@ -159,48 +159,100 @@ class OllamaProxyService:
         Returns:
             Un générateur de dictionnaires contenant les parties de la réponse
         """
-        client, host, port = self.get_client_for_model(request.model)
-        if not client:
-            yield {
-                "error": "Aucun serveur disponible pour ce modèle",
-                "model": request.model,
-                "done": True
-            }
-            return
-            
+        # Ajouter la requête à la file d'attente
+        request_data = {
+            "model": request.model,
+            "prompt": request.prompt,
+            "options": request.options,
+            "stream": True,  # Streaming activé
+            "request_type": "generate"
+        }
+        
         try:
-            # Pour le streaming, nous utilisons directement le client sans passer par la file d'attente
-            # car la file d'attente ne gère pas bien le streaming pour l'instant
-            for resp in client.generate(request.model, request.prompt, True, request.options):
-                response = {
-                    "model": request.model,
-                    "done": resp.done if hasattr(resp, 'done') else False
-                }
-                
-                if hasattr(resp, 'response'):
-                    response["response"] = resp.response
-                    
-                # Ajouter les métriques si disponibles
-                if hasattr(resp, 'total_duration'):
-                    response["total_duration"] = resp.total_duration
-                if hasattr(resp, 'load_duration'):
-                    response["load_duration"] = resp.load_duration
-                if hasattr(resp, 'prompt_eval_count'):
-                    response["prompt_eval_count"] = resp.prompt_eval_count
-                if hasattr(resp, 'eval_count'):
-                    response["eval_count"] = resp.eval_count
-                if hasattr(resp, 'eval_duration'):
-                    response["eval_duration"] = resp.eval_duration
-                
-                yield response
-                
-                if hasattr(resp, 'done') and resp.done:
-                    break
-                    
-            # Message de fin si nécessaire
+            # Ajouter à la file d'attente
+            request_id = self.queue_manager.enqueue(request_data)
+            
+            # Pour le streaming, on va utiliser un mécanisme de polling pour récupérer les mises à jour
+            # et les transmettre au client au fur et à mesure
+            max_wait_time = 120  # Temps maximum d'attente en secondes (augmenté pour distributed)
+            poll_interval = 0.1  # Intervalle de vérification en secondes (plus court pour le streaming)
+            total_wait_time = 0
+            last_content = ""
+            
+            # Yield initial empty response to establish the stream
             yield {
                 "model": request.model,
                 "response": "",
+                "done": False
+            }
+            
+            while total_wait_time < max_wait_time:
+                # Récupérer l'état actuel de la requête
+                queue_request = self.queue_manager.get_request(request_id)
+                
+                if not queue_request:
+                    yield {
+                        "error": "Requête non trouvée dans la file d'attente",
+                        "model": request.model,
+                        "done": True
+                    }
+                    return
+                
+                # Vérifier si la requête est terminée ou a une mise à jour disponible
+                status = queue_request.get("status")
+                result = queue_request.get("result", {})
+                current_content = result.get("response", "")
+                
+                # S'il y a du nouveau contenu, le renvoyer
+                if current_content and current_content != last_content:
+                    # Déterminer le nouveau contenu à envoyer
+                    new_content = current_content[len(last_content):]
+                    last_content = current_content
+                    
+                    # Envoyer la mise à jour
+                    yield {
+                        "model": request.model,
+                        "response": new_content,
+                        "done": False
+                    }
+                
+                # Vérifier si la requête est terminée
+                if status == self.queue_manager.STATUS_COMPLETED:
+                    # Requête terminée avec succès
+                    # Envoyer un message final avec done=True
+                    yield {
+                        "model": request.model,
+                        "response": "",
+                        "done": True,
+                        **{k: v for k, v in result.items() if k not in ["model", "response", "done"]}
+                    }
+                    return
+                elif status == self.queue_manager.STATUS_FAILED:
+                    # Requête échouée
+                    error = queue_request.get("failed_reason", "Erreur inconnue")
+                    yield {
+                        "error": error,
+                        "model": request.model,
+                        "done": True
+                    }
+                    return
+                elif status == self.queue_manager.STATUS_CANCELED:
+                    # Requête annulée
+                    yield {
+                        "error": "Requête annulée",
+                        "model": request.model,
+                        "done": True
+                    }
+                    return
+                
+                # Attendre avant la prochaine vérification
+                time.sleep(poll_interval)
+                total_wait_time += poll_interval
+                
+            # Si on arrive ici, le temps maximum d'attente est dépassé
+            yield {
+                "error": "Délai d'attente dépassé",
+                "model": request.model,
                 "done": True
             }
                 
@@ -211,9 +263,6 @@ class OllamaProxyService:
                 "model": request.model,
                 "done": True
             }
-        finally:
-            if client:
-                client.close()
     
     def chat(self, request: ChatRequest) -> Dict[str, Any]:
         """
@@ -316,51 +365,120 @@ class OllamaProxyService:
         Returns:
             Un générateur de dictionnaires contenant les parties de la réponse
         """
-        client, host, port = self.get_client_for_model(request.model)
-        if not client:
-            yield {
-                "error": "Aucun serveur disponible pour ce modèle",
-                "model": request.model,
-                "done": True
+        # Convertir les messages au format attendu par la file d'attente
+        messages_dict = []
+        for msg in request.messages:
+            msg_dict = {
+                "role": msg.role,
+                "content": msg.content
             }
-            return
-            
+            if msg.images:
+                msg_dict["images"] = msg.images
+            messages_dict.append(msg_dict)
+        
+        # Préparer les données pour la file d'attente
+        request_data = {
+            "model": request.model,
+            "messages": messages_dict,
+            "options": request.options,
+            "stream": True,  # Streaming activé
+            "request_type": "chat"
+        }
+        
         try:
-            # Pour le streaming, nous utilisons directement le client sans passer par la file d'attente
-            # car la file d'attente ne gère pas bien le streaming pour l'instant
-            # Convertir les messages au format attendu par le client
-            messages_dict = []
-            for msg in request.messages:
-                msg_dict = {
-                    "role": msg.role,
-                    "content": msg.content
-                }
-                if msg.images:
-                    msg_dict["images"] = msg.images
-                messages_dict.append(msg_dict)
+            # Ajouter à la file d'attente
+            request_id = self.queue_manager.enqueue(request_data)
             
-            # Utiliser directement la méthode chat avec streaming
-            for resp in client.chat(request.model, messages_dict, True, request.options):
-                if hasattr(resp, 'message'):
-                    yield {
-                        "model": request.model,
-                        "message": {
-                            "role": "assistant",
-                            "content": resp.message.content if hasattr(resp.message, 'content') else ""
-                        },
-                        "done": resp.done if hasattr(resp, 'done') else False
-                    }
-                
-                if hasattr(resp, 'done') and resp.done:
-                    break
-                    
-            # Message de fin si nécessaire
+            # Pour le streaming, on va utiliser un mécanisme de polling pour récupérer les mises à jour
+            max_wait_time = 120  # Temps maximum d'attente en secondes (augmenté pour distributed)
+            poll_interval = 0.1  # Intervalle de vérification en secondes (plus court pour le streaming)
+            total_wait_time = 0
+            last_content = ""
+            
+            # Yield initial empty response to establish the stream
             yield {
                 "model": request.model,
                 "message": {
                     "role": "assistant",
                     "content": ""
                 },
+                "done": False
+            }
+            
+            while total_wait_time < max_wait_time:
+                # Récupérer l'état actuel de la requête
+                queue_request = self.queue_manager.get_request(request_id)
+                
+                if not queue_request:
+                    yield {
+                        "error": "Requête non trouvée dans la file d'attente",
+                        "model": request.model,
+                        "done": True
+                    }
+                    return
+                
+                # Vérifier si la requête est terminée ou a une mise à jour disponible
+                status = queue_request.get("status")
+                result = queue_request.get("result", {})
+                message = result.get("message", {})
+                current_content = message.get("content", "")
+                
+                # S'il y a du nouveau contenu, le renvoyer
+                if current_content and current_content != last_content:
+                    # Déterminer le nouveau contenu à envoyer
+                    new_content = current_content[len(last_content):]
+                    last_content = current_content
+                    
+                    # Envoyer la mise à jour
+                    yield {
+                        "model": request.model,
+                        "message": {
+                            "role": "assistant",
+                            "content": new_content
+                        },
+                        "done": False
+                    }
+                
+                # Vérifier si la requête est terminée
+                if status == self.queue_manager.STATUS_COMPLETED:
+                    # Requête terminée avec succès
+                    # Envoyer un message final avec done=True
+                    yield {
+                        "model": request.model,
+                        "message": {
+                            "role": "assistant",
+                            "content": ""
+                        },
+                        "done": True,
+                        **{k: v for k, v in result.items() if k not in ["model", "message", "done"]}
+                    }
+                    return
+                elif status == self.queue_manager.STATUS_FAILED:
+                    # Requête échouée
+                    error = queue_request.get("failed_reason", "Erreur inconnue")
+                    yield {
+                        "error": error,
+                        "model": request.model,
+                        "done": True
+                    }
+                    return
+                elif status == self.queue_manager.STATUS_CANCELED:
+                    # Requête annulée
+                    yield {
+                        "error": "Requête annulée",
+                        "model": request.model,
+                        "done": True
+                    }
+                    return
+                
+                # Attendre avant la prochaine vérification
+                time.sleep(poll_interval)
+                total_wait_time += poll_interval
+                
+            # Si on arrive ici, le temps maximum d'attente est dépassé
+            yield {
+                "error": "Délai d'attente dépassé",
+                "model": request.model,
                 "done": True
             }
                 
@@ -371,9 +489,6 @@ class OllamaProxyService:
                 "model": request.model,
                 "done": True
             }
-        finally:
-            if client:
-                client.close()
     
     def embeddings(self, request: EmbeddingsRequest) -> Dict[str, Any]:
         """
