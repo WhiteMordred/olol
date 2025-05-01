@@ -4,7 +4,7 @@
  */
 
 // Fonctions utilitaires
-const OLOL = {
+const OllamaSync = {
     // Couleurs du thème sombre pour les graphiques
     chartColors: {
         primary: '#0d6efd',
@@ -153,7 +153,7 @@ const OLOL = {
                 
                 const autoRefreshTitle = window.I18n ? window.I18n.t('auto_refresh') : 'Actualisation automatique';
                 const autoRefreshMsg = window.I18n ? window.I18n.t('auto_refresh_enabled') : 'L\'actualisation automatique est activée';
-                OLOL.showToast(autoRefreshTitle, autoRefreshMsg, 'info');
+                OllamaSync.showToast(autoRefreshTitle, autoRefreshMsg, 'info');
             } else {
                 // Désactiver l'actualisation automatique
                 const autoOffText = window.I18n ? window.I18n.t('auto_refresh_off') : 'Auto (OFF)';
@@ -176,9 +176,9 @@ const OLOL = {
             
             if ((increment >= 0 && currentValue >= targetValue) || 
                 (increment < 0 && currentValue <= targetValue)) {
-                element.textContent = OLOL.formatNumber(targetValue);
+                element.textContent = OllamaSync.formatNumber(targetValue);
             } else {
-                element.textContent = OLOL.formatNumber(Math.floor(currentValue));
+                element.textContent = OllamaSync.formatNumber(Math.floor(currentValue));
                 requestAnimationFrame(animate);
             }
         };
@@ -191,7 +191,7 @@ const OLOL = {
         if (!ctx) return null;
         
         // Fusionner les options par défaut et personnalisées
-        const chartOptions = {...OLOL.commonChartOptions, ...options};
+        const chartOptions = {...OllamaSync.commonChartOptions, ...options};
         
         return new Chart(ctx, {
             type: 'line',
@@ -199,7 +199,7 @@ const OLOL = {
                 labels: labels,
                 datasets: datasets.map(dataset => ({
                     ...dataset,
-                    borderColor: dataset.borderColor || OLOL.chartColors.primary,
+                    borderColor: dataset.borderColor || OllamaSync.chartColors.primary,
                     backgroundColor: dataset.backgroundColor || 'rgba(13, 110, 253, 0.1)',
                     borderWidth: dataset.borderWidth || 2,
                     pointRadius: dataset.pointRadius || 3,
@@ -216,7 +216,7 @@ const OLOL = {
         if (!ctx) return null;
         
         // Fusionner les options par défaut et personnalisées
-        const chartOptions = {...OLOL.commonChartOptions, ...options};
+        const chartOptions = {...OllamaSync.commonChartOptions, ...options};
         
         return new Chart(ctx, {
             type: 'bar',
@@ -224,7 +224,7 @@ const OLOL = {
                 labels: labels,
                 datasets: datasets.map(dataset => ({
                     ...dataset,
-                    borderColor: dataset.borderColor || OLOL.chartColors.primary,
+                    borderColor: dataset.borderColor || OllamaSync.chartColors.primary,
                     backgroundColor: dataset.backgroundColor || 'rgba(13, 110, 253, 0.7)',
                     borderWidth: dataset.borderWidth || 1,
                     borderRadius: dataset.borderRadius || 4
@@ -240,12 +240,12 @@ const OLOL = {
         
         // Couleurs par défaut du thème sombre si non spécifiées
         const defaultColors = [
-            OLOL.chartColors.primary,
-            OLOL.chartColors.success,
-            OLOL.chartColors.warning,
-            OLOL.chartColors.danger,
-            OLOL.chartColors.info,
-            OLOL.chartColors.secondary
+            OllamaSync.chartColors.primary,
+            OllamaSync.chartColors.success,
+            OllamaSync.chartColors.warning,
+            OllamaSync.chartColors.danger,
+            OllamaSync.chartColors.info,
+            OllamaSync.chartColors.secondary
         ];
         
         // Utiliser les couleurs spécifiées ou les couleurs par défaut
@@ -259,7 +259,7 @@ const OLOL = {
                 legend: {
                     position: 'right',
                     labels: {
-                        color: OLOL.chartColors.text,
+                        color: OllamaSync.chartColors.text,
                         padding: 15,
                         font: {
                             size: 12
@@ -268,9 +268,9 @@ const OLOL = {
                 },
                 tooltip: {
                     backgroundColor: 'rgba(30, 30, 30, 0.9)',
-                    titleColor: OLOL.chartColors.text,
-                    bodyColor: OLOL.chartColors.text,
-                    borderColor: OLOL.chartColors.border,
+                    titleColor: OllamaSync.chartColors.text,
+                    bodyColor: OllamaSync.chartColors.text,
+                    borderColor: OllamaSync.chartColors.border,
                     borderWidth: 1
                 }
             },
@@ -287,7 +287,7 @@ const OLOL = {
                 datasets: [{
                     data: data,
                     backgroundColor: chartColors,
-                    borderColor: OLOL.chartColors.background,
+                    borderColor: OllamaSync.chartColors.background,
                     borderWidth: 2,
                     hoverOffset: 10
                 }]
@@ -376,7 +376,7 @@ const OLOL = {
                         
                         // Afficher un toast de confirmation
                         const message = window.I18n.t('settings.language.changed');
-                        OLOL.showToast(window.I18n.t('settings.language.title'), message, 'success');
+                        OllamaSync.showToast(window.I18n.t('settings.language.title'), message, 'success');
                         
                         // Réactiver le lien
                         this.classList.remove('disabled');
@@ -394,7 +394,7 @@ const OLOL = {
 };
 
 // Exposer la fonction showToast globalement pour le système de traduction
-window.showToast = OLOL.showToast;
+window.showToast = OllamaSync.showToast;
 
 // Initialisation au chargement du document
 document.addEventListener('DOMContentLoaded', function() {
@@ -413,7 +413,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (window.I18n) {
         window.I18n.init().then(() => {
             // Configure le sélecteur de langue
-            OLOL.setupLanguageSwitcher();
+            OllamaSync.setupLanguageSwitcher();
             
             // Traduire la page après chargement
             window.I18n.translatePage();

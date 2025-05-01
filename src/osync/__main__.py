@@ -1,4 +1,4 @@
-"""Main entry point for the OLOL package."""
+"""Main entry point for the OllamaSync package."""
 
 import argparse
 import asyncio
@@ -212,7 +212,7 @@ def main() -> None:
     
     if args.command == "version":
         from . import __version__
-        print(f"OLOL version {__version__}")
+        print(f"OllamaSync version {__version__}")
         return
     
     if args.command is None:

@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 ui_exit_event = threading.Event()
 
 class RichUI:
-    """Rich-based console UI for OLOL proxy with stats and tables."""
+    """Rich-based console UI for OllamaSync proxy with stats and tables."""
     
     def __init__(self, params=None):
         """Initialize the Rich UI.

@@ -1,4 +1,4 @@
-"""Discovery utilities for OLOL servers and proxies."""
+"""Discovery utilities for OllamaSync servers and proxies."""
 
 import json
 import logging
@@ -167,7 +167,7 @@ def register_server(server_info: Dict[str, Any],
 
 
 class DiscoveryService:
-    """Service for automatic discovery of OLOL proxies and servers."""
+    """Service for automatic discovery of OllamaSync proxies and servers."""
     
     def __init__(self, 
                  service_id: Optional[str] = None,

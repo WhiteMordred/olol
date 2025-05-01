@@ -1,4 +1,4 @@
-"""Protocol buffer definitions for OLOL."""
+"""Protocol buffer definitions for OllamaSync."""
 
 # Import the pb2 modules for easy access
 from .. import ollama_pb2, ollama_pb2_grpc

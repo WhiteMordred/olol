@@ -1,4 +1,4 @@
-"""Synchronous client and server implementations for OLOL."""
+"""Synchronous client and server implementations for OllamaSync."""
 
 from .client import OllamaClient
 

@@ -1,4 +1,4 @@
-"""Protocol buffer compilation utilities for OLOL."""
+"""Protocol buffer compilation utilities for OllamaSync."""
 
 import subprocess
 import sys
@@ -121,7 +121,7 @@ def build(args: Optional[List[str]] = None) -> int:
         async_impl_dir.mkdir(parents=True, exist_ok=True)
         # Create an __init__.py file
         with open(async_impl_dir / "__init__.py", "w") as f:
-            f.write('"""Asynchronous client and server implementations for OLOL."""\n\n')
+            f.write('"""Asynchronous client and server implementations for OllamaSync."""\n\n')
     
     # Check if grpclib.plugin.main is available
     try:
@@ -288,7 +288,7 @@ def fix_imports(package_dir: Path) -> None:
     init_file = package_dir / "async_impl" / "__init__.py"
     if not init_file.exists():
         with open(init_file, 'w') as f:
-            f.write('"""Asynchronous client and server implementations for OLOL."""\n\n')
+            f.write('"""Asynchronous client and server implementations for OllamaSync."""\n\n')
         print(f"Created {init_file}")
 
 

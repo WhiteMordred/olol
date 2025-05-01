@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Simple example demonstrating how to use the OLOL library to talk to Ollama."""
+"""Simple example demonstrating how to use the OllamaSync library to talk to Ollama."""
 
 import argparse
 import asyncio
@@ -65,7 +65,7 @@ def parse_args() -> argparse.Namespace:
     Returns:
         Parsed arguments
     """
-    parser = argparse.ArgumentParser(description="OLOL Client Demo")
+    parser = argparse.ArgumentParser(description="OllamaSync Client Demo")
     parser.add_argument("--host", default="localhost", help="Server hostname")
     parser.add_argument("--port", type=int, default=50051, help="Server port")
     parser.add_argument("--model", default="llama2", help="Model name")

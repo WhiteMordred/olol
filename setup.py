@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Setup script for OLOL."""
+"""Setup script for OllamaSync."""
 
 import os
 import subprocess

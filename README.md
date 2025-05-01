@@ -32,7 +32,7 @@ The system consists of these main components:
 
 ### Distributed Inference
 
-OLOL supports distributed inference, which allows you to split large models across multiple servers:
+OllamaSync supports distributed inference, which allows you to split large models across multiple servers:
 
 - **Layer Partitioning**: Automatically splits model layers across available servers
 - **Auto-Detection**: Automatically uses distributed inference for large models (13B+)
@@ -47,7 +47,7 @@ Distributed inference is particularly useful for:
 
 ### Model Quantization
 
-OLOL intelligently handles model quantization:
+OllamaSync intelligently handles model quantization:
 
 - **Smart Quantization**: Automatically selects the best quantization level based on hardware and model size
 - **Compatibility Detection**: Checks if a compatible quantization is already loaded
@@ -56,7 +56,7 @@ OLOL intelligently handles model quantization:
 
 ### Auto-Discovery
 
-OLOL includes an auto-discovery system for zero-configuration clustering:
+OllamaSync includes an auto-discovery system for zero-configuration clustering:
 
 - **Server Auto-Registration**: RPC servers automatically find and register with the proxy
 - **Capability Broadcasting**: Servers advertise their hardware capabilities and device types
@@ -69,7 +69,7 @@ Quantization compatibility rules:
 - `q8_0` (highest quality): Only compatible with q8_0
 - `f16` (unquantized): Only compatible with f16
 
-When requested quantization isn't available, OLOL will:
+When requested quantization isn't available, OllamaSync will:
 1. Try to find a model with compatible (higher-quality) quantization
 2. Try to load the model with the requested quantization
 3. If that fails, load with the best quantization for the available hardware
@@ -463,7 +463,7 @@ osync proxy --help
 
 ### Direct Command Tools
 
-OLOL also provides direct command tools that can be used with `uv run`:
+OllamaSync also provides direct command tools that can be used with `uv run`:
 
 ```bash
 # Start a proxy server
@@ -486,7 +486,7 @@ These command tools accept the same options as their corresponding `osync` comma
 
 Environment variables:
 
-**OLOL configuration:**
+**OllamaSync configuration:**
 - `OLLAMA_SERVERS`: Comma-separated list of gRPC server addresses (default: "localhost:50051")
 - `OLOL_PORT`: HTTP port for the API proxy (default: 8000)
 - `OLOL_LOG_LEVEL`: Set logging level (default: INFO)

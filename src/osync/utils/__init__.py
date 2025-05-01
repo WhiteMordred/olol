@@ -1,1 +1,1 @@
-"""Utility functions and tools for OLOL."""
+"""Utility functions and tools for OllamaSync."""

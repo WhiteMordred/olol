@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Ce document présente la roadmap détaillée pour l'implémentation d'un système de persistance de données basé sur TinyDB dans le projet OLOL. Il décrit les étapes, les dépendances entre les composants et les objectifs à atteindre à chaque phase du développement.
+Ce document présente la roadmap détaillée pour l'implémentation d'un système de persistance de données basé sur TinyDB dans le projet OllamaSync. Il décrit les étapes, les dépendances entre les composants et les objectifs à atteindre à chaque phase du développement.
 
 **Objectifs principaux :**
 - Remplacer les structures en mémoire (verrous, dictionnaires) par une persistance basée sur TinyDB
