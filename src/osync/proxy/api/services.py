@@ -428,7 +428,8 @@ class OllamaProxyService:
         # Ajouter les informations sur les serveurs
         server_addresses = self.cluster_manager.get_server_addresses()
         status.server_count = len(server_addresses)
-        status.server_addresses = server_addresses
+        # Convertir l'ensemble (set) en liste pour permettre la sérialisation JSON
+        status.server_addresses = list(server_addresses)
         
         return status
     
