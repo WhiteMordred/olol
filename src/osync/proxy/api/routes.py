@@ -172,8 +172,8 @@ def status():
         
         logger.debug("Requête pour le statut")
         
-        # Obtenir le statut
-        resp = service.status()
+        # Obtenir le statut en appelant get_status() au lieu de status()
+        resp = service.get_status()
         
         # Retourner la réponse
         return jsonify(resp)
