@@ -38,7 +38,7 @@ def register_api_routes(app: Flask, ollamaproxy_service: OllamaProxyService):
     app.ollamaproxy_service = ollamaproxy_service
     
     # Enregistrer le blueprint
-    app.register_blueprint(api_bp, url_prefix='')
+    app.register_blueprint(api_bp, url_prefix='api')
     
     logger.info("Routes API enregistrées avec succès")
 
