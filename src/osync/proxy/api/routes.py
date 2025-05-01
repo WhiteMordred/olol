@@ -15,7 +15,8 @@ from .models import (
     GenerateRequest, GenerateResponse, 
     ChatRequest, ChatResponse, ChatMessage,
     EmbeddingsRequest, EmbeddingsResponse,
-    ModelInfo, ServerInfo, StatusResponse, ModelsResponse, ServersResponse
+    ModelInfo, ServerInfo, StatusResponse, ModelsResponse, ServersResponse,
+    dict_to_generate_request, dict_to_chat_request, dict_to_embeddings_request
 )
 from .services import OllamaProxyService
 
@@ -57,23 +58,27 @@ def generate():
         
         logger.debug(f"Requête generate pour le modèle: {model}")
         
-        # Créer un objet GenerateRequest
-        req = GenerateRequest.from_dict(req_json)
+        # Créer un objet GenerateRequest en utilisant la fonction utilitaire
+        req = dict_to_generate_request(req_json)
         
-        # Obtenir une réponse en streaming
-        resp = service.generate(req)
-        
-        def generate_stream():
-            """Produit un flux de réponses."""
-            try:
-                for chunk in resp:
-                    yield chunk
-            except Exception as e:
-                logger.error(f"Erreur lors de la génération du stream: {e}")
-                yield json.dumps({"error": str(e), "done": True})
-        
-        # Retourner la réponse en streaming
-        return Response(generate_stream(), content_type='application/x-ndjson')
+        # Si streaming est demandé
+        if req.stream:
+            def generate_stream():
+                """Produit un flux de réponses."""
+                try:
+                    for chunk in service.generate_stream(req):
+                        yield json.dumps(chunk) + '\n'
+                except Exception as e:
+                    logger.error(f"Erreur lors de la génération du stream: {e}")
+                    yield json.dumps({"error": str(e), "done": True}) + '\n'
+            
+            # Retourner la réponse en streaming
+            return Response(generate_stream(), content_type='application/x-ndjson')
+        else:
+            # Obtenir une réponse non-streaming
+            resp = service.generate(req)
+            return jsonify(resp)
+            
     except Exception as e:
         logger.error(f"Erreur dans la route generate: {e}")
         return jsonify({"error": str(e)}), 500
@@ -93,23 +98,27 @@ def chat():
         
         logger.debug(f"Requête chat pour le modèle: {model}")
         
-        # Créer un objet ChatRequest
-        req = ChatRequest.from_dict(req_json)
+        # Créer un objet ChatRequest en utilisant la fonction utilitaire
+        req = dict_to_chat_request(req_json)
         
-        # Obtenir une réponse en streaming
-        resp = service.chat(req)
-        
-        def generate_stream():
-            """Produit un flux de réponses."""
-            try:
-                for chunk in resp:
-                    yield chunk
-            except Exception as e:
-                logger.error(f"Erreur lors de la génération du stream: {e}")
-                yield json.dumps({"error": str(e), "done": True})
-        
-        # Retourner la réponse en streaming
-        return Response(generate_stream(), content_type='application/x-ndjson')
+        # Si streaming est demandé
+        if req.stream:
+            def generate_stream():
+                """Produit un flux de réponses."""
+                try:
+                    for chunk in service.chat_stream(req):
+                        yield json.dumps(chunk) + '\n'
+                except Exception as e:
+                    logger.error(f"Erreur lors de la génération du stream: {e}")
+                    yield json.dumps({"error": str(e), "done": True}) + '\n'
+            
+            # Retourner la réponse en streaming
+            return Response(generate_stream(), content_type='application/x-ndjson')
+        else:
+            # Obtenir une réponse non-streaming
+            resp = service.chat(req)
+            return jsonify(resp)
+            
     except Exception as e:
         logger.error(f"Erreur dans la route chat: {e}")
         return jsonify({"error": str(e)}), 500
@@ -129,8 +138,8 @@ def embeddings():
         
         logger.debug(f"Requête embeddings pour le modèle: {model}")
         
-        # Créer un objet EmbeddingsRequest
-        req = EmbeddingsRequest.from_dict(req_json)
+        # Créer un objet EmbeddingsRequest en utilisant la fonction utilitaire
+        req = dict_to_embeddings_request(req_json)
         
         # Obtenir une réponse
         resp_dict = service.embeddings(req)
