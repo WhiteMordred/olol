@@ -24,13 +24,24 @@ class RPCClient:
         Args:
             server_addresses: List of server addresses in "host:port" format
         """
-        self.server_addresses = server_addresses
+        # Traiter les adresses des serveurs pour séparer celles qui contiennent des virgules
+        processed_addresses = []
+        for address in server_addresses:
+            # Si l'adresse contient des virgules, la diviser en plusieurs adresses
+            if ',' in address:
+                for addr in address.split(','):
+                    if addr.strip():  # Vérifier que l'adresse n'est pas vide
+                        processed_addresses.append(addr.strip())
+            else:
+                processed_addresses.append(address)
+
+        self.server_addresses = processed_addresses
         self.channels = {}
         self.stubs = {}
         self.partitioner = TensorPartitioner()
         
         # Set up connections to all servers
-        for i, address in enumerate(server_addresses):
+        for i, address in enumerate(self.server_addresses):
             try:
                 channel = grpc.insecure_channel(address)
                 self.channels[address] = channel
