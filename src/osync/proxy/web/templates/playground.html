@@ -935,7 +935,11 @@ document.addEventListener('DOMContentLoaded', function() {
         toastEl.classList.remove('success', 'danger', 'warning', 'info');
         toastEl.classList.add(type);
         
-        const toast = new bootstrap.Toast(toastEl);
+        // Configurer le toast avec auto-disparition
+        const toast = new bootstrap.Toast(toastEl, {
+            autohide: true,
+            delay: 5000 // Disparaît après 5 secondes
+        });
         toast.show();
     }
     
