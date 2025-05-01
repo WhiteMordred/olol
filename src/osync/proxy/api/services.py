@@ -14,6 +14,7 @@ from typing import Dict, List, Any, Optional, Generator, Tuple
 from flask import Response, stream_with_context
 from osync.sync.client import OllamaClient
 from osync.proxy.db.database import DatabaseManager
+from osync.proxy.queue.queue import get_queue_manager
 
 from .models import (
     GenerateRequest, GenerateResponse, 
@@ -39,6 +40,8 @@ class OllamaProxyService:
         self.cluster_manager = cluster_manager
         # Initialiser le gestionnaire de base de données
         self.db_manager = DatabaseManager()
+        # Initialiser le gestionnaire de file d'attente
+        self.queue_manager = get_queue_manager()
     
     def get_client_for_model(self, model_name: str) -> Tuple[Optional[OllamaClient], str, int]:
         """
@@ -75,49 +78,68 @@ class OllamaProxyService:
         Returns:
             Un dictionnaire contenant la réponse
         """
-        client, host, port = self.get_client_for_model(request.model)
-        if not client:
+        # Ajouter la requête à la file d'attente
+        request_data = {
+            "model": request.model,
+            "prompt": request.prompt,
+            "options": request.options,
+            "stream": False,  # Non-streaming pour cette méthode
+            "request_type": "generate"
+        }
+        
+        try:
+            # Ajouter à la file d'attente
+            request_id = self.queue_manager.enqueue(request_data)
+            
+            # Si la requête n'utilise pas de streaming, on attend le résultat
+            # On récupère régulièrement le statut de la requête jusqu'à ce qu'elle soit terminée
+            max_wait_time = 60  # Temps maximum d'attente en secondes
+            poll_interval = 0.2  # Intervalle de vérification en secondes
+            total_wait_time = 0
+            
+            while total_wait_time < max_wait_time:
+                # Récupérer l'état actuel de la requête
+                queue_request = self.queue_manager.get_request(request_id)
+                
+                if not queue_request:
+                    return {
+                        "error": "Requête non trouvée dans la file d'attente",
+                        "model": request.model,
+                        "done": True
+                    }
+                
+                # Vérifier si la requête est terminée
+                status = queue_request.get("status")
+                if status == self.queue_manager.STATUS_COMPLETED:
+                    # Requête terminée avec succès
+                    result = queue_request.get("result", {})
+                    return result
+                elif status == self.queue_manager.STATUS_FAILED:
+                    # Requête échouée
+                    error = queue_request.get("failed_reason", "Erreur inconnue")
+                    return {
+                        "error": error,
+                        "model": request.model,
+                        "done": True
+                    }
+                elif status == self.queue_manager.STATUS_CANCELED:
+                    # Requête annulée
+                    return {
+                        "error": "Requête annulée",
+                        "model": request.model,
+                        "done": True
+                    }
+                
+                # Attendre avant la prochaine vérification
+                time.sleep(poll_interval)
+                total_wait_time += poll_interval
+                
+            # Si on arrive ici, le temps maximum d'attente est dépassé
             return {
-                "error": "Aucun serveur disponible pour ce modèle",
+                "error": "Délai d'attente dépassé",
                 "model": request.model,
                 "done": True
             }
-            
-        try:
-            if not request.stream:
-                # Génération non-streaming
-                response_text = ""
-                final_response = None
-                
-                for resp in client.generate(request.model, request.prompt, False, request.options):
-                    final_response = resp
-                    if hasattr(resp, 'response'):
-                        response_text += resp.response
-                
-                # Créer la réponse finale
-                response = {
-                    "model": request.model,
-                    "response": response_text,
-                    "done": True
-                }
-                
-                # Ajouter les métriques si disponibles
-                if final_response:
-                    if hasattr(final_response, 'total_duration'):
-                        response["total_duration"] = final_response.total_duration
-                    if hasattr(final_response, 'load_duration'):
-                        response["load_duration"] = final_response.load_duration
-                    if hasattr(final_response, 'prompt_eval_count'):
-                        response["prompt_eval_count"] = final_response.prompt_eval_count
-                    if hasattr(final_response, 'eval_count'):
-                        response["eval_count"] = final_response.eval_count
-                    if hasattr(final_response, 'eval_duration'):
-                        response["eval_duration"] = final_response.eval_duration
-                
-                return response
-            else:
-                # La génération en streaming sera gérée directement dans la route
-                return {"streaming": True}
                 
         except Exception as e:
             logger.error(f"Erreur lors de la génération: {e}")
@@ -126,9 +148,6 @@ class OllamaProxyService:
                 "model": request.model,
                 "done": True
             }
-        finally:
-            if client:
-                client.close()
     
     def generate_stream(self, request: GenerateRequest) -> Generator[Dict[str, Any], None, None]:
         """
@@ -150,7 +169,8 @@ class OllamaProxyService:
             return
             
         try:
-            # Utiliser directement la méthode generate avec streaming
+            # Pour le streaming, nous utilisons directement le client sans passer par la file d'attente
+            # car la file d'attente ne gère pas bien le streaming pour l'instant
             for resp in client.generate(request.model, request.prompt, True, request.options):
                 response = {
                     "model": request.model,
@@ -205,54 +225,78 @@ class OllamaProxyService:
         Returns:
             Un dictionnaire contenant la réponse
         """
-        client, host, port = self.get_client_for_model(request.model)
-        if not client:
+        # Convertir les messages au format attendu par la file d'attente
+        messages_dict = []
+        for msg in request.messages:
+            msg_dict = {
+                "role": msg.role,
+                "content": msg.content
+            }
+            if msg.images:
+                msg_dict["images"] = msg.images
+            messages_dict.append(msg_dict)
+        
+        # Préparer les données pour la file d'attente
+        request_data = {
+            "model": request.model,
+            "messages": messages_dict,
+            "options": request.options,
+            "stream": False,  # Non-streaming pour cette méthode
+            "request_type": "chat"
+        }
+        
+        try:
+            # Ajouter à la file d'attente
+            request_id = self.queue_manager.enqueue(request_data)
+            
+            # Si la requête n'utilise pas de streaming, on attend le résultat
+            max_wait_time = 60  # Temps maximum d'attente en secondes
+            poll_interval = 0.2  # Intervalle de vérification en secondes
+            total_wait_time = 0
+            
+            while total_wait_time < max_wait_time:
+                # Récupérer l'état actuel de la requête
+                queue_request = self.queue_manager.get_request(request_id)
+                
+                if not queue_request:
+                    return {
+                        "error": "Requête non trouvée dans la file d'attente",
+                        "model": request.model,
+                        "done": True
+                    }
+                
+                # Vérifier si la requête est terminée
+                status = queue_request.get("status")
+                if status == self.queue_manager.STATUS_COMPLETED:
+                    # Requête terminée avec succès
+                    result = queue_request.get("result", {})
+                    return result
+                elif status == self.queue_manager.STATUS_FAILED:
+                    # Requête échouée
+                    error = queue_request.get("failed_reason", "Erreur inconnue")
+                    return {
+                        "error": error,
+                        "model": request.model,
+                        "done": True
+                    }
+                elif status == self.queue_manager.STATUS_CANCELED:
+                    # Requête annulée
+                    return {
+                        "error": "Requête annulée",
+                        "model": request.model,
+                        "done": True
+                    }
+                
+                # Attendre avant la prochaine vérification
+                time.sleep(poll_interval)
+                total_wait_time += poll_interval
+                
+            # Si on arrive ici, le temps maximum d'attente est dépassé
             return {
-                "error": "Aucun serveur disponible pour ce modèle",
+                "error": "Délai d'attente dépassé",
                 "model": request.model,
                 "done": True
             }
-            
-        try:
-            if not request.stream:
-                # Chat non-streaming
-                # Convertir les messages au format attendu par le client
-                messages_dict = []
-                for msg in request.messages:
-                    msg_dict = {
-                        "role": msg.role,
-                        "content": msg.content
-                    }
-                    if msg.images:
-                        msg_dict["images"] = msg.images
-                    messages_dict.append(msg_dict)
-                
-                response = None
-                for resp in client.chat(request.model, messages_dict, False, request.options):
-                    response = resp
-                
-                if response:
-                    # Convertir la réponse au format attendu par l'API
-                    return {
-                        "model": request.model,
-                        "message": {
-                            "role": "assistant",
-                            "content": response.message.content if hasattr(response, 'message') and hasattr(response.message, 'content') else ""
-                        },
-                        "done": True
-                    }
-                else:
-                    return {
-                        "model": request.model,
-                        "message": {
-                            "role": "assistant",
-                            "content": "Pas de réponse du serveur"
-                        },
-                        "done": True
-                    }
-            else:
-                # Le chat en streaming sera géré directement dans la route
-                return {"streaming": True}
                 
         except Exception as e:
             logger.error(f"Erreur lors du chat: {e}")
@@ -261,9 +305,6 @@ class OllamaProxyService:
                 "model": request.model,
                 "done": True
             }
-        finally:
-            if client:
-                client.close()
     
     def chat_stream(self, request: ChatRequest) -> Generator[Dict[str, Any], None, None]:
         """
@@ -285,6 +326,8 @@ class OllamaProxyService:
             return
             
         try:
+            # Pour le streaming, nous utilisons directement le client sans passer par la file d'attente
+            # car la file d'attente ne gère pas bien le streaming pour l'instant
             # Convertir les messages au format attendu par le client
             messages_dict = []
             for msg in request.messages:
@@ -342,43 +385,66 @@ class OllamaProxyService:
         Returns:
             Un dictionnaire contenant la réponse
         """
-        client, host, port = self.get_client_for_model(request.model)
-        if not client:
+        # Ajouter la requête à la file d'attente
+        request_data = {
+            "model": request.model,
+            "prompt": request.prompt,
+            "options": request.options,
+            "request_type": "embeddings"
+        }
+        
+        try:
+            # Ajouter à la file d'attente
+            request_id = self.queue_manager.enqueue(request_data)
+            
+            # Attendre le résultat
+            max_wait_time = 30  # Temps maximum d'attente en secondes (plus court pour les embeddings)
+            poll_interval = 0.1  # Intervalle de vérification en secondes
+            total_wait_time = 0
+            
+            while total_wait_time < max_wait_time:
+                # Récupérer l'état actuel de la requête
+                queue_request = self.queue_manager.get_request(request_id)
+                
+                if not queue_request:
+                    return {
+                        "error": "Requête non trouvée dans la file d'attente",
+                        "model": request.model,
+                        "embedding": []
+                    }
+                
+                # Vérifier si la requête est terminée
+                status = queue_request.get("status")
+                if status == self.queue_manager.STATUS_COMPLETED:
+                    # Requête terminée avec succès
+                    result = queue_request.get("result", {})
+                    return result
+                elif status == self.queue_manager.STATUS_FAILED:
+                    # Requête échouée
+                    error = queue_request.get("failed_reason", "Erreur inconnue")
+                    return {
+                        "error": error,
+                        "model": request.model,
+                        "embedding": []
+                    }
+                elif status == self.queue_manager.STATUS_CANCELED:
+                    # Requête annulée
+                    return {
+                        "error": "Requête annulée",
+                        "model": request.model,
+                        "embedding": []
+                    }
+                
+                # Attendre avant la prochaine vérification
+                time.sleep(poll_interval)
+                total_wait_time += poll_interval
+                
+            # Si on arrive ici, le temps maximum d'attente est dépassé
             return {
-                "error": "Aucun serveur disponible pour ce modèle",
+                "error": "Délai d'attente dépassé",
                 "model": request.model,
                 "embedding": []
             }
-            
-        try:
-            # Définir un timeout court pour éviter le blocage
-            start_time = time.time()
-            max_time = 10  # 10 secondes maximum
-            
-            # Appel à embeddings
-            response = client.embeddings(request.model, request.prompt, request.options)
-            
-            # Vérifier si on a dépassé le temps maximal
-            if time.time() - start_time > max_time:
-                return {
-                    "model": request.model,
-                    "embedding": [],
-                    "error": "Timeout lors de la génération des embeddings"
-                }
-                
-            # Réponse standard
-            if hasattr(response, 'embeddings'):
-                return {
-                    "model": request.model,
-                    "embedding": list(response.embeddings),
-                }
-            else:
-                # En cas de réponse incorrecte
-                return {
-                    "model": request.model,
-                    "embedding": [],
-                    "error": "Format de réponse invalide du serveur"
-                }
                 
         except Exception as e:
             logger.error(f"Erreur lors de la génération des embeddings: {e}")
@@ -387,9 +453,6 @@ class OllamaProxyService:
                 "model": request.model,
                 "embedding": []
             }
-        finally:
-            if client:
-                client.close()
     
     def get_status(self) -> StatusResponse:
         """
