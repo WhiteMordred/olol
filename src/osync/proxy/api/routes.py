@@ -9,7 +9,7 @@ import logging
 import os
 from typing import Dict, Any
 
-from flask import Blueprint, request, jsonify, Response, stream_with_context, Flask
+from flask import Blueprint, request, jsonify, Response, stream_with_context, Flask, current_app
 
 from .models import (
     GenerateRequest, GenerateResponse, 
@@ -48,27 +48,35 @@ def generate():
     """
     Point de terminaison pour générer du texte.
     """
-    service = request.app.ollamaproxy_service
+    service = current_app.ollamaproxy_service
     
-    # Analyser la requête
-    req_json = request.get_json() if request.is_json else {}
-    model = req_json.get('model', '')
-    
-    logger.debug(f"Requête generate pour le modèle: {model}")
-    
-    # Créer un objet GenerateRequest
-    req = GenerateRequest.from_dict(req_json)
-    
-    # Obtenir une réponse en streaming
-    resp = service.generate(req)
-    
-    def generate_stream():
-        """Produit un flux de réponses."""
-        for chunk in resp:
-            yield chunk
-    
-    # Retourner la réponse en streaming
-    return Response(generate_stream(), content_type='application/x-ndjson')
+    try:
+        # Analyser la requête
+        req_json = request.get_json() if request.is_json else {}
+        model = req_json.get('model', '')
+        
+        logger.debug(f"Requête generate pour le modèle: {model}")
+        
+        # Créer un objet GenerateRequest
+        req = GenerateRequest.from_dict(req_json)
+        
+        # Obtenir une réponse en streaming
+        resp = service.generate(req)
+        
+        def generate_stream():
+            """Produit un flux de réponses."""
+            try:
+                for chunk in resp:
+                    yield chunk
+            except Exception as e:
+                logger.error(f"Erreur lors de la génération du stream: {e}")
+                yield json.dumps({"error": str(e), "done": True})
+        
+        # Retourner la réponse en streaming
+        return Response(generate_stream(), content_type='application/x-ndjson')
+    except Exception as e:
+        logger.error(f"Erreur dans la route generate: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @api_bp.route('/v1/chat', methods=['POST'])
@@ -76,27 +84,35 @@ def chat():
     """
     Point de terminaison pour le chat.
     """
-    service = request.app.ollamaproxy_service
-    
-    # Analyser la requête
-    req_json = request.get_json() if request.is_json else {}
-    model = req_json.get('model', '')
-    
-    logger.debug(f"Requête chat pour le modèle: {model}")
-    
-    # Créer un objet ChatRequest
-    req = ChatRequest.from_dict(req_json)
-    
-    # Obtenir une réponse en streaming
-    resp = service.chat(req)
-    
-    def generate_stream():
-        """Produit un flux de réponses."""
-        for chunk in resp:
-            yield chunk
-    
-    # Retourner la réponse en streaming
-    return Response(generate_stream(), content_type='application/x-ndjson')
+    try:
+        service = current_app.ollamaproxy_service
+        
+        # Analyser la requête
+        req_json = request.get_json() if request.is_json else {}
+        model = req_json.get('model', '')
+        
+        logger.debug(f"Requête chat pour le modèle: {model}")
+        
+        # Créer un objet ChatRequest
+        req = ChatRequest.from_dict(req_json)
+        
+        # Obtenir une réponse en streaming
+        resp = service.chat(req)
+        
+        def generate_stream():
+            """Produit un flux de réponses."""
+            try:
+                for chunk in resp:
+                    yield chunk
+            except Exception as e:
+                logger.error(f"Erreur lors de la génération du stream: {e}")
+                yield json.dumps({"error": str(e), "done": True})
+        
+        # Retourner la réponse en streaming
+        return Response(generate_stream(), content_type='application/x-ndjson')
+    except Exception as e:
+        logger.error(f"Erreur dans la route chat: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @api_bp.route('/v1/embeddings', methods=['POST'])
@@ -104,22 +120,26 @@ def embeddings():
     """
     Point de terminaison pour obtenir des embeddings.
     """
-    service = request.app.ollamaproxy_service
-    
-    # Analyser la requête
-    req_json = request.get_json() if request.is_json else {}
-    model = req_json.get('model', '')
-    
-    logger.debug(f"Requête embeddings pour le modèle: {model}")
-    
-    # Créer un objet EmbeddingsRequest
-    req = EmbeddingsRequest.from_dict(req_json)
-    
-    # Obtenir une réponse
-    resp_dict = service.embeddings(req)
-    
-    # Retourner la réponse
-    return jsonify(resp_dict)
+    try:
+        service = current_app.ollamaproxy_service
+        
+        # Analyser la requête
+        req_json = request.get_json() if request.is_json else {}
+        model = req_json.get('model', '')
+        
+        logger.debug(f"Requête embeddings pour le modèle: {model}")
+        
+        # Créer un objet EmbeddingsRequest
+        req = EmbeddingsRequest.from_dict(req_json)
+        
+        # Obtenir une réponse
+        resp_dict = service.embeddings(req)
+        
+        # Retourner la réponse
+        return jsonify(resp_dict)
+    except Exception as e:
+        logger.error(f"Erreur dans la route embeddings: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @api_bp.route('/v1/models', methods=['GET'])
@@ -127,15 +147,19 @@ def models():
     """
     Point de terminaison pour lister les modèles disponibles.
     """
-    service = request.app.ollamaproxy_service
-    
-    logger.debug("Requête pour lister les modèles")
-    
-    # Obtenir les modèles
-    resp = service.models()
-    
-    # Retourner la réponse
-    return jsonify(resp)
+    try:
+        service = current_app.ollamaproxy_service
+        
+        logger.debug("Requête pour lister les modèles")
+        
+        # Obtenir les modèles
+        resp = service.models()
+        
+        # Retourner la réponse
+        return jsonify(resp)
+    except Exception as e:
+        logger.error(f"Erreur dans la route models: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @api_bp.route('/v1/status', methods=['GET'])
@@ -143,15 +167,19 @@ def status():
     """
     Point de terminaison pour vérifier le statut du proxy.
     """
-    service = request.app.ollamaproxy_service
-    
-    logger.debug("Requête pour le statut")
-    
-    # Obtenir le statut
-    resp = service.status()
-    
-    # Retourner la réponse
-    return jsonify(resp)
+    try:
+        service = current_app.ollamaproxy_service
+        
+        logger.debug("Requête pour le statut")
+        
+        # Obtenir le statut
+        resp = service.status()
+        
+        # Retourner la réponse
+        return jsonify(resp)
+    except Exception as e:
+        logger.error(f"Erreur dans la route status: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @api_bp.route('/v1/servers', methods=['GET'])
@@ -159,17 +187,20 @@ def servers():
     """
     Point de terminaison pour lister les serveurs disponibles.
     """
-    service = request.app.ollamaproxy_service
-    
-    logger.debug("Requête pour lister les serveurs")
-    
-    # Obtenir les serveurs
-    resp = service.servers()
-    
-    # Retourner la réponse
-    return jsonify(resp)
+    try:
+        service = current_app.ollamaproxy_service
+        
+        logger.debug("Requête pour lister les serveurs")
+        
+        # Obtenir les serveurs
+        resp = service.servers()
+        
+        # Retourner la réponse
+        return jsonify(resp)
+    except Exception as e:
+        logger.error(f"Erreur dans la route servers: {e}")
+        return jsonify({"error": str(e)}), 500
 
-# Nouvelles routes pour les statistiques persistantes
 
 @api_bp.route('/v1/stats/history', methods=['GET'])
 def stats_history():
@@ -183,7 +214,7 @@ def stats_history():
     Returns:
         Un JSON contenant l'historique des statistiques
     """
-    service = request.app.ollamaproxy_service
+    service = current_app.ollamaproxy_service
     
     period = request.args.get('period', 'daily')
     days = int(request.args.get('days', 7))
@@ -209,7 +240,7 @@ def stats_aggregate():
     Returns:
         Un JSON contenant les statistiques agrégées
     """
-    service = request.app.ollamaproxy_service
+    service = current_app.ollamaproxy_service
     
     period = request.args.get('period', 'daily')
     days = int(request.args.get('days', 30))
@@ -234,7 +265,7 @@ def models_history():
     Returns:
         Un JSON contenant l'historique d'utilisation des modèles
     """
-    service = request.app.ollamaproxy_service
+    service = current_app.ollamaproxy_service
     
     days = int(request.args.get('days', 30))
     
@@ -259,7 +290,7 @@ def model_stats(model_name):
     Returns:
         Un JSON contenant les statistiques du modèle
     """
-    service = request.app.ollamaproxy_service
+    service = current_app.ollamaproxy_service
     
     days = int(request.args.get('days', 30))
     
@@ -284,7 +315,7 @@ def health_history():
     Returns:
         Un JSON contenant l'historique de santé
     """
-    service = request.app.ollamaproxy_service
+    service = current_app.ollamaproxy_service
     
     days = int(request.args.get('days', 30))
     period = request.args.get('period', 'daily')
@@ -310,7 +341,7 @@ def servers_stats():
     Returns:
         Un JSON contenant les statistiques des serveurs
     """
-    service = request.app.ollamaproxy_service
+    service = current_app.ollamaproxy_service
     
     days = int(request.args.get('days', 7))
     period = request.args.get('period', 'daily')
@@ -335,7 +366,7 @@ def cleanup_data():
     Returns:
         Un JSON contenant le résultat du nettoyage
     """
-    service = request.app.ollamaproxy_service
+    service = current_app.ollamaproxy_service
     
     req_json = request.get_json() if request.is_json else {}
     days_to_keep = req_json.get('days_to_keep', 90)
@@ -360,7 +391,7 @@ def force_aggregation():
     Returns:
         Un JSON contenant le résultat de l'agrégation
     """
-    service = request.app.ollamaproxy_service
+    service = current_app.ollamaproxy_service
     
     req_json = request.get_json() if request.is_json else {}
     period = req_json.get('period', 'hourly')
