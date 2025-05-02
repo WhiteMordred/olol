@@ -3,9 +3,12 @@
 import threading
 import time
 import logging
+import sys
+import os
 from typing import Dict, Any, Optional, List, Deque
 from collections import deque
-import os
+import select
+from io import StringIO
 
 # Import Rich components
 from rich.live import Live
@@ -27,47 +30,111 @@ from .db.sync_manager import get_sync_manager
 from .cluster.registry import get_model_registry
 from .queue.queue import get_queue_manager
 
-# Set up logging
-# Créer un logger specifique pour Rich
-console = Console(stderr=True)
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(message)s",
-    datefmt="[%X]",
-    handlers=[RichHandler(console=console, rich_tracebacks=True)]
-)
-logger = logging.getLogger(__name__)
-
 # UI state
 ui_exit_event = threading.Event()
 
+# Stream for capturing stderr and stdout
+class StreamCapture:
+    def __init__(self, maxlen=500):
+        self.buffer = deque(maxlen=maxlen)
+        self.old_stderr = None
+        self.old_stdout = None
+        self.active = False
+    
+    def write(self, text):
+        # Forward to original stream
+        if self.old_stderr:
+            self.old_stderr.write(text)
+            self.old_stderr.flush()
+        
+        # Don't capture empty lines
+        if text and not text.isspace():
+            self.buffer.append(text)
+    
+    def flush(self):
+        if self.old_stderr:
+            self.old_stderr.flush()
+    
+    def start_capture(self):
+        if not self.active:
+            self.old_stderr = sys.stderr
+            self.old_stdout = sys.stdout
+            sys.stderr = self
+            sys.stdout = self
+            self.active = True
+    
+    def stop_capture(self):
+        if self.active:
+            sys.stderr = self.old_stderr
+            sys.stdout = self.old_stdout
+            self.active = False
+    
+    def get_recent_output(self, n=20):
+        return list(self.buffer)[-n:]
+
+# Set up stream capture
+stream_capture = StreamCapture(maxlen=1000)
+
 # Créer un gestionnaire de logs pour capturer tous les messages
 class LogCapture(logging.Handler):
-    def __init__(self, level=logging.NOTSET, max_lines=200):
+    def __init__(self, level=logging.NOTSET, max_lines=500):
         super().__init__(level)
         self.log_messages = deque(maxlen=max_lines)
         self.formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+        self.debug_logs = deque(maxlen=max_lines)  # Logs de niveau DEBUG uniquement
+        self.info_logs = deque(maxlen=max_lines)   # Logs de niveau INFO uniquement
+        self.error_logs = deque(maxlen=max_lines)  # Logs de niveau WARNING, ERROR, CRITICAL
     
     def emit(self, record):
         # Formatter le message et l'ajouter à notre deque
         try:
             log_entry = self.formatter.format(record)
-            # Ajouter la couleur selon le niveau de log
-            if record.levelno >= logging.ERROR:
-                log_entry = f"[bold red]{log_entry}[/bold red]"
-            elif record.levelno >= logging.WARNING:
-                log_entry = f"[yellow]{log_entry}[/yellow]"
-            elif record.levelno >= logging.DEBUG:
-                log_entry = f"[dim]{log_entry}[/dim]"
             
-            self.log_messages.append(log_entry)
+            # Ajouter la couleur selon le niveau de log
+            formatted_entry = log_entry
+            if record.levelno >= logging.ERROR:
+                formatted_entry = f"[bold red]{log_entry}[/bold red]"
+            elif record.levelno >= logging.WARNING:
+                formatted_entry = f"[yellow]{log_entry}[/yellow]"
+            elif record.levelno >= logging.DEBUG:
+                formatted_entry = f"[dim]{log_entry}[/dim]"
+                
+            # Ajouter à la liste générale
+            self.log_messages.append(formatted_entry)
+            
+            # Ajouter aussi à la liste spécifique en fonction du niveau
+            if record.levelno >= logging.ERROR:
+                self.error_logs.append(formatted_entry)
+            elif record.levelno >= logging.INFO:
+                self.info_logs.append(formatted_entry)
+            elif record.levelno >= logging.DEBUG:
+                self.debug_logs.append(formatted_entry)
+                
         except Exception:
             self.handleError(record)
 
-# Installer le gestionnaire de logs
-log_capture = LogCapture(max_lines=200)
+# Configurer le logging pour capturer tous les logs
+log_capture = LogCapture(max_lines=500)
+
+# Console Rich pour les logs
+rich_console = Console(stderr=True)
+
+# Configuration du logging
+logging.basicConfig(
+    level=logging.DEBUG,  # Capturer tous les niveaux de logs
+    format="%(message)s",
+    handlers=[
+        RichHandler(console=rich_console, rich_tracebacks=True, markup=True),
+        log_capture  # Notre gestionnaire personnalisé
+    ]
+)
+logger = logging.getLogger(__name__)
+
+# S'assurer que les handlers sont bien configurés pour le root logger
 root_logger = logging.getLogger()
-root_logger.addHandler(log_capture)
+root_logger.setLevel(logging.DEBUG)  # Capturer tous les logs
+if not any(isinstance(h, LogCapture) for h in root_logger.handlers):
+    root_logger.addHandler(log_capture)
 
 class RichUI:
     """Rich-based console UI for OllamaSync proxy with stats and tables."""
@@ -78,23 +145,27 @@ class RichUI:
         Args:
             params: Dictionary of parameters controlling UI behavior
         """
+        # Commencer à capturer les flux de sortie standard
+        stream_capture.start_capture()
+        
         # Create Rich console
         self.console = Console()
         
         # Status messages
         self.status_messages = []
-        self.max_status_messages = 30  # Augmenté de 15 à 30
+        self.max_status_messages = 50  # Augmenté pour conserver plus de messages
         
         # Requests log
-        self.request_logs = deque(maxlen=50)  # Pour stocker les requêtes récentes
+        self.request_logs = deque(maxlen=100)  # Pour stocker les requêtes récentes
         
         # Interface mode
         self.show_logs = False  # Par défaut, on montre l'interface normale
         self.show_requests = False  # Par défaut, on ne montre pas la liste des requêtes
+        self.log_level = "all"  # Options: "all", "debug", "info", "error"
         
         # Last refresh time
         self.last_update = 0
-        self.update_interval = 0.5  # Augmenté de 0.2 à 0.5 secondes
+        self.update_interval = 0.5  # secondes
         
         # Layout elements
         self.layout = self._make_layout()
@@ -111,8 +182,8 @@ class RichUI:
         
         # Add first status message
         self.add_status_message("Rich Console UI started")
-        self.add_status_message("Connected to TinyDB database")
-        self.add_status_message("Press 'l' to toggle logs display, 'r' for requests, 'q' to exit")
+        self.add_status_message("Connected to database")
+        self.add_status_message("Press 'l' to toggle logs | 'd' for debug logs | 'r' for requests | 'q' to exit")
         
         # Keyboard handler thread
         self.keyboard_thread = None
@@ -138,13 +209,14 @@ class RichUI:
         # Split left column
         layout["left"].split(
             Layout(name="stats", size=7),
-            Layout(name="servers", ratio=1)
+            Layout(name="servers", ratio=1),
+            Layout(name="db_sync", size=8 if self.debug else 0)  # Zone dédiée aux infos de sync DB
         )
         
         # Split right column
         layout["right"].split(
             Layout(name="status_messages", ratio=1),
-            Layout(name="logs_or_models", ratio=1)  # Cette zone affichera soit les logs soit les modèles
+            Layout(name="logs_area", ratio=2)  # Zone principale pour les logs
         )
         
         return layout
@@ -183,9 +255,18 @@ class RichUI:
         spinner_text = "•"
         
         # Ajouter une indication sur le mode d'affichage actuel
-        mode_indicator = "[bold yellow]MODE LOGS[/bold yellow]" if self.show_logs else \
-                       "[bold cyan]MODE REQUÊTES[/bold cyan]" if self.show_requests else \
-                       "[bold green]MODE NORMAL[/bold green]"
+        mode_indicator = ""
+        if self.show_logs:
+            if self.log_level == "debug":
+                mode_indicator = "[bold yellow]MODE DEBUG LOGS[/bold yellow]"
+            elif self.log_level == "error":
+                mode_indicator = "[bold red]MODE ERROR LOGS[/bold red]"
+            else:
+                mode_indicator = "[bold blue]MODE LOGS[/bold blue]"
+        elif self.show_requests:
+            mode_indicator = "[bold cyan]MODE REQUÊTES[/bold cyan]"
+        else:
+            mode_indicator = "[bold green]MODE NORMAL[/bold green]"
         
         grid = Table.grid(expand=True)
         grid.add_column(justify="left", ratio=1)
@@ -342,6 +423,80 @@ class RichUI:
             logger.exception("Error creating servers panel")
             return Panel(f"Error accessing servers: {str(e)}", title="Servers", border_style="red")
     
+    def _create_db_sync_panel(self) -> Panel:
+        """Create panel with database synchronization information."""
+        try:
+            # Récupérer des infos de synchronisation de la base de données
+            sync_stats = {}
+            try:
+                sync_stats = self.sync_manager.get_sync_stats()
+            except:
+                sync_stats = {
+                    "last_sync": time.time(),
+                    "ram_items": 0,
+                    "db_items": 0,
+                    "sync_interval": 0
+                }
+            
+            # Création du tableau de synchronisation
+            table = Table(box=box.SIMPLE, expand=True)
+            table.add_column("Collection", style="cyan")
+            table.add_column("RAM", justify="right")
+            table.add_column("DB", justify="right")
+            table.add_column("Status", justify="center")
+            
+            # Ajouter des lignes pour différentes collections
+            for collection_name, stats in sync_stats.get("collections", {}).items():
+                ram_count = stats.get("ram_count", 0)
+                db_count = stats.get("db_count", 0)
+                status = "[green]✓[/green]" if ram_count == db_count else "[yellow]⚠[/yellow]"
+                
+                table.add_row(
+                    collection_name,
+                    str(ram_count),
+                    str(db_count),
+                    status
+                )
+            
+            # Si pas de collections spécifiques, ajouter des statistiques générales
+            if not sync_stats.get("collections"):
+                ram_items = sync_stats.get("ram_items", 0)
+                db_items = sync_stats.get("db_items", 0)
+                
+                table.add_row(
+                    "Total",
+                    str(ram_items),
+                    str(db_items),
+                    "[green]✓[/green]" if ram_items == db_items else "[yellow]⚠[/yellow]"
+                )
+            
+            # Ajouter des infos sur la dernière synchronisation
+            last_sync = sync_stats.get("last_sync", 0)
+            sync_interval = sync_stats.get("sync_interval", 0)
+            
+            # Formater le temps écoulé depuis la dernière synchronisation
+            time_since_sync = time.time() - last_sync
+            if time_since_sync < 60:
+                time_str = f"{int(time_since_sync)}s ago"
+            else:
+                time_str = f"{int(time_since_sync / 60)}m ago"
+            
+            footer = Text.from_markup(f"Last sync: [cyan]{time_str}[/cyan] | Interval: {sync_interval}s")
+            
+            return Panel(
+                Table.grid(expand=True)
+                .add_column()
+                .add_row(table)
+                .add_row(footer),
+                title="[bold]Database Sync[/bold]",
+                border_style="yellow",
+                box=box.ROUNDED
+            )
+            
+        except Exception as e:
+            logger.debug(f"Error creating DB sync panel: {str(e)}")
+            return Panel("Error fetching sync info", title="DB Sync", border_style="red")
+    
     def _create_models_panel(self) -> Panel:
         """Create models panel with model availability from registry."""
         try:
@@ -419,27 +574,51 @@ class RichUI:
             return Panel("No status messages", title="Status", border_style="green")
         
         # Show the most recent messages
-        # Afficher plus de messages quand on est en mode logs (20 au lieu de 10)
-        visible_count = 20 if self.show_logs else 10
+        visible_count = 15
         visible_messages = self.status_messages[-visible_count:] if len(self.status_messages) > visible_count else self.status_messages
         
         text = "\n".join(visible_messages)
-        return Panel(Text.from_markup(text), title="[bold]Status Messages[/bold]", border_style="green", box=box.ROUNDED)
+        return Panel(Text.from_markup(text), title=f"[bold]Status Messages[/bold] ({len(self.status_messages)} total)", border_style="green", box=box.ROUNDED)
     
     def _create_logs_panel(self) -> Panel:
         """Create logs panel with captured log messages."""
-        if not log_capture.log_messages:
-            return Panel("No log messages captured yet.", title="Logs", border_style="yellow")
+        # Choisir les logs en fonction du niveau sélectionné
+        logs_to_show = []
         
-        # Calculer combien de logs on peut afficher en fonction de la hauteur disponible
-        # Estimation de 20 lignes disponibles, mais cela peut varier
-        visible_logs = list(log_capture.log_messages)[-20:]
+        if self.log_level == "debug":
+            logs_to_show = list(log_capture.debug_logs)
+            title = "[bold yellow]DEBUG Logs[/bold yellow]"
+            style = "yellow"
+        elif self.log_level == "error":
+            logs_to_show = list(log_capture.error_logs)
+            title = "[bold red]ERROR Logs[/bold red]"
+            style = "red"
+        else:
+            # Tous les logs (mais limités aux 30 plus récents)
+            logs_to_show = list(log_capture.log_messages)
+            title = "[bold]All Logs[/bold]"
+            style = "blue"
+        
+        if not logs_to_show:
+            return Panel(f"No {self.log_level} logs captured yet.", title=title, border_style=style)
+        
+        # Obtenir les logs récents (basé sur la taille d'écran estimée)
+        visible_logs = logs_to_show[-25:] if len(logs_to_show) > 25 else logs_to_show
+        
+        # Ajouter les sorties capturées de stdout/stderr
+        stdout_logs = stream_capture.get_recent_output(5)
+        if stdout_logs:
+            if visible_logs:
+                visible_logs.append("")
+                visible_logs.append("[bold magenta]--- Standard Output ---[/bold magenta]")
+            for line in stdout_logs:
+                visible_logs.append(line.rstrip())
         
         text = "\n".join(visible_logs)
         return Panel(
             Text.from_markup(text),
-            title=f"[bold]Logs[/bold] ({len(log_capture.log_messages)} captured)",
-            border_style="yellow",
+            title=f"{title} ({len(logs_to_show)} captured)",
+            border_style=style,
             box=box.ROUNDED
         )
         
@@ -494,7 +673,7 @@ class RichUI:
     
     def _create_footer(self) -> Panel:
         """Create footer panel with help text."""
-        footer_text = "[bold]Press 'l' to toggle logs | 'r' to toggle requests | 'q' to exit[/bold]"
+        footer_text = "[bold]Press 'l' to toggle logs | 'd' for debug logs | 'e' for error logs | 'r' for requests | 'q' to exit[/bold]"
         if self.debug:
             footer_text += " [red][DEBUG MODE][/red]"
         elif self.verbose:
@@ -509,6 +688,9 @@ class RichUI:
         except Exception:
             pass
             
+        # Ajouter le nombre de logs capturés
+        footer_text += f" | Logs: {len(log_capture.log_messages)} (Debug: {len(log_capture.debug_logs)}, Error: {len(log_capture.error_logs)})"
+            
         return Panel(Text.from_markup(footer_text), border_style="blue", box=box.ROUNDED)
     
     def _generate_layout(self) -> Layout:
@@ -522,18 +704,26 @@ class RichUI:
             self.layout["header"].update(self._create_header(stats))
             self.layout["stats"].update(self._create_stats_panel(stats))
             self.layout["servers"].update(self._create_servers_panel())
+            
+            # Ajouter le panneau de sync DB en mode debug
+            if self.debug:
+                self.layout["db_sync"].update(self._create_db_sync_panel())
+                self.layout["db_sync"].visible = True
+            else:
+                self.layout["db_sync"].visible = False
+            
             self.layout["status_messages"].update(self._create_status_panel())
             
-            # Choisir ce qu'on affiche dans la zone logs_or_models en fonction du mode
-            if self.show_logs:
-                # Mode logs : afficher les logs de debug
-                self.layout["logs_or_models"].update(self._create_logs_panel())
+            # Choisir ce qu'on affiche dans la zone logs_area en fonction du mode
+            if self.show_logs or self.debug:
+                # Mode logs : afficher les logs
+                self.layout["logs_area"].update(self._create_logs_panel())
             elif self.show_requests:
                 # Mode requêtes : afficher les requêtes récentes
-                self.layout["logs_or_models"].update(self._create_requests_panel())
+                self.layout["logs_area"].update(self._create_requests_panel())
             else:
                 # Mode normal : afficher les modèles
-                self.layout["logs_or_models"].update(self._create_models_panel())
+                self.layout["logs_area"].update(self._create_models_panel())
                 
             self.layout["footer"].update(self._create_footer())
             
@@ -573,10 +763,21 @@ class RichUI:
                         elif key == 'l':  # Toggle logs display
                             self.show_logs = not self.show_logs
                             if self.show_logs:
+                                self.log_level = "all"  # Afficher tous les logs par défaut
                                 self.show_requests = False  # Désactiver mode requêtes
-                                self.add_status_message("Switched to LOGS mode")
+                                self.add_status_message("Switched to LOGS mode (all levels)")
                             else:
                                 self.add_status_message("Switched to NORMAL mode")
+                        elif key == 'd':  # Activer les logs de debug
+                            self.show_logs = True
+                            self.log_level = "debug"
+                            self.show_requests = False
+                            self.add_status_message("Switched to DEBUG logs mode")
+                        elif key == 'e':  # Activer les logs d'erreur
+                            self.show_logs = True
+                            self.log_level = "error"
+                            self.show_requests = False
+                            self.add_status_message("Switched to ERROR logs mode")
                         elif key == 'r':  # Toggle requests display
                             self.show_requests = not self.show_requests
                             if self.show_requests:
@@ -602,12 +803,15 @@ class RichUI:
             # Ajouter un délai initial pour permettre au cluster de s'initialiser
             time.sleep(1.0)
             
-            # Import select ici pour éviter des erreurs d'import sur Windows
-            import select
-            
             # Démarrer le thread de surveillance du clavier
             self.keyboard_thread = threading.Thread(target=self._keyboard_monitor, daemon=True)
             self.keyboard_thread.start()
+            
+            # Si on est en mode debug, activer automatiquement l'affichage des logs
+            if self.debug:
+                self.show_logs = True
+                self.log_level = "debug"
+                self.add_status_message("Debug mode: logs display activated automatically")
             
             # Run the UI with live updates - réduction du taux de rafraîchissement pour éviter les effets de glitch
             with Live(self._generate_layout(), refresh_per_second=2, screen=True) as live:
@@ -626,17 +830,16 @@ class RichUI:
                         self.add_status_message(f"UI update error: {str(e)}")
                     
                     # Augmenter le délai pour réduire l'utilisation du CPU et les glitches
-                    time.sleep(0.5)  # Augmenté de 0.25 à 0.5
-        except ImportError:
-            logger.error("Required module 'select' not available")
-            # Fallback to a simpler UI without keyboard control
-            self._start_simple()
+                    time.sleep(0.5)
         except KeyboardInterrupt:
             # Handle Ctrl+C gracefully
             ui_exit_event.set()
         except Exception as e:
             logger.error(f"UI error: {str(e)}")
             ui_exit_event.set()
+        finally:
+            # Arrêter la capture de flux
+            stream_capture.stop_capture()
             
     def _start_simple(self):
         """Start a simpler version of the UI without keyboard monitoring."""
@@ -653,6 +856,9 @@ class RichUI:
             time.sleep(0.5)
         except KeyboardInterrupt:
             ui_exit_event.set()
+        finally:
+            # Arrêter la capture de flux
+            stream_capture.stop_capture()
 
 
 def run_console_ui(params=None):
