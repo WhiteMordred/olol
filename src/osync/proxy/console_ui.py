@@ -55,6 +55,21 @@ class StreamCapture:
         if self.old_stderr:
             self.old_stderr.flush()
     
+    # Ajouter des méthodes nécessaires pour un objet "file-like"
+    def isatty(self):
+        return self.old_stderr.isatty() if self.old_stderr else False
+        
+    def fileno(self):
+        return self.old_stderr.fileno() if self.old_stderr else None
+    
+    # Cette méthode est cruciale pour Flask/Click
+    def __getattr__(self, name):
+        # Déléguer tous les autres attributs au flux d'origine
+        if self.old_stderr:
+            return getattr(self.old_stderr, name)
+        else:
+            raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
+    
     def start_capture(self):
         if not self.active:
             self.old_stderr = sys.stderr
